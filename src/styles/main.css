@@ -161,7 +161,7 @@ body.has-touch .touch { display: block; }
 .hud[data-mode="browse"] [data-when="browse"], .hud[data-mode="explore"] [data-when="explore"] { display: inline-flex; }
 .hud[data-mode="browse"] .help[data-when="browse"], .hud[data-mode="explore"] .help[data-when="explore"] { display: block; }
 body.has-touch .hud .help { display: none !important; }
-.mode-bar { position: absolute; right: 16px; bottom: calc(14px + var(--safe-b)); display: flex; gap: 8px; pointer-events: none; }
+.mode-bar { position: absolute; right: 16px; bottom: calc(68px + var(--safe-b)); /* clear of the hosting badge in the bottom-right corner */ display: flex; gap: 8px; pointer-events: none; }
 .mode-bar > * { pointer-events: auto; align-items: center; gap: 8px; }
 .mode-bar .btn.primary { padding: 12px 22px; font-size: 16px; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 .mode-bar .exit .key { width: auto; height: 22px; padding: 0 6px; font-size: 12px; }
@@ -180,6 +180,7 @@ body.has-touch .mode-bar { bottom: auto; top: calc(14px + var(--safe-t)); right:
 body.has-touch .mode-bar .exit .key { display: none; }
 @media (max-width: 640px) {
   .guide { top: calc(180px + var(--safe-t)); }
+  .toast { top: calc(176px + var(--safe-t)); width: calc(100% - 32px); text-align: center; white-space: normal; }
   body.has-touch .mode-bar { top: auto; bottom: calc(160px + var(--safe-b)); left: auto; right: 16px; transform: none; }
   .help { white-space: normal; width: calc(100% - 32px); text-align: center; bottom: calc(76px + var(--safe-b)); }
 }
