@@ -7,3 +7,22 @@ shots/
 /assets/models/pilgrim-avatar.glb
 # Assets restored from assets.lock.json
 /assets/share/favicon.png
+# Secrets and local environment (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+# Logs, caches and OS/editor files
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.vite/
+coverage/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
