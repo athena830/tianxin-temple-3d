@@ -5,7 +5,7 @@
  * The starter ships no audio files: SFX are synthesized and the music is a generative ambient
  * pad. To use recorded assets, `load(url)` an AudioBuffer and `playBuffer()` it on either bus.
  */
-export type Sfx = 'pickup' | 'jump' | 'land' | 'hurt' | 'ui' | 'win' | 'lose' | 'dash'
+export type Sfx = 'pickup' | 'jump' | 'land' | 'hurt' | 'ui' | 'win' | 'lose' | 'dash' | 'bell' | 'woodfish' | 'coin' | 'chime'
 
 export class Audio {
   readonly ctx: AudioContext
@@ -79,6 +79,10 @@ export class Audio {
       case 'ui': tone(660, 700, 0.06, 'triangle', 0.18); break
       case 'dash': tone(500, 180, 0.18, 'sawtooth', 0.1); break
       case 'win': [523, 659, 784, 1047].forEach((f, i) => tone(f, f * 1.01, 0.3, 'triangle', 0.25, i * 0.11)); break
+      case 'bell': [196, 392, 588, 785].forEach((f, i) => tone(f, f * 0.995, 3.2 - i * 0.5, 'sine', 0.3 / (i + 1))); break
+      case 'woodfish': tone(720, 380, 0.09, 'triangle', 0.45); tone(1450, 900, 0.05, 'sine', 0.15); break
+      case 'coin': tone(2100, 2000, 0.25, 'sine', 0.2); tone(2800, 2700, 0.2, 'sine', 0.12, 0.08); tone(300, 120, 0.35, 'sine', 0.12, 0.45); break
+      case 'chime': [659, 880, 1175].forEach((f, i) => tone(f, f, 1.1, 'sine', 0.16, i * 0.14)); break
       case 'lose': [392, 330, 262].forEach((f, i) => tone(f, f * 0.98, 0.38, 'sine', 0.25, i * 0.16)); break
     }
   }

@@ -23,8 +23,8 @@ export const DEFAULT_CONFIG = {
   player: {
     radius: 0.42,
     halfHeight: 0.5,
-    walkSpeed: 7,
-    sprintSpeed: 11,
+    walkSpeed: 3.8,
+    sprintSpeed: 6.5,
     acceleration: 60,
     airControl: 0.45,
     jumpSpeed: 10.5,

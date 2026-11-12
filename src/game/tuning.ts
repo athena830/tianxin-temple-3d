@@ -18,18 +18,9 @@ function number<S extends keyof typeof CONFIG>(section: S, key: keyof typeof CON
     integrity: section === 'camera' ? 'COSMETIC' : 'GAMEPLAY' }), boundary,
     read: () => values[key], write: value => { values[key] = value } })
 }
-number('player', 'walkSpeed', 'Walking speed', 1, 14, 0.5, 'm/s')
-number('player', 'sprintSpeed', 'Sprint speed', 1, 20, 0.5, 'm/s')
-number('player', 'acceleration', 'Acceleration', 12, 120, 1, '')
-number('player', 'airControl', 'Air control', 0, 1, 0.05, '')
-number('player', 'jumpSpeed', 'Jump strength', 4, 16, 0.5, 'm/s', 'jump')
-number('player', 'dashSpeed', 'Dash speed', 8, 30, 1, 'm/s', 'dash')
-number('player', 'dashTime', 'Dash duration', 0.08, 0.4, 0.02, 's', 'dash')
+number('player', 'walkSpeed', 'Walking speed', 1, 10, 0.1, 'm/s')
+number('player', 'sprintSpeed', 'Brisk walk speed', 1, 14, 0.1, 'm/s')
 number('camera', 'fov', 'Field of view', 40, 100, 1, '°')
-number('camera', 'distance', 'Camera distance', 3, 12, 0.1, 'm')
-number('camera', 'follow', 'Camera follow speed', 2, 20, 1, '')
-number('run', 'seconds', 'Time limit', 30, 300, 10, 's', 'run')
-number('run', 'lives', 'Starting lives', 1, 10, 1, '', 'run')
 
 const byId = new Map(bindings.map(binding => [binding.control.id, binding]))
 let requested = Object.fromEntries(bindings.map(({ control }) => [control.id, control.default]))
