@@ -1,6 +1,37 @@
 {
   "version": 2,
-  "groups": {},
+  "groups": {
+    "models": {
+      "name": "Models",
+      "order": 10
+    },
+    "share": {
+      "name": "Share",
+      "order": 20
+    }
+  },
   "bundles": {},
-  "assets": {}
+  "assets": {
+    "assets/models/guanyin-statue.glb": {
+      "path": "/manus-storage/game/sha256/5bf8007b9397f6c782006f4d7ffbdb7609c11c1101ac1f1641b7a125b050d9a4.glb",
+      "sha256": "sha256:5bf8007b9397f6c782006f4d7ffbdb7609c11c1101ac1f1641b7a125b050d9a4",
+      "size": 1171836,
+      "assetType": "model",
+      "groupId": "models"
+    },
+    "assets/models/pilgrim-avatar.glb": {
+      "path": "/manus-storage/game/sha256/ab97fd4f6f1e1badaa0ef779d51e772bd795d188d6ed43f37ec65e74dad54dad.glb",
+      "sha256": "sha256:ab97fd4f6f1e1badaa0ef779d51e772bd795d188d6ed43f37ec65e74dad54dad",
+      "size": 1058512,
+      "assetType": "model",
+      "groupId": "models"
+    },
+    "assets/share/favicon.png": {
+      "path": "/manus-storage/game/sha256/5864433c1e4a1a1e06bdb2dfc56e92c85436e799c741d643fcd4463cfe8f83a2.png",
+      "sha256": "sha256:5864433c1e4a1a1e06bdb2dfc56e92c85436e799c741d643fcd4463cfe8f83a2",
+      "size": 9304,
+      "assetType": "image",
+      "groupId": "share"
+    }
+  }
 }
