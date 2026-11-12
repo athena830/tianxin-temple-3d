@@ -184,3 +184,4 @@ body.has-touch .mode-bar .exit .key { display: none; }
   body.has-touch .mode-bar { top: auto; bottom: calc(160px + var(--safe-b)); left: auto; right: 16px; transform: none; }
   .help { white-space: normal; width: calc(100% - 32px); text-align: center; bottom: calc(76px + var(--safe-b)); }
 }
+.panel ul.info { margin: 8px 0 14px; padding-left: 1.2em; display: grid; gap: 6px; line-height: 1.6; }

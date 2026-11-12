@@ -192,6 +192,7 @@ export class TempleStore {
   ringBell(): void { this.addRecord('鳴鐘', '願心安定，祝福相隨。') }
   tapWoodfish(): void { this.addRecord('敲木魚', '靜心一念。') }
   offerIncense(): void { this.addRecord('上香祈福', '於觀音佛祖主殿敬香。') }
+  worshipTiangong(): void { this.addRecord('參拜天公爐', '於前庭天公爐向玉皇上帝合掌敬拜。') }
 }
 
 export function formatRecordDate(at: number): string {

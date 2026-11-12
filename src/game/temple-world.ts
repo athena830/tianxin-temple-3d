@@ -2,10 +2,11 @@ import * as THREE from 'three'
 import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
+import { FrontCourtyard, PAVILION, STAND, TIANGONG, WISH_POOL } from './temple-courtyard'
 
 export type ShrinePointId =
   | 'incense' | 'prayer' | 'offerings' | 'daily-lot' | 'chess'
-  | 'lamps' | 'woodfish' | 'bell' | 'wishing-pool' | 'prayer-wall' | 'records'
+  | 'lamps' | 'woodfish' | 'bell' | 'wishing-pool' | 'prayer-wall' | 'records' | 'tiangong'
 
 export type ShrinePoint = {
   id: ShrinePointId
@@ -26,23 +27,26 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'prayer', title: '寫下心願', subtitle: '將一念善願留在祈願牆', radius: 3.2 },
   { id: 'offerings', title: '虛擬供奉', subtitle: '供花、供果、供茶', radius: 3.0 },
   { id: 'daily-lot', title: '每日抽籤', subtitle: '靜心抽取今日籤詩', radius: 3.0 },
-  { id: 'chess', title: '象棋卜卦', subtitle: '選一枚棋子，起一局心念', radius: 3.0 },
+  { id: 'chess', title: '天心仙姑問事亭', subtitle: '象棋卜卦・問事服務', radius: 2.6 },
   { id: 'lamps', title: '祈福燈區', subtitle: '點平安燈、財神燈、文昌燈', radius: 3.2 },
   { id: 'woodfish', title: '木魚', subtitle: '敲擊木魚，收攝心念', radius: 2.5 },
   { id: 'bell', title: '祈福鐘', subtitle: '鳴鐘祈願，祝福相隨', radius: 2.8 },
-  { id: 'wishing-pool', title: '許願池', subtitle: '投入一枚祈福銅錢', radius: 3.0 },
+  { id: 'wishing-pool', title: '蓮花許願池', subtitle: '投入一枚祈福銅錢', radius: 2.8 },
   { id: 'prayer-wall', title: '祈願牆', subtitle: '閱讀此裝置上的祝願', radius: 3.0 },
   { id: 'records', title: '祈福紀錄', subtitle: '回看本機保存的參拜足跡', radius: 3.0 },
+  { id: 'tiangong', title: '參拜玉皇上帝', subtitle: '於前庭天公爐前合掌敬拜', radius: 2.8 },
 ]
 const pointPositions: [number, number][] = [
-  [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [-9.4, -8.3],
-  [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [0, 14.2], [14.6, 4.3], [15, 0.2],
+  [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
+  [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [WISH_POOL.x + 3.9, WISH_POOL.z], [14.6, 4.3], [15, 0.2],
+  [TIANGONG.x - 3.0, TIANGONG.z],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
 export const POINT_TARGETS: [number, number][] = [
-  [0, -2.55], [0, -12.2], [-4.4, -4.2], [-12, 1.2], [-12, -8.3],
-  [12.5, -1.6], [8.5, -8.5], [15.2, -8], [0, 11], [17.5, 4.3], [17.2, 0.2],
+  [0, -2.55], [0, -12.2], [-4.4, -4.2], [-12, 1.2], [PAVILION.x, PAVILION.z],
+  [12.5, -1.6], [8.5, -8.5], [15.2, -8], [WISH_POOL.x, WISH_POOL.z], [17.5, 4.3], [17.2, 0.2],
+  [TIANGONG.x, TIANGONG.z],
 ]
 
 const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStandardMaterial =>
@@ -50,7 +54,7 @@ const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStan
 
 export class TempleWorld {
   readonly scene = new THREE.Scene()
-  readonly spawn = new THREE.Vector3(0, 1.2, 19.6)
+  readonly spawn = new THREE.Vector3(STAND.x, 1.2, STAND.z)
   readonly points: ShrinePoint[] = pointSpecs.map((point, i) => ({
     ...point,
     position: new THREE.Vector3(pointPositions[i][0], 0, pointPositions[i][1]),
@@ -71,6 +75,8 @@ export class TempleWorld {
   private readonly guideArrow: THREE.Mesh
   private readonly guideBeacon: THREE.Mesh
   private readonly incenseGlow: THREE.PointLight
+  private readonly courtyard: FrontCourtyard
+  private puffTimer = 0
   private bellImpulse = 0
   private woodfishImpulse = 0
   private readonly lamps: { id: LampId; position: THREE.Vector3 }[] = [
@@ -81,23 +87,27 @@ export class TempleWorld {
 
   constructor(private readonly physics: Physics) {
     this.scene.background = new THREE.Color('#b9ad98')
-    this.scene.fog = new THREE.Fog('#b9ad98', 48, 105)
+    this.scene.fog = new THREE.Fog('#b9ad98', 70, 150)
     this.scene.add(new THREE.HemisphereLight('#f2e9d6', '#5c5145', 1.15))
     const sun = new THREE.DirectionalLight('#ffe5b1', 1.35)
-    sun.position.set(-18, 30, 18)
+    sun.position.set(-18, 34, 30)
+    sun.target.position.set(0, 0, 12)
     sun.castShadow = true
-    sun.shadow.mapSize.set(1536, 1536)
-    sun.shadow.camera.left = -27
-    sun.shadow.camera.right = 27
-    sun.shadow.camera.top = 32
-    sun.shadow.camera.bottom = -28
+    sun.shadow.mapSize.set(2048, 2048)
+    sun.shadow.camera.left = -40
+    sun.shadow.camera.right = 40
+    sun.shadow.camera.top = 52
+    sun.shadow.camera.bottom = -36
     sun.shadow.camera.near = 1
-    sun.shadow.camera.far = 80
+    sun.shadow.camera.far = 110
     sun.shadow.normalBias = 0.035
     this.scene.add(sun, sun.target)
 
-    this.addCourtyard()
-    this.addEntranceGate()
+    this.courtyard = new FrontCourtyard({
+      scene: this.scene, physics: this.physics, mat: makeMat,
+      roof: (w, d, e, pk) => this.createRoof(w, d, e, pk),
+      text: (t, fg, bg) => this.textMaterial(t, fg, bg),
+    })
     this.addMainHall()
     this.addSideArchitecture()
     this.addRitualProps()
@@ -120,127 +130,6 @@ export class TempleWorld {
     this.incenseGlow = new THREE.PointLight('#f1a754', 0.22, 7, 2)
     this.incenseGlow.position.set(0, 1.8, -2.6)
     this.scene.add(this.incenseGlow)
-  }
-
-  private addCourtyard(): void {
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(42, 0.8, 54), makeMat(C.stone, 0.96))
-    floor.position.set(0, -0.42, 0)
-    floor.receiveShadow = true
-    floor.castShadow = false
-    this.scene.add(floor)
-    this.physics.addStaticBox(floor.position, new THREE.Vector3(42, 0.8, 54))
-
-    const path = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.035, 27), makeMat('#765444', 0.92))
-    path.position.set(0, 0.015, 5)
-    path.receiveShadow = true
-    this.scene.add(path)
-    for (let i = 0; i < 7; i += 1) {
-      const tile = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.025, 0.16), makeMat('#a88d6b', 0.88))
-      tile.position.set(0, 0.04, 16 - i * 3)
-      this.scene.add(tile)
-    }
-
-    const wallMat = makeMat(C.darkWood)
-    for (const x of [-20.5, 20.5]) {
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(0.65, 4.2, 52), wallMat)
-      wall.position.set(x, 2.1, -0.2)
-      wall.castShadow = true
-      wall.receiveShadow = true
-      this.scene.add(wall)
-      this.physics.addStaticBox(wall.position, new THREE.Vector3(0.65, 4.2, 52))
-      for (const z of [-22, -12, -2, 8, 18]) this.addPillar(x * 0.91, z, 3.2, 0.25, makeMat(C.vermilion))
-    }
-    for (const side of [-1, 1]) {
-      const front = new THREE.Mesh(new THREE.BoxGeometry(16, 4.2, 0.65), wallMat)
-      front.position.set(side * 12.5, 2.1, 22)
-      front.castShadow = true
-      this.scene.add(front)
-      this.physics.addStaticBox(front.position, new THREE.Vector3(16, 4.2, 0.65))
-    }
-    this.physics.addStaticBox(new THREE.Vector3(0, 2, 27.2), new THREE.Vector3(42, 4, 0.6))
-    for (const x of [-21.2, 21.2]) this.physics.addStaticBox(new THREE.Vector3(x, 2, 24.5), new THREE.Vector3(0.6, 4, 6))
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(41, 4.5, 0.7), wallMat)
-    backWall.position.set(0, 2.1, -26.5)
-    this.scene.add(backWall)
-    this.physics.addStaticBox(backWall.position, new THREE.Vector3(41, 4.5, 0.7))
-
-    const stone = makeMat('#c4ad82', 0.95)
-    for (const x of [-17, 17]) {
-      const plinth = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.22, 3.6), stone)
-      plinth.position.set(x, 0.11, 8)
-      plinth.receiveShadow = true
-      this.scene.add(plinth)
-      const tree = new THREE.Group()
-      tree.position.set(x, 0.2, 8)
-      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.72, 0.8, 8), makeMat(C.vermilion))
-      pot.position.y = 0.4
-      tree.add(pot)
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.19, 2.3, 7), makeMat(C.darkWood))
-      trunk.position.y = 1.75
-      tree.add(trunk)
-      for (let j = 0; j < 3; j += 1) {
-        const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.82 - j * 0.11, 1.2, 7), makeMat(j === 1 ? C.roofLight : C.jade))
-        leaf.position.set((j % 2 ? -0.15 : 0.14), 2.6 + j * 0.67, 0)
-        leaf.rotation.z = j % 2 ? 0.1 : -0.12
-        leaf.castShadow = true
-        tree.add(leaf)
-      }
-      this.scene.add(tree)
-      this.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, 8), 0.85, 3)
-    }
-
-    const lanternLine = makeMat(C.gold, 0.5, 0.2)
-    for (const x of [-8, 8]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.2, 0.16), makeMat(C.darkWood))
-      post.position.set(x, 1.6, 12)
-      this.scene.add(post)
-      const lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 1), lanternLine)
-      lamp.position.set(x, 3.05, 12)
-      this.scene.add(lamp)
-      const glow = new THREE.PointLight('#f5c87b', 0.38, 8, 2)
-      glow.position.copy(lamp.position)
-      this.scene.add(glow)
-    }
-  }
-
-  private addEntranceGate(): void {
-    const gate = new THREE.Group()
-    gate.position.set(0, 0, 22)
-    this.scene.add(gate)
-    const red = makeMat(C.vermilion, 0.72)
-    const gold = makeMat(C.gold, 0.5, 0.18)
-    for (const x of [-4, -2.65, 2.65, 4]) {
-      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.48, 5, 12), red)
-      pillar.position.set(x, 2.5, 0)
-      pillar.castShadow = true
-      gate.add(pillar)
-      this.physics.addStaticCylinder(new THREE.Vector3(x, 2.5, 22), 0.4, 5)
-      const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.38, 1.2), gold)
-      base.position.set(x, 0.19, 0)
-      gate.add(base)
-    }
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.58, 0.95), red)
-    beam.position.set(0, 5.05, 0)
-    beam.castShadow = true
-    gate.add(beam)
-    const plaque = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1.25, 0.26), makeMat('#30231a'))
-    plaque.position.set(0, 4.36, 0.55)
-    gate.add(plaque)
-    const plaqueFace = new THREE.Mesh(new THREE.PlaneGeometry(4.1, 0.92), this.textMaterial('玉 皇 宮', '#e5c57d', '#38251b'))
-    plaqueFace.position.set(0, 4.36, 0.7)
-    gate.add(plaqueFace)
-    const gateRoof = this.createRoof(10.6, 3.8, 5.35, 7.0)
-    gateRoof.position.y = 4.5
-    gate.add(gateRoof)
-    this.addRoofFinial(gate, 5.4, 7.65)
-    for (const x of [-1.6, 0, 1.6]) {
-      const tassel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 7), gold)
-      tassel.position.set(x, 3.1, 0.56)
-      gate.add(tassel)
-      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.13, 9, 7), makeMat(C.vermilionLight))
-      knot.position.set(x, 2.63, 0.56)
-      gate.add(knot)
-    }
   }
 
   private addMainHall(): void {
@@ -444,34 +333,6 @@ export class TempleWorld {
     this.scene.add(lotTable)
     this.physics.addStaticBox(new THREE.Vector3(-12, 1.05, 1.2), new THREE.Vector3(1.55, 2, 1.55))
 
-    // Chess-divination table and an inlaid 3x3 board.
-    this.addTable(new THREE.Vector3(-12, 0, -8.3), 3.1, 1.2)
-    const board = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.055, 2.15), makeMat('#d4c092', 0.75))
-    board.position.set(-12, 1.85, -8.3)
-    this.scene.add(board)
-    const lineMat = new THREE.LineBasicMaterial({ color: '#75563b' })
-    const vertices: number[] = []
-    for (let i = 0; i < 4; i += 1) {
-      const x = -13.04 + i * 0.69
-      vertices.push(x, 1.89, -9.28, x, 1.89, -7.32)
-      const z = -9.12 + i * 0.54
-      vertices.push(-13.04, 1.89, z, -10.96, 1.89, z)
-    }
-    const lines = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)), lineMat)
-    this.scene.add(lines)
-    const chessPieces = [
-      { x: -12.69, z: -8.85, color: C.vermilion }, { x: -11.31, z: -8.85, color: '#34302a' },
-      { x: -12, z: -7.77, color: C.vermilion },
-    ]
-    for (const piece of chessPieces) {
-      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.14, 12), makeMat(piece.color, 0.55))
-      p.position.set(piece.x, 1.98, piece.z)
-      this.scene.add(p)
-      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), gold)
-      dot.position.set(piece.x, 2.08, piece.z)
-      this.scene.add(dot)
-    }
-
     // Wooden fish on a small stand.
     const fishStand = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.42, 1.35), wood)
     fishStand.position.set(8.5, 0.52, -8.5)
@@ -529,22 +390,6 @@ export class TempleWorld {
     this.scene.add(panelFace)
     this.physics.addStaticBox(new THREE.Vector3(17.5, 2.2, 4.3), new THREE.Vector3(0.45, 3.7, 5.2))
 
-    // Round wishing pool with a restrained warm-water sheen.
-    const pool = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.4, 0.68, 32), makeMat('#b4a07d'))
-    pool.position.set(0, -0.08, 11)
-    pool.receiveShadow = true
-    pool.castShadow = true
-    this.scene.add(pool)
-    const water = new THREE.Mesh(new THREE.CircleGeometry(2.2, 36), new THREE.MeshStandardMaterial({ color: C.water, roughness: 0.25, metalness: 0.18, transparent: true, opacity: 0.9 }))
-    water.rotation.x = -Math.PI / 2
-    water.position.set(0, 0.28, 11)
-    this.scene.add(water)
-    const poolRim = new THREE.Mesh(new THREE.TorusGeometry(2.38, 0.16, 10, 40), gold)
-    poolRim.rotation.x = Math.PI / 2
-    poolRim.position.set(0, 0.32, 11)
-    this.scene.add(poolRim)
-    this.physics.addStaticCylinder(new THREE.Vector3(0, 0.04, 11), 2.42, 0.6)
-
     // Small memory kiosk for local prayer records.
     const recordStand = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.65, 0.36), makeMat('#684636'))
     recordStand.position.set(17.2, 0.96, 0.2)
@@ -584,7 +429,7 @@ export class TempleWorld {
   private addMarkers(): void {
     const colors: Record<ShrinePointId, string> = {
       incense: '#e8bb71', prayer: '#e8bb71', offerings: '#d8a45e', 'daily-lot': '#d8a45e', chess: '#a9c2a9',
-      lamps: '#edba61', woodfish: '#d68c63', bell: '#e8c77d', 'wishing-pool': '#a8d2c6', 'prayer-wall': '#e8c77d', records: '#e8c77d',
+      lamps: '#edba61', woodfish: '#d68c63', bell: '#e8c77d', 'wishing-pool': '#a8d2c6', 'prayer-wall': '#e8c77d', records: '#e8c77d', tiangong: '#f0c070',
     }
     for (const point of this.points) {
       const mat = new THREE.MeshBasicMaterial({ color: colors[point.id], transparent: true, opacity: 0.42, depthWrite: false })
@@ -664,14 +509,6 @@ export class TempleWorld {
     return new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
   }
 
-  private addPillar(x: number, z: number, height: number, radius: number, material: THREE.Material): void {
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.9, radius, height, 10), material)
-    pillar.position.set(x, height / 2, z)
-    pillar.castShadow = true
-    this.scene.add(pillar)
-    this.physics.addStaticCylinder(new THREE.Vector3(x, height / 2, z), radius, height)
-  }
-
   setStatue(source: THREE.Object3D): void {
     const root = new THREE.Group()
     const model = source.clone(true)
@@ -690,7 +527,7 @@ export class TempleWorld {
 
   /** Show the procedural chibi standing at the select-screen stand. */
   placeAvatarAtStand(): void {
-    this.chibi.root.position.set(0, 0, 23.2)
+    this.chibi.root.position.set(STAND.x, 0, STAND.z)
     this.chibi.root.rotation.y = 0
   }
   /** Follow the player: `feet` is the ground point under the capsule, heading in radians (0 = +Z). */
@@ -698,7 +535,7 @@ export class TempleWorld {
     this.chibi.root.position.copy(feet)
     this.chibi.root.rotation.y = heading
   }
-  animateAvatar(dt: number, time: number, speed: number, reducedMotion: boolean): void { this.chibi.animate(dt, time, speed, reducedMotion) }
+  animateAvatar(dt: number, time: number, speed: number, reducedMotion: boolean, bow = 0): void { this.chibi.animate(dt, time, speed, reducedMotion, bow) }
   setCharacter(id: string): void { this.chibi.setPalette(id) }
   /** Objects excluded from click picking (the visitor and guidance helpers). */
   get pickIgnore(): THREE.Object3D[] { return [this.avatarStand, this.guideArrow, this.guideBeacon] }
@@ -749,13 +586,19 @@ export class TempleWorld {
     if (action === 'woodfish') this.woodfishImpulse = 0.2
     if (action === 'bell') this.bellImpulse = 0.23
     if (action === 'coin') this.dropCoin()
-    if (action === 'lottery' || action === 'chess') this.spawnSmoke(new THREE.Vector3(-11.8, 1.8, action === 'lottery' ? 1.2 : -8.3))
+    if (action === 'lottery') this.spawnSmoke(new THREE.Vector3(-11.8, 1.8, 1.2))
+    if (action === 'chess') this.spawnSmoke(new THREE.Vector3(PAVILION.x, 1.2, PAVILION.z))
+    if (action === 'tiangong') { this.spawnSmoke(this.courtyard.tiangongSmoke.clone()); this.courtyard.tiangongGlow.intensity = 1.4 }
   }
 
   update(dt: number, time: number, playerPosition: THREE.Vector3, activePoint: ShrinePointId | null): void {
     const insideHall = playerPosition.z < 0 && playerPosition.z > -13.5 && Math.abs(playerPosition.x) < 9
     this.roof.visible = !insideHall
     this.incenseGlow.intensity = THREE.MathUtils.damp(this.incenseGlow.intensity, 0.22, 1.4, dt)
+    this.courtyard.update(time)
+    // A thin, continuous thread of smoke above the Tiangong urn.
+    this.puffTimer -= dt
+    if (this.puffTimer <= 0 && !this.reducedSmoke) { this.puffTimer = 0.8; this.spawnPuff(this.courtyard.tiangongSmoke) }
     this.woodfishImpulse = THREE.MathUtils.damp(this.woodfishImpulse, 0, 11, dt)
     this.bellImpulse = THREE.MathUtils.damp(this.bellImpulse, 0, 5.5, dt)
     this.woodfish.rotation.x = Math.sin(this.woodfishImpulse * 7) * this.woodfishImpulse
@@ -845,6 +688,14 @@ export class TempleWorld {
     }
   }
 
+  /** Set by the game when reduced motion is preferred; stops the ambient urn smoke. */
+  reducedSmoke = false
+  private spawnPuff(position: THREE.Vector3): void {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 7, 6), new THREE.MeshBasicMaterial({ color: '#e7d7b8', transparent: true, opacity: 0.3, depthWrite: false }))
+    mesh.position.copy(position).add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.3))
+    this.scene.add(mesh)
+    this.smoke.push({ mesh, age: 0, life: 3 })
+  }
   private spawnSmoke(position: THREE.Vector3): void {
     for (let i = 0; i < 6; i += 1) {
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.12, 7, 6), new THREE.MeshBasicMaterial({ color: '#e7d7b8', transparent: true, opacity: 0.36, depthWrite: false }))
@@ -862,7 +713,7 @@ export class TempleWorld {
 
   private dropCoin(): void {
     const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.045, 20), makeMat(C.gold, 0.28, 0.6))
-    coin.position.set((Math.random() - 0.5) * 0.8, 1.5, 11 + (Math.random() - 0.5) * 0.8)
+    coin.position.set(WISH_POOL.x + (Math.random() - 0.5) * 0.8, 1.5, WISH_POOL.z + (Math.random() - 0.5) * 0.8)
     coin.castShadow = true
     this.scene.add(coin)
     const rippleMat = new THREE.MeshBasicMaterial({ color: '#cae2cf', transparent: true, opacity: 0.5, depthWrite: false })

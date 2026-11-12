@@ -1,5 +1,6 @@
 import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId } from '../game/temple-data'
 import type { ShrinePoint, ShrinePointId } from '../game/temple-world'
+export type PanelId = ShrinePointId | 'consult'
 
 const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
@@ -57,9 +58,9 @@ export class TempleUi {
         </header>
         <nav class="map" hidden>
           <p>選擇目的地，跟著金色箭頭前往</p>
-          <button data-go="incense">上香祈福</button><button data-go="prayer">寫下心願</button><button data-go="offerings">虛擬供奉</button>
-          <button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button><button data-go="chess">象棋卜卦</button>
-          <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="wishing-pool">許願池</button>
+          <button data-go="tiangong">參拜天公爐</button><button data-go="chess">天心仙姑問事亭</button><button data-go="incense">上香祈福</button><button data-go="prayer">寫下心願</button><button data-go="offerings">虛擬供奉</button>
+          <button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
+          <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="wishing-pool">蓮花許願池</button>
           <button data-go="prayer-wall">祈願牆</button><button data-go="records">祈福紀錄</button>
         </nav>
         <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact">互動</button></div>
@@ -132,17 +133,17 @@ export class TempleUi {
     el.querySelector('[data-prompt-sub]')!.textContent = point.subtitle
   }
 
-  toast(text: string): void {
+  toast(text: string, ms = 2600): void {
     const el = this.root.querySelector<HTMLElement>('.toast')!
     el.textContent = text
     el.hidden = false
     clearTimeout(this.toastTimer)
-    this.toastTimer = window.setTimeout(() => { el.hidden = true }, 2600)
+    this.toastTimer = window.setTimeout(() => { el.hidden = true }, ms)
   }
 
   closePanel(): void { this.root.querySelector<HTMLElement>('.panel-wrap')!.hidden = true }
 
-  open(id: ShrinePointId, message = ''): void {
+  open(id: PanelId, message = ''): void {
     const wrap = this.root.querySelector<HTMLElement>('.panel-wrap')!
     const body = wrap.querySelector<HTMLElement>('.panel-body')!
     body.innerHTML = this.render(id, message)
@@ -151,7 +152,7 @@ export class TempleUi {
     body.querySelector<HTMLElement>('textarea, button.primary')?.focus()
   }
 
-  private render(id: ShrinePointId, message: string): string {
+  private render(id: PanelId, message: string): string {
     const d = this.store.data
     const note = message ? `<p class="result">${esc(message)}</p>` : ''
     switch (id) {
@@ -175,10 +176,19 @@ export class TempleUi {
         return `<p class="eyebrow">每日一籤</p><h2>每日抽籤</h2><p>每天可抽一支籤，籤詩僅作心靈參考。共 ${LOTS.length} 支籤。</p>${note}
           ${lot ? this.lotCard(lot) : '<button class="btn primary" data-ritual="lottery">搖籤筒・求今日籤</button>'}`
       }
+      case 'tiangong':
+        return `<p class="eyebrow">前庭天公爐</p><h2>參拜玉皇上帝</h2><p>立於天公爐前，雙手合十，向玉皇上帝敬拜。人物會面向天公爐合掌鞠躬，完成後即可繼續走動。</p>${note}
+          <div class="row"><button class="btn primary" data-ritual="tiangong">合掌敬拜</button></div>`
+      case 'consult':
+        return `<p class="eyebrow">天心仙姑問事亭</p><h2>問事服務介紹</h2>
+          <p>天心仙姑問事亭位於前庭左側，是天心仙姑專屬的象棋卜卦與問事服務空間。</p>
+          <ul class="info"><li>象棋卜卦：點擊亭內桌上的棋盤即可開始。</li><li>正式問事：採預約方式進行。</li><li>隱私：個人問事內容與卜卦紀錄僅保存在你自己的瀏覽器，不會顯示在公開場景。</li></ul>
+          <div class="row"><button class="btn primary" data-open="chess">返回象棋卜卦</button><button class="btn" data-act="contact">正式問事聯絡入口</button></div>`
       case 'chess':
-        return `<p class="eyebrow">象棋卜卦</p><h2>選一枚棋子</h2><p>心中默想一件事，再選擇棋子與落子方向。</p>${note}
+        return `<p class="eyebrow">天心仙姑問事亭・象棋卜卦</p><h2>選一枚棋子</h2><p>心中默想一件事，再選擇棋子與落子方向。</p>${note}
           <div class="chess">${['帥', '仕', '相', '馬', '車', '炮', '兵'].map((p, i) => `<button class="piece ${i % 2 ? 'black' : ''}" data-piece="${p}">${p}</button>`).join('')}</div>
-          <div class="row dir">${['向前', '守中', '轉向'].map(x => `<button class="btn" data-dir="${x}">${x}</button>`).join('')}</div>`
+          <div class="row dir">${['向前', '守中', '轉向'].map(x => `<button class="btn" data-dir="${x}">${x}</button>`).join('')}</div>
+          <div class="row"><button class="btn" data-open="consult">問事服務介紹</button><button class="btn" data-act="contact">正式問事聯絡入口</button></div>`
       case 'woodfish':
         return `<p class="eyebrow">靜心</p><h2>敲木魚</h2><p>隨著節奏，一聲一念，讓心慢慢安定下來。</p>${note}<button class="btn primary big" data-ritual="woodfish">叩・敲一下</button>`
       case 'bell':
@@ -218,9 +228,10 @@ export class TempleUi {
     else if (act === 'exit') this.actions.exitExplore()
     else if (act === 'guide-cancel') this.actions.cancelGuide()
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
+    else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
     if (t.dataset.char) { this.actions.choose(t.dataset.char as CharacterId); this.refreshCharacter() }
-    if (t.dataset.open) this.open(t.dataset.open as ShrinePointId)
+    if (t.dataset.open) this.open(t.dataset.open as PanelId)
     if (t.dataset.go) { this.root.querySelector<HTMLElement>('.map')!.hidden = true; this.actions.travel(t.dataset.go as ShrinePointId) }
     if (t.dataset.ritual) this.actions.ritual(t.dataset.ritual)
     if (t.dataset.piece) {

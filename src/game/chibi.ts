@@ -28,6 +28,7 @@ export class Chibi {
   private readonly hairMat = std('#2c211b', 0.6)
   private phase = 0
   private walk = 0
+  private bowBlend = 0
 
   constructor() {
     const skin = std('#f3d9bf', 0.6)
@@ -104,7 +105,8 @@ export class Chibi {
   }
 
   /** `speed` is metres per second; drives a simple walk swing or idle breathing. */
-  animate(dt: number, time: number, speed: number, reducedMotion: boolean): void {
+  /** `bow` 0..1 blends in a palms-together pose; while it is held the visitor bows twice. */
+  animate(dt: number, time: number, speed: number, reducedMotion: boolean, bow = 0): void {
     const target = THREE.MathUtils.clamp(speed / 3.2, 0, 1)
     this.walk = THREE.MathUtils.damp(this.walk, target, 10, dt)
     this.phase += dt * (4 + speed * 2.4)
@@ -120,5 +122,22 @@ export class Chibi {
     this.head.position.y = 1.12 + breathe
     this.head.rotation.z = Math.sin(this.phase * 0.5) * 0.05 * this.walk * motion
     this.body.scale.set(1, 1 + breathe, 1)
+    this.bowBlend = THREE.MathUtils.damp(this.bowBlend, bow > 0 ? 1 : 0, 8, dt)
+    const k = this.bowBlend
+    if (k > 0.001) {
+      // Hands meet in front of the chest; the upper body dips forward in two slow bows.
+      this.armL.rotation.x = THREE.MathUtils.lerp(this.armL.rotation.x, -1.25, k)
+      this.armR.rotation.x = THREE.MathUtils.lerp(this.armR.rotation.x, -1.25, k)
+      this.armL.rotation.z = -0.55 * k
+      this.armR.rotation.z = 0.55 * k
+      const dip = bow > 0 ? Math.max(0, Math.sin(bow * Math.PI * 4 - Math.PI / 2) * 0.5 + 0.5) : 0
+      const amount = (reducedMotion ? 0.2 : 0.42) * dip * k
+      this.body.rotation.x = amount * 0.35
+      this.head.rotation.x = amount
+    } else {
+      this.armL.rotation.z = this.armR.rotation.z = 0
+      this.body.rotation.x = 0
+      this.head.rotation.x = 0
+    }
   }
 }

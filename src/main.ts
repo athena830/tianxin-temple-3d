@@ -5,6 +5,7 @@ import { Input } from './engine/input'
 import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
+import { TIANGONG } from './game/temple-courtyard'
 import type { TempleGame } from './game/temple-game'
 import type { ShrinePointId } from './game/temple-world'
 import { TempleUi } from './ui/temple-ui'
@@ -49,6 +50,16 @@ async function boot(): Promise<void> {
       const w = game.world
       if (action === 'incense') { store.offerIncense(); w.perform('incense'); audio.play('chime'); reopen('incense', '清香裊裊，願觀音佛祖慈悲護佑，平安吉祥。') }
       else if (action === 'wish') { w.perform('wish'); audio.play('chime') }
+      else if (action === 'tiangong') {
+        if (game.worshipping) return
+        // Close the panel, face the urn, bow with palms together, then show the blessing and resume free movement.
+        ui.closePanel(); game.closePanel(); syncMode()
+        w.perform('tiangong'); audio.play('chime')
+        game.worship(TIANGONG, 2.6, () => {
+          store.worshipTiangong(); audio.play('bell')
+          ui.toast('敬拜玉皇上帝：願天公庇佑，風調雨順，闔家平安。', 4800)
+        })
+      }
       else if (action.startsWith('offer-')) {
         const id = action.slice(6) as OfferingId
         store.offer(id); w.perform(action, store.data.offerings); audio.play('pickup')
@@ -87,6 +98,7 @@ async function boot(): Promise<void> {
   const g = new TempleGame(renderer, input, audio)
   game = g
   g.reducedMotion = save.data.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches
+  g.world.reducedSmoke = g.reducedMotion
   const assets = new Assets()
   assets.onProgress(p => ui.setBootProgress(0.7 + p * 0.3))
   await g.loadModels(assets)
@@ -110,9 +122,10 @@ async function boot(): Promise<void> {
     await registerGameTuning(tuning)
   }
 
+  let stepped = false
   const loop = new GameLoop({
     beforeFrame: frameSeconds => input.update(frameSeconds),
-    step: dt => g.step(dt),
+    step: dt => { g.step(dt); stepped = true },
     render: (alpha, frameSeconds) => {
       // Esc closes the open panel first; otherwise it leaves exploration and returns the mouse to the page.
       if (input.consume('pause')) {
@@ -120,7 +133,8 @@ async function boot(): Promise<void> {
         else if (g.mode === 'explore') exitExplore()
       }
       g.render(alpha, frameSeconds)
-      input.endFrame()
+      // Clear edge presses only once the simulation has seen them; a frame with no fixed step must not drop a key.
+      if (stepped) { input.endFrame(); stepped = false }
     },
   })
   loop.start()

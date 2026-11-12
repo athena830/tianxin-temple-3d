@@ -52,6 +52,11 @@ export class TempleGame {
   private vy = 0
   private time = 0
   private selectOrbit = 0
+  /** Seconds left in a worship pose (face the target, palms together, bow); movement is held meanwhile. */
+  private ritualLeft = 0
+  private ritualLength = 1
+  private ritualHeading = 0
+  private ritualDone: (() => void) | null = null
   /** Decorations temporarily hidden because they sit between the lens and the visitor. */
   private readonly occluders: THREE.Object3D[] = []
   active: ShrinePoint | null = null
@@ -127,6 +132,15 @@ export class TempleGame {
     this.input.clearHeld()
   }
 
+  /** Turn the visitor toward a point and play the palms-together bow, then call `done`. */
+  worship(target: { x: number; z: number }, seconds: number, done: () => void): void {
+    const t = this.body.translation()
+    this.ritualHeading = Math.atan2(target.x - t.x, target.z - t.z)
+    this.ritualLeft = this.ritualLength = seconds
+    this.ritualDone = done
+    this.input.clearHeld()
+  }
+  get worshipping(): boolean { return this.ritualLeft > 0 }
   get inTemple(): boolean { return this.mode === 'browse' || this.mode === 'explore' || this.mode === 'panel' }
 
   setQuality(quality: Quality): void { this.renderer.applyQuality(quality) }
@@ -142,7 +156,14 @@ export class TempleGame {
       this.pitch = THREE.MathUtils.clamp(this.pitch + look.y, PITCH_MIN, PITCH_MAX)
       this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), ZOOM_MIN, ZOOM_MAX)
     }
-    const moving = this.mode === 'explore'
+    if (this.ritualLeft > 0) {
+      this.ritualLeft -= dt
+      let diff = this.ritualHeading - this.heading
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff))
+      this.heading += diff * Math.min(1, dt * 8)
+      if (this.ritualLeft <= 0) { this.ritualLeft = 0; const done = this.ritualDone; this.ritualDone = null; done?.() }
+    }
+    const moving = this.mode === 'explore' && this.ritualLeft <= 0
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw))
     const wish = new THREE.Vector3()
@@ -176,7 +197,7 @@ export class TempleGame {
       if (near?.id === this.guide.id) this.setGuide(null)
       else this.onGuide(this.guide, d)
     }
-    if (free && this.input.consume('interact') && this.active) window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.active.id }))
+    if (free && this.ritualLeft <= 0 && this.input.consume('interact') && this.active) window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.active.id }))
     else this.input.consume('interact')
     const clicks = this.input.takeClicks()
     if (free && clicks.length) this.onClickResult(this.pick(clicks[clicks.length - 1]))
@@ -250,14 +271,16 @@ export class TempleGame {
     if (this.mode === 'select' || this.mode === 'loading') {
       this.selectOrbit += frameSeconds * (this.reducedMotion ? 0 : 0.12)
       const a = Math.sin(this.selectOrbit) * 0.35
-      this.camera.position.set(Math.sin(a) * 3.2, 1.35, 23.2 + Math.cos(a) * 3.2)
-      this.camera.lookAt(0, 0.85, 23.2)
+      const st = this.world.spawn
+      this.camera.position.set(st.x + Math.sin(a) * 3.2, 1.35, st.z + Math.cos(a) * 3.2)
+      this.camera.lookAt(st.x, 0.85, st.z)
       this.world.animateAvatar(dt, this.time, 0, this.reducedMotion)
       this.world.setGuide(null, null, this.time)
     } else {
       const feet = this.feet
       this.world.placeAvatar(feet, this.heading)
-      this.world.animateAvatar(dt, this.time, this.speedNow, this.reducedMotion)
+      const bow = this.ritualLeft > 0 ? 1 - this.ritualLeft / this.ritualLength : 0
+      this.world.animateAvatar(dt, this.time, this.speedNow, this.reducedMotion, bow)
       const target = new THREE.Vector3(feet.x, feet.y + LOOK_HEIGHT, feet.z)
       if (!this.camReady) { this.camTarget.copy(target); this.camDistance = this.zoom; this.camReady = true }
       else this.camTarget.lerp(target, 1 - Math.exp(-14 * dt))
