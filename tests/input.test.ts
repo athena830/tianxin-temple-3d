@@ -132,4 +132,17 @@ describe('input lifecycle', () => {
     expect(input.move).toEqual({ x: 0.4, y: 0.2 }); expect(input.consume('jump')).toBe(true)
     input.update(); expect(input.consume('jump')).toBe(false); expect(input.held('jump')).toBe(true)
   })
+  it('ignores movement keys typed into a text field (wish form)', () => {
+    key('keydown', 'KeyW', true); input.update()
+    expect(input.move.y).toBe(0)
+  })
+  it('clearHeld stops the visitor immediately when a panel opens', () => {
+    key('keydown', 'KeyW'); input.update(); expect(input.move.y).toBe(1)
+    input.clearHeld(); expect(input.move.y).toBe(0)
+    input.update(); expect(input.move.y).toBe(0)
+  })
+  it('maps only Escape to leaving exploration', () => {
+    key('keydown', 'KeyP'); input.update(); expect(input.consume('pause')).toBe(false)
+    key('keydown', 'Escape'); input.update(); expect(input.consume('pause')).toBe(true)
+  })
 })

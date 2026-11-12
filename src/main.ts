@@ -21,7 +21,10 @@ async function boot(): Promise<void> {
   const audio = new Audio()
   audio.setVolumes(save.data.musicVolume * 0.6, save.data.sfxVolume, save.data.muted)
   let game: TempleGame | undefined
-  let lockLostAt = 0
+  let touch: TouchControls | undefined
+  const syncMode = () => { if (game) ui.setMode(game.mode === 'panel' ? 'panel' : game.mode) }
+  const startExplore = () => { if (!game) return; audio.unlock(); game.startExplore(); syncMode(); loop.resetAccumulator() }
+  const exitExplore = () => { if (!game) return; game.stopExplore(); touch?.releaseStick(); syncMode() }
 
   const reopen = (id: ShrinePointId, msg: string) => ui.open(id, msg)
   const ui = new TempleUi(store, {
@@ -29,13 +32,18 @@ async function boot(): Promise<void> {
     choose: id => { store.setCharacter(id); game?.world.setCharacter(id); audio.play('ui') },
     enter: () => {
       audio.unlock(); audio.startMusic()
-      game?.enter(); ui.show('hud'); loop.resetAccumulator(); input.lockPointer()
-      ui.toast('穿過宮門，沿著石道前往觀音佛祖主殿')
+      game?.enter(); ui.show('hud'); loop.resetAccumulator()
+      // Touch devices go straight to exploring; desktop starts with a free mouse until the visitor opts in.
+      if (input.method === 'touch' || document.body.classList.contains('has-touch')) { startExplore(); ui.toast('左下搖桿移動，右側拖曳轉視角') }
+      else { syncMode(); ui.toast('已穿過宮門。按「開始探索」後用 WASD 走動，沿石道前往觀音佛祖主殿') }
     },
-    resume: () => { if (!game) return; game.resume(); ui.show('hud'); loop.resetAccumulator(); input.lockPointer() },
-    openPanel: () => { if (game && game.mode === 'explore') game.mode = 'panel'; input.unlockPointer() },
-    closePanel: () => { ui.closePanel(); if (game?.mode === 'panel') { game.resume(); loop.resetAccumulator(); input.lockPointer() } },
-    travel: id => { game?.travelTo(id); audio.play('ui') },
+    resume: () => { if (!game) return; ui.show('hud'); syncMode() },
+    openPanel: () => { game?.openPanel(); touch?.releaseStick(); syncMode() },
+    closePanel: () => { ui.closePanel(); game?.closePanel(); loop.resetAccumulator(); syncMode() },
+    travel: id => { game?.setGuide(id); audio.play('ui'); ui.toast('跟著地上的金色箭頭前往') },
+    explore: startExplore,
+    exitExplore,
+    cancelGuide: () => game?.setGuide(null),
     ritual: action => {
       if (!game) return
       const w = game.world
@@ -88,38 +96,36 @@ async function boot(): Promise<void> {
     for (let i = 1; i <= Math.min(2, store.data.offerings[id]); i += 1) g.world.perform(`offer-${id}`, { [id]: i })
   }
   g.onNear = point => ui.near(point)
+  g.onGuide = (point, distance) => ui.guideTo(point, distance)
+  g.onClickResult = result => {
+    if (!result) return
+    if (result.kind === 'open') ui.open(result.id)
+    else { ui.toast(`「${result.point.title}」還有一段距離，請再走近一點`); g.setGuide(result.point.id) }
+  }
   window.addEventListener('temple:interact', e => ui.open((e as CustomEvent<ShrinePointId>).detail))
-  window.addEventListener('temple:interact-touch', () => { if (g.mode === 'explore' && g.active) ui.open(g.active.id) })
+  window.addEventListener('temple:interact-touch', () => { if (g.active && (g.mode === 'explore' || g.mode === 'browse')) ui.open(g.active.id) })
 
   if (import.meta.env.DEV) {
     const [{ registerGameTuning }, { tuning }] = await Promise.all([import('../scripts/manus-tuning/adapter.js'), import('./game/tuning')])
     await registerGameTuning(tuning)
   }
 
-  const pause = () => {
-    if (g.mode !== 'explore') return
-    g.mode = 'paused'
-    ui.show('pause')
-    input.unlockPointer()
-  }
   const loop = new GameLoop({
     beforeFrame: frameSeconds => input.update(frameSeconds),
     step: dt => g.step(dt),
     render: (alpha, frameSeconds) => {
-      if (input.consume('pause') && performance.now() - lockLostAt > 300) {
-        if (g.mode === 'panel') { ui.closePanel(); g.mode = 'explore' }
-        else if (g.mode === 'explore') pause()
+      // Esc closes the open panel first; otherwise it leaves exploration and returns the mouse to the page.
+      if (input.consume('pause')) {
+        if (ui.panelOpen) { ui.closePanel(); g.closePanel(); syncMode() }
+        else if (g.mode === 'explore') exitExplore()
       }
       g.render(alpha, frameSeconds)
+      input.endFrame()
     },
   })
   loop.start()
-  document.addEventListener('pointerlockchange', () => {
-    if (!document.pointerLockElement && g.mode === 'explore' && input.method === 'keyboard') { lockLostAt = performance.now(); pause() }
-  })
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pause() })
-  canvas.addEventListener('click', () => { if (g.mode === 'explore') input.lockPointer() })
-  new TouchControls(document.getElementById('ui')!, input, () => g.mode === 'explore')
+  document.addEventListener('visibilitychange', () => { if (document.hidden) exitExplore() })
+  touch = new TouchControls(document.getElementById('ui')!, input, () => g.mode === 'explore' || g.mode === 'browse', () => g.mode === 'explore')
   g.mode = 'select'
   ui.show('title')
   ;(window as unknown as { __game: unknown }).__game = { game: g, ui, input, store }

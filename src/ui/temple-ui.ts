@@ -14,6 +14,9 @@ export type TempleUiActions = {
   openPanel(): void
   ritual(action: string): void
   travel(id: ShrinePointId): void
+  explore(): void
+  exitExplore(): void
+  cancelGuide(): void
 }
 
 export class TempleUi {
@@ -53,14 +56,20 @@ export class TempleUi {
           </div>
         </header>
         <nav class="map" hidden>
-          <p>點選前往</p>
+          <p>選擇目的地，跟著金色箭頭前往</p>
           <button data-go="incense">上香祈福</button><button data-go="prayer">寫下心願</button><button data-go="offerings">虛擬供奉</button>
           <button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button><button data-go="chess">象棋卜卦</button>
           <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="wishing-pool">許願池</button>
           <button data-go="prayer-wall">祈願牆</button><button data-go="records">祈福紀錄</button>
         </nav>
         <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact">互動</button></div>
-        <p class="help">WASD 移動・滑鼠轉向・Shift 快走・E 互動・Esc 暫停</p>
+        <div class="guide" hidden><span>前往</span><b data-guide-name></b><small data-guide-dist></small><button class="guide-x" data-act="guide-cancel" aria-label="取消指引">×</button></div>
+        <div class="mode-bar">
+          <button class="btn primary" data-act="explore" data-when="browse">開始探索</button>
+          <button class="chip exit" data-act="exit" data-when="explore">退出探索<kbd class="key">Esc</kbd></button>
+        </div>
+        <p class="help" data-when="browse">按「開始探索」後即可走動・右鍵拖曳轉視角・滾輪縮放・點擊設施互動</p>
+        <p class="help" data-when="explore">WASD／方向鍵 移動・Shift 快走・右鍵拖曳 轉視角・滾輪 縮放・E 或點擊 互動・Esc 退出探索</p>
         <div class="touch"><div class="touch-stick"><i></i></div></div>
       </section>
       <section class="screen pause" data-screen="pause"><div class="title-card"><h2>暫歇片刻</h2><p class="lead">點擊下方按鈕繼續參拜。</p><button class="btn primary" data-act="resume">繼續參拜</button></div></section>
@@ -86,6 +95,23 @@ export class TempleUi {
     this.screen = screen
     for (const el of this.root.querySelectorAll<HTMLElement>('[data-screen]')) el.classList.toggle('on', el.dataset.screen === screen)
   }
+
+  /** Reflect browse/explore mode in the HUD (button, help line, body class for cursor styling). */
+  setMode(mode: string): void {
+    const hud = this.root.querySelector<HTMLElement>('.hud')!
+    hud.dataset.mode = mode
+    document.body.dataset.mode = mode
+  }
+
+  guideTo(point: ShrinePoint | null, distance: number): void {
+    const el = this.root.querySelector<HTMLElement>('.guide')!
+    el.hidden = !point
+    if (!point) return
+    el.querySelector('[data-guide-name]')!.textContent = point.title
+    el.querySelector('[data-guide-dist]')!.textContent = `約 ${Math.max(1, Math.round(distance))} 公尺`
+  }
+
+  get panelOpen(): boolean { return !this.panelHidden }
 
   setBootProgress(v: number): void {
     this.root.querySelector<HTMLElement>('.boot .bar i')!.style.width = `${Math.round(v * 100)}%`
@@ -188,6 +214,9 @@ export class TempleUi {
     else if (act === 'enter') this.actions.enter()
     else if (act === 'resume') this.actions.resume()
     else if (act === 'close') this.actions.closePanel()
+    else if (act === 'explore') this.actions.explore()
+    else if (act === 'exit') this.actions.exitExplore()
+    else if (act === 'guide-cancel') this.actions.cancelGuide()
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
     if (t.dataset.char) { this.actions.choose(t.dataset.char as CharacterId); this.refreshCharacter() }

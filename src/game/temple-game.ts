@@ -7,16 +7,32 @@ import type { Renderer } from '../engine/renderer'
 import type { Quality } from '../engine/save'
 import { CONFIG } from './config'
 import { TEMPLE_MODEL_URLS } from './temple-assets'
-import { POINT_TARGETS, TempleWorld, type ShrinePoint } from './temple-world'
+import { POINT_TARGETS, TempleWorld, type ShrinePoint, type ShrinePointId } from './temple-world'
 
-export type TempleMode = 'loading' | 'select' | 'explore' | 'panel' | 'paused'
+/**
+ * - `browse`: in the temple, mouse is free for the page; the visitor stands still (default after entering).
+ * - `explore`: WASD / arrows / stick move the visitor. The mouse is still never captured.
+ * - `panel`: a ritual panel is open; movement stops and resumes into the previous mode on close.
+ */
+export type TempleMode = 'loading' | 'select' | 'browse' | 'explore' | 'panel'
 
 const HALF_HEIGHT = 0.55
 const RADIUS = 0.36
-const EYE = 1.62
+const FOOT_OFFSET = HALF_HEIGHT + RADIUS
+const LOOK_HEIGHT = 1.25
+const ZOOM_MIN = 2.4
+const ZOOM_MAX = 8
+const PITCH_MIN = -0.2
+const PITCH_MAX = 1.15
+/** Extra reach beyond a station's prompt radius at which a click still opens it. */
+const CLICK_REACH = 1.4
+
+export type ClickResult = { kind: 'open'; id: ShrinePointId } | { kind: 'far'; point: ShrinePoint } | null
 
 export class TempleGame {
   mode: TempleMode = 'loading'
+  /** Mode to return to when a panel closes. */
+  private resumeMode: 'browse' | 'explore' = 'browse'
   reducedMotion = false
   readonly physics = new Physics(-24)
   readonly world: TempleWorld
@@ -24,15 +40,26 @@ export class TempleGame {
   private readonly body: RAPIER.RigidBody
   private readonly collider: RAPIER.Collider
   private readonly controller: RAPIER.KinematicCharacterController
+  private readonly raycaster = new THREE.Raycaster()
   private yaw = 0
-  private pitch = -0.04
+  private pitch = 0.32
+  private zoom = 4.6
+  private camDistance = 4.6
+  private readonly camTarget = new THREE.Vector3()
+  private camReady = false
+  private heading = Math.PI
+  private speedNow = 0
   private vy = 0
   private time = 0
-  private bob = 0
   private selectOrbit = 0
-  private enteredAt = 0
+  /** Decorations temporarily hidden because they sit between the lens and the visitor. */
+  private readonly occluders: THREE.Object3D[] = []
   active: ShrinePoint | null = null
+  /** Station the guide arrow currently points to. */
+  guide: ShrinePoint | null = null
   onNear: (point: ShrinePoint | null) => void = () => undefined
+  onGuide: (point: ShrinePoint | null, distance: number) => void = () => undefined
+  onClickResult: (result: ClickResult) => void = () => undefined
 
   constructor(private readonly renderer: Renderer, private readonly input: Input, private readonly audio: Audio) {
     this.world = new TempleWorld(this.physics)
@@ -47,11 +74,9 @@ export class TempleGame {
   }
 
   async loadModels(assets: Assets): Promise<void> {
-    const [avatar, statue] = await Promise.allSettled([assets.gltf(TEMPLE_MODEL_URLS.avatar), assets.gltf(TEMPLE_MODEL_URLS.guanyin)])
-    if (avatar.status === 'fulfilled') this.world.setAvatar(avatar.value.scene)
-    else console.warn('avatar model failed', avatar.reason)
-    if (statue.status === 'fulfilled') this.world.setStatue(statue.value.scene)
-    else console.warn('statue model failed', statue.reason)
+    // The visitor is the procedural chibi placeholder; only the Guanyin statue is a loaded model.
+    try { this.world.setStatue((await assets.gltf(TEMPLE_MODEL_URLS.guanyin)).scene) }
+    catch (err) { console.warn('statue model failed', err) }
   }
 
   get position(): THREE.Vector3 {
@@ -59,45 +84,72 @@ export class TempleGame {
     return new THREE.Vector3(t.x, t.y, t.z)
   }
 
-  showSelect(): void {
-    this.mode = 'select'
-    this.world.setAvatarVisible(true)
+  get feet(): THREE.Vector3 {
+    const t = this.body.translation()
+    return new THREE.Vector3(t.x, t.y - FOOT_OFFSET, t.z)
   }
 
+  showSelect(): void {
+    this.mode = 'select'
+    this.world.placeAvatarAtStand()
+  }
+
+  /** Walk through the gate: the visitor appears inside, in browse mode (mouse free, standing still). */
   enter(): void {
-    this.mode = 'explore'
-    this.enteredAt = this.time
-    this.world.setAvatarVisible(false)
     const s = this.world.spawn
     this.body.setTranslation({ x: s.x, y: s.y, z: s.z }, true)
     this.body.setNextKinematicTranslation({ x: s.x, y: s.y, z: s.z })
     this.yaw = 0
-    this.pitch = -0.04
+    this.pitch = 0.32
+    this.heading = Math.PI
+    this.camReady = false
+    this.mode = 'browse'
+    this.resumeMode = 'browse'
     this.audio.play('bell')
   }
 
-  resume(): void {
-    this.mode = 'explore'
-    this.enteredAt = this.time
+  startExplore(): void {
+    if (this.mode === 'browse' || this.mode === 'panel') { this.mode = 'explore'; this.resumeMode = 'explore' }
   }
+
+  stopExplore(): void {
+    if (this.mode === 'explore') { this.mode = 'browse'; this.resumeMode = 'browse' }
+    this.input.clearHeld()
+  }
+
+  openPanel(): void {
+    if (this.mode === 'browse' || this.mode === 'explore') { this.resumeMode = this.mode; this.mode = 'panel' }
+    this.input.clearHeld()
+  }
+
+  closePanel(): void {
+    if (this.mode === 'panel') this.mode = this.resumeMode
+    this.input.clearHeld()
+  }
+
+  get inTemple(): boolean { return this.mode === 'browse' || this.mode === 'explore' || this.mode === 'panel' }
 
   setQuality(quality: Quality): void { this.renderer.applyQuality(quality) }
 
   step(dt: number): void {
     this.time += dt
-    if (this.mode !== 'explore') { this.input.consume('interact'); this.input.takeLook(); return }
-    const raw = this.input.takeLook()
-    // Pointer-lock acquisition can report one huge movement spike; ignore it and cap per-step turns.
-    const settle = this.time - this.enteredAt < 0.25
-    const look = settle ? { x: 0, y: 0 } : { x: THREE.MathUtils.clamp(raw.x, -0.25, 0.25), y: THREE.MathUtils.clamp(raw.y, -0.25, 0.25) }
-    this.yaw -= look.x
-    this.pitch = THREE.MathUtils.clamp(this.pitch - look.y, -1.1, 0.9)
+    if (this.mode === 'loading' || this.mode === 'select') { this.input.consume('interact'); this.input.takeLook(); this.input.takeZoom(); this.input.takeClicks(); return }
+    const free = this.mode === 'browse' || this.mode === 'explore'
+    const look = this.input.takeLook()
+    const zoom = this.input.takeZoom()
+    if (free) {
+      this.yaw -= look.x
+      this.pitch = THREE.MathUtils.clamp(this.pitch + look.y, PITCH_MIN, PITCH_MAX)
+      this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), ZOOM_MIN, ZOOM_MAX)
+    }
+    const moving = this.mode === 'explore'
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw))
-    const wish = new THREE.Vector3().addScaledVector(right, this.input.move.x).addScaledVector(forward, this.input.move.y)
+    const wish = new THREE.Vector3()
+    if (moving) wish.addScaledVector(right, this.input.move.x).addScaledVector(forward, this.input.move.y)
     const amount = Math.min(1, wish.length())
     if (amount > 0.01) wish.normalize()
-    const speed = (this.input.held('sprint') ? CONFIG.player.sprintSpeed : CONFIG.player.walkSpeed) * amount
+    const speed = moving ? (this.input.held('sprint') ? CONFIG.player.sprintSpeed : CONFIG.player.walkSpeed) * amount : 0
     const grounded = this.controller.computedGrounded()
     this.vy = grounded ? -1 : Math.max(-30, this.vy - 24 * dt)
     const desired = { x: wish.x * speed * dt, y: this.vy * dt, z: wish.z * speed * dt }
@@ -108,39 +160,121 @@ export class TempleGame {
     if (next.y < -5) { const s = this.world.spawn; next.x = s.x; next.y = s.y; next.z = s.z }
     this.body.setNextKinematicTranslation(next)
     this.physics.step(dt)
-    this.bob += speed * dt * 2.2
-    const near = this.world.nearestPoint(new THREE.Vector3(next.x, 0, next.z))
+    this.speedNow = Math.hypot(m.x, m.z) / Math.max(dt, 1e-4)
+    if (amount > 0.01) {
+      const targetHeading = Math.atan2(wish.x, wish.z)
+      let diff = targetHeading - this.heading
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff))
+      this.heading += diff * Math.min(1, dt * 12)
+    }
+
+    const here = new THREE.Vector3(next.x, 0, next.z)
+    const near = this.mode === 'panel' ? this.active : this.world.nearestPoint(here)
     if (near?.id !== this.active?.id) { this.active = near; this.onNear(near) }
-    if (this.input.consume('interact') && this.active) window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.active.id }))
+    if (this.guide) {
+      const d = Math.hypot(this.guide.position.x - next.x, this.guide.position.z - next.z)
+      if (near?.id === this.guide.id) this.setGuide(null)
+      else this.onGuide(this.guide, d)
+    }
+    if (free && this.input.consume('interact') && this.active) window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.active.id }))
+    else this.input.consume('interact')
+    const clicks = this.input.takeClicks()
+    if (free && clicks.length) this.onClickResult(this.pick(clicks[clicks.length - 1]))
+  }
+
+  /** Resolve a canvas click to a station; open it when close enough. */
+  pick(client: { x: number; y: number }): ClickResult {
+    const rect = this.renderer.gl.domElement.getBoundingClientRect()
+    const ndc = new THREE.Vector2(((client.x - rect.left) / rect.width) * 2 - 1, -((client.y - rect.top) / rect.height) * 2 + 1)
+    this.raycaster.setFromCamera(ndc, this.camera)
+    const ignore = new Set(this.world.pickIgnore)
+    const visible = (o: THREE.Object3D | null): boolean => {
+      for (let n = o; n; n = n.parent) { if (!n.visible || ignore.has(n)) return false }
+      return true
+    }
+    const hit = this.raycaster.intersectObjects(this.world.scene.children, true).find(h => h.object instanceof THREE.Mesh && visible(h.object))
+    if (!hit) return null
+    let best: ShrinePoint | null = null
+    let bestD = 2.4
+    this.world.points.forEach((point, i) => {
+      const [tx, tz] = POINT_TARGETS[i]
+      const d = Math.min(Math.hypot(hit.point.x - point.position.x, hit.point.z - point.position.z), Math.hypot(hit.point.x - tx, hit.point.z - tz))
+      if (d < bestD) { bestD = d; best = point }
+    })
+    const point = best as ShrinePoint | null
+    if (!point) return null
+    const p = this.body.translation()
+    const reach = Math.hypot(point.position.x - p.x, point.position.z - p.z)
+    if (reach <= point.radius + CLICK_REACH) return { kind: 'open', id: point.id }
+    return { kind: 'far', point }
+  }
+
+  /**
+   * Lanterns, beams and other collider-less decorations can still block the view; hide any mesh crossing the
+   * lens-to-visitor segment for this frame. Walls never reach here because the physics ray already pulled the lens in.
+   */
+  private hideOccluders(): void {
+    for (const o of this.occluders) o.visible = true
+    this.occluders.length = 0
+    const toTarget = this.camTarget.clone().sub(this.camera.position)
+    const dist = toTarget.length()
+    if (dist < 0.2) return
+    toTarget.divideScalar(dist)
+    // Start a little behind the lens so meshes that enclose the camera are caught too.
+    const origin = this.camera.position.clone().addScaledVector(toTarget, -0.6)
+    this.raycaster.set(origin, toTarget)
+    this.raycaster.near = 0
+    this.raycaster.far = dist + 0.6 - 0.45
+    const ignore = new Set(this.world.pickIgnore)
+    for (const hit of this.raycaster.intersectObjects(this.world.scene.children, true)) {
+      let skip = false
+      for (let n: THREE.Object3D | null = hit.object; n; n = n.parent) { if (ignore.has(n) || !n.visible) { skip = true; break } }
+      if (skip || !(hit.object instanceof THREE.Mesh)) continue
+      hit.object.visible = false
+      this.occluders.push(hit.object)
+    }
+    this.raycaster.far = Infinity
+  }
+
+  /** Show a guide arrow toward a station instead of teleporting. */
+  setGuide(id: ShrinePointId | null): void {
+    this.guide = id ? this.world.points.find(p => p.id === id) ?? null : null
+    const p = this.body.translation()
+    this.onGuide(this.guide, this.guide ? Math.hypot(this.guide.position.x - p.x, this.guide.position.z - p.z) : 0)
   }
 
   render(_alpha: number, frameSeconds: number): void {
     if (this.camera.fov !== CONFIG.camera.fov) { this.camera.fov = CONFIG.camera.fov; this.camera.updateProjectionMatrix() }
     const p = this.position
+    const dt = Math.min(frameSeconds, 0.1)
     if (this.mode === 'select' || this.mode === 'loading') {
       this.selectOrbit += frameSeconds * (this.reducedMotion ? 0 : 0.12)
       const a = Math.sin(this.selectOrbit) * 0.35
-      this.camera.position.set(Math.sin(a) * 3.4, 1.5, 23.2 + Math.cos(a) * 3.4)
-      this.camera.lookAt(0, 1.05, 23.2)
+      this.camera.position.set(Math.sin(a) * 3.2, 1.35, 23.2 + Math.cos(a) * 3.2)
+      this.camera.lookAt(0, 0.85, 23.2)
+      this.world.animateAvatar(dt, this.time, 0, this.reducedMotion)
+      this.world.setGuide(null, null, this.time)
     } else {
-      const bob = this.reducedMotion ? 0 : Math.sin(this.bob) * 0.03
-      this.camera.position.set(p.x, p.y - HALF_HEIGHT - RADIUS + EYE + bob, p.z)
-      this.camera.rotation.order = 'YXZ'
-      this.camera.rotation.set(this.pitch, this.yaw, 0)
+      const feet = this.feet
+      this.world.placeAvatar(feet, this.heading)
+      this.world.animateAvatar(dt, this.time, this.speedNow, this.reducedMotion)
+      const target = new THREE.Vector3(feet.x, feet.y + LOOK_HEIGHT, feet.z)
+      if (!this.camReady) { this.camTarget.copy(target); this.camDistance = this.zoom; this.camReady = true }
+      else this.camTarget.lerp(target, 1 - Math.exp(-14 * dt))
+      const dir = new THREE.Vector3(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch))
+      // Pull the camera in front of walls/pillars between the visitor and the lens.
+      let allowed = this.zoom
+      const ray = new RAPIER.Ray({ x: this.camTarget.x, y: this.camTarget.y, z: this.camTarget.z }, { x: dir.x, y: dir.y, z: dir.z })
+      const hit = this.physics.world.castRay(ray, this.zoom + 0.3, true, undefined, undefined, undefined, this.body)
+      if (hit) allowed = Math.max(0.5, Math.min(allowed, hit.timeOfImpact - 0.3))
+      // Snap closer immediately when blocked; ease back out when clear.
+      this.camDistance = allowed < this.camDistance ? allowed : THREE.MathUtils.damp(this.camDistance, allowed, 6, dt)
+      this.camera.position.copy(this.camTarget).addScaledVector(dir, this.camDistance)
+      this.camera.lookAt(this.camTarget)
+      this.hideOccluders()
+      this.world.setGuide(this.guide ? feet : null, this.guide ? this.guide.position : null, this.time)
     }
-    this.world.update(frameSeconds, this.time, p, this.mode === 'explore' || this.mode === 'panel' ? this.active?.id ?? null : null)
+    this.world.update(frameSeconds, this.time, p, this.inTemple ? this.active?.id ?? null : null)
     this.renderer.render(this.world.scene, this.camera)
-  }
-
-  /** Teleport target used by the HUD map so visitors can reach a station quickly. */
-  travelTo(id: string): void {
-    const index = this.world.points.findIndex(item => item.id === id)
-    if (index < 0) return
-    const p = this.world.points[index].position
-    const [tx, tz] = POINT_TARGETS[index]
-    this.yaw = Math.atan2(-(tx - p.x), -(tz - p.z))
-    this.pitch = -0.12
-    this.body.setTranslation({ x: p.x, y: 1.2, z: p.z }, true)
-    this.body.setNextKinematicTranslation({ x: p.x, y: 1.2, z: p.z })
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Unified input: keyboard + mouse (pointer lock), gamepad and touch all feed one action state.
+ * Unified input: keyboard + mouse (drag to look, never pointer lock), gamepad and touch all feed one action state.
  * Gameplay reads `move`, `look` and `pressed()/held()`; it never checks raw keys.
  *
  * Call `endFrame()` once per rendered frame after gameplay consumed edge-triggered presses.
@@ -11,7 +11,7 @@ const KEY_BINDINGS: Record<Action, string[]> = {
   jump: ['Space'],
   sprint: ['ShiftLeft', 'ShiftRight'],
   dash: ['KeyF', 'KeyJ'],
-  pause: ['Escape', 'KeyP'],
+  pause: ['Escape'],
   confirm: ['Enter', 'NumpadEnter'],
   // Menus handle Escape/Backspace themselves via DOM keydown; `back` is the gamepad B button.
   back: [],
@@ -41,47 +41,105 @@ export class Input {
   private padId = ''
   private listeners: Array<() => void> = []
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement) {
     const on = <K extends keyof WindowEventMap>(target: Window | HTMLElement, type: K, fn: (e: WindowEventMap[K]) => void, opts?: AddEventListenerOptions) => {
       target.addEventListener(type, fn as EventListener, opts)
       this.listeners.push(() => target.removeEventListener(type, fn as EventListener, opts))
     }
     on(window, 'keydown', e => {
       if (e.repeat) return
+      // Never treat typing in a text field (wish form) as movement or shortcuts.
+      const typing = (e.target as HTMLElement | null)?.matches?.('input, textarea, select, [contenteditable="true"]')
+      if (typing) return
       this.keys.add(e.code)
       this.method = 'keyboard'
       for (const [action, codes] of Object.entries(KEY_BINDINGS) as [Action, string[]][]) {
         if (codes.includes(e.code)) this.pressed_.add(action)
       }
-      // Keep the page from scrolling, but never block typing in text fields (leaderboard name).
-      const typing = (e.target as HTMLElement | null)?.matches?.('input, textarea')
-      if (!typing && (e.code === 'Space' || e.code.startsWith('Arrow'))) e.preventDefault()
+      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault()
     })
     on(window, 'keyup', e => this.keys.delete(e.code))
-    on(window, 'blur', () => this.keys.clear())
+    on(window, 'blur', () => this.clearHeld())
     on(window, 'gamepaddisconnected', e => {
       if (e.gamepad.index === this.padIndex) this.resetPad()
     })
-    on(window, 'mousedown', e => {
-      // Left click dashes while the mouse is captured for camera look.
-      if (document.pointerLockElement === canvas && e.button === 0) this.pressed_.add('dash')
-    })
-    on(window, 'mousemove', e => {
-      if (document.pointerLockElement !== canvas) return
-      this.look.x += e.movementX * 0.0022
-      this.look.y += e.movementY * 0.0022
-    })
-  }
-
-  /** Request pointer lock for mouse look (must be called from a user gesture). */
-  lockPointer(): void {
-    if (this.method !== 'touch' && document.pointerLockElement !== this.canvas) {
-      this.canvas.requestPointerLock?.()?.catch?.(() => undefined)
+    // Mouse never captures the pointer: drag on the canvas to turn (right button, or left drag), wheel zooms,
+    // and a short left click selects whatever was clicked in the scene.
+    const target = canvas as HTMLElement
+    if (typeof target?.addEventListener !== 'function') return
+    target.addEventListener('contextmenu', e => e.preventDefault())
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') return
+      if (e.button !== 0 && e.button !== 2) return
+      this.drag = { id: e.pointerId, button: e.button, x: e.clientX, y: e.clientY, moved: 0, at: performance.now() }
+      try { target.setPointerCapture(e.pointerId) } catch { /* capture is optional */ }
     }
+    const onMove = (e: PointerEvent) => {
+      const d = this.drag
+      if (!d || d.id !== e.pointerId) return
+      const dx = e.clientX - d.x
+      const dy = e.clientY - d.y
+      d.x = e.clientX
+      d.y = e.clientY
+      d.moved += Math.abs(dx) + Math.abs(dy)
+      if (d.button === 2 || d.moved > 6) {
+        this.look.x += dx * 0.0045
+        this.look.y += dy * 0.0045
+        this.dragging = true
+      }
+    }
+    const onUp = (e: PointerEvent) => {
+      const d = this.drag
+      if (!d || d.id !== e.pointerId) return
+      if (d.button === 0 && d.moved <= 6 && performance.now() - d.at < 600) this.clicks.push({ x: e.clientX, y: e.clientY })
+      this.drag = null
+      this.dragging = false
+    }
+    target.addEventListener('pointerdown', onDown)
+    target.addEventListener('pointermove', onMove)
+    target.addEventListener('pointerup', onUp)
+    target.addEventListener('pointercancel', () => { this.drag = null; this.dragging = false })
+    target.addEventListener('wheel', e => {
+      e.preventDefault()
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
+      this.zoom += e.deltaY * unit
+    }, { passive: false })
+    this.listeners.push(() => {
+      target.removeEventListener('pointerdown', onDown)
+      target.removeEventListener('pointermove', onMove)
+      target.removeEventListener('pointerup', onUp)
+    })
   }
 
-  unlockPointer(): void {
-    if (document.pointerLockElement) document.exitPointerLock()
+  /** True while a mouse drag is turning the camera (lets the UI show a grabbing cursor). */
+  dragging = false
+  private drag: { id: number; button: number; x: number; y: number; moved: number; at: number } | null = null
+  private clicks: { x: number; y: number }[] = []
+  private zoom = 0
+
+  /** Clicks (client pixels) on the 3D canvas since the last call. */
+  takeClicks(): { x: number; y: number }[] {
+    const out = this.clicks
+    this.clicks = []
+    return out
+  }
+
+  /** Accumulated wheel delta in pixels since the last call (positive = zoom out). */
+  takeZoom(): number {
+    const z = this.zoom
+    this.zoom = 0
+    return z
+  }
+
+  /** Release every held key/stick so the visitor stops when a panel opens or the tab loses focus. */
+  clearHeld(): void {
+    this.keys.clear()
+    this.touchMove.x = 0
+    this.touchMove.y = 0
+    this.touchButtons.clear()
+    this.move.x = 0
+    this.move.y = 0
+    this.pressed_.clear()
   }
 
   /** Touch controls feed these from the on-screen joystick and buttons. */

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
 
@@ -49,7 +50,7 @@ const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStan
 
 export class TempleWorld {
   readonly scene = new THREE.Scene()
-  readonly spawn = new THREE.Vector3(0, 1.2, 25.2)
+  readonly spawn = new THREE.Vector3(0, 1.2, 19.6)
   readonly points: ShrinePoint[] = pointSpecs.map((point, i) => ({
     ...point,
     position: new THREE.Vector3(pointPositions[i][0], 0, pointPositions[i][1]),
@@ -66,7 +67,9 @@ export class TempleWorld {
   private readonly bell = new THREE.Group()
   private readonly woodfish = new THREE.Group()
   private readonly avatarStand = new THREE.Group()
-  private avatarModel?: THREE.Object3D
+  private readonly chibi = new Chibi()
+  private readonly guideArrow: THREE.Mesh
+  private readonly guideBeacon: THREE.Mesh
   private readonly incenseGlow: THREE.PointLight
   private bellImpulse = 0
   private woodfishImpulse = 0
@@ -99,7 +102,21 @@ export class TempleWorld {
     this.addSideArchitecture()
     this.addRitualProps()
     this.addMarkers()
+    this.avatarStand.add(this.chibi.root)
     this.scene.add(this.avatarStand)
+    this.placeAvatarAtStand()
+    const arrowShape = new THREE.Shape()
+    arrowShape.moveTo(0, 0.55); arrowShape.lineTo(0.38, 0); arrowShape.lineTo(0.14, 0); arrowShape.lineTo(0.14, -0.4)
+    arrowShape.lineTo(-0.14, -0.4); arrowShape.lineTo(-0.14, 0); arrowShape.lineTo(-0.38, 0); arrowShape.closePath()
+    const arrowGeo = new THREE.ShapeGeometry(arrowShape)
+    arrowGeo.rotateX(Math.PI / 2)
+    this.guideArrow = new THREE.Mesh(arrowGeo, new THREE.MeshBasicMaterial({ color: '#f2c46a', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }))
+    this.guideArrow.renderOrder = 3
+    this.guideArrow.scale.setScalar(1.6)
+    this.guideBeacon = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 7, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#f2c46a', transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false }))
+    this.guideBeacon.geometry.translate(0, 3.5, 0)
+    this.guideArrow.visible = this.guideBeacon.visible = false
+    this.scene.add(this.guideArrow, this.guideBeacon)
     this.incenseGlow = new THREE.PointLight('#f1a754', 0.22, 7, 2)
     this.incenseGlow.position.set(0, 1.8, -2.6)
     this.scene.add(this.incenseGlow)
@@ -671,47 +688,36 @@ export class TempleWorld {
     this.scene.add(root)
   }
 
-  setAvatar(source: THREE.Object3D): void {
-    this.avatarStand.clear()
-    const model = source.clone(true)
-    const bounds = new THREE.Box3().setFromObject(model)
-    const size = bounds.getSize(new THREE.Vector3())
-    const scale = size.y > 0.01 ? 1.65 / size.y : 1
-    model.scale.setScalar(scale)
-    const scaled = new THREE.Box3().setFromObject(model)
-    model.position.y -= scaled.min.y
-    model.rotation.y = 0
-    model.traverse(obj => {
-      if (!(obj instanceof THREE.Mesh)) return
-      obj.castShadow = true
-      obj.receiveShadow = true
-      if (!obj.material) return
-      obj.material = Array.isArray(obj.material) ? obj.material.map(material => material.clone()) : obj.material.clone()
-    })
-    this.avatarModel = model
-    this.avatarStand.position.set(0, 0, 23.2)
-    this.avatarStand.add(model)
-    this.setCharacter('jade')
+  /** Show the procedural chibi standing at the select-screen stand. */
+  placeAvatarAtStand(): void {
+    this.chibi.root.position.set(0, 0, 23.2)
+    this.chibi.root.rotation.y = 0
   }
-
-  setCharacter(id: string): void {
-    if (!this.avatarModel) return
-    const palette: Record<string, string> = { jade: '#bca77a', vermillion: '#9d3f31', moon: '#84998b' }
-    const tint = new THREE.Color(palette[id] ?? palette.jade)
-    this.avatarModel.traverse(obj => {
-      if (!(obj instanceof THREE.Mesh)) return
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
-      for (const m of mats) {
-        if (m instanceof THREE.MeshStandardMaterial) {
-          if (!m.userData.templeOriginalColor) m.userData.templeOriginalColor = m.color.clone()
-          const original = m.userData.templeOriginalColor as THREE.Color
-          const isGarment = /robe|cloth|fabric|garment|tunic/i.test(`${obj.name} ${m.name}`)
-          m.color.copy(original).lerp(tint, isGarment ? 0.6 : 0.07)
-        }
-      }
-    })
+  /** Follow the player: `feet` is the ground point under the capsule, heading in radians (0 = +Z). */
+  placeAvatar(feet: THREE.Vector3, heading: number): void {
+    this.chibi.root.position.copy(feet)
+    this.chibi.root.rotation.y = heading
   }
-
+  animateAvatar(dt: number, time: number, speed: number, reducedMotion: boolean): void { this.chibi.animate(dt, time, speed, reducedMotion) }
+  setCharacter(id: string): void { this.chibi.setPalette(id) }
+  /** Objects excluded from click picking (the visitor and guidance helpers). */
+  get pickIgnore(): THREE.Object3D[] { return [this.avatarStand, this.guideArrow, this.guideBeacon] }
+  /** Point a guide arrow from the visitor toward a station; null hides it. */
+  setGuide(from: THREE.Vector3 | null, to: THREE.Vector3 | null, time: number): void {
+    const show = !!from && !!to
+    this.guideArrow.visible = show
+    this.guideBeacon.visible = show
+    if (!from || !to) return
+    const dir = new THREE.Vector3(to.x - from.x, 0, to.z - from.z)
+    const len = dir.length()
+    if (len < 0.01) return
+    dir.divideScalar(len)
+    this.guideArrow.position.set(from.x + dir.x * 2.1, from.y + 0.1, from.z + dir.z * 2.1)
+    this.guideArrow.rotation.set(0, Math.atan2(dir.x, dir.z), 0)
+    this.guideBeacon.position.set(to.x, 0, to.z)
+    const pulse = 0.55 + Math.sin(time * 4) * 0.15
+    ;(this.guideBeacon.material as THREE.MeshBasicMaterial).opacity = pulse * 0.5
+  }
   setAvatarVisible(visible: boolean): void { this.avatarStand.visible = visible }
 
   nearestPoint(position: THREE.Vector3): ShrinePoint | null {
