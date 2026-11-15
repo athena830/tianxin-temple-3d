@@ -190,9 +190,13 @@ export class TempleStore {
   }
 
   ringBell(): void { this.addRecord('鳴鐘', '願心安定，祝福相隨。') }
+  strikeDrum(): void { this.addRecord('暮鼓鳴志', '鼓聲深沉悠遠，收攝心念，宏願堅定。') }
   tapWoodfish(): void { this.addRecord('敲木魚', '靜心一念。') }
   offerIncense(): void { this.addRecord('上香祈福', '於觀世音菩薩主殿敬香。') }
   worshipTiangong(): void { this.addRecord('參拜天公爐', '於前庭天公爐向玉皇上帝合掌敬拜。') }
+  worshipYuhuang(): void { this.addRecord('凌霄朝拜', '於後殿凌霄寶殿至誠禮拜玉皇上帝，蒙沐聖眷，萬事禎祥。') }
+  burnGold(type: string): void { this.addRecord('八角金爐化金', `虔化「${type}」入八角金亭，化吉納祥，福澤延綿。`) }
+  divineBobei(resultText: string, detail: string): void { this.addRecord('擲筊請示', `${resultText}：${detail}`) }
 }
 
 export function formatRecordDate(at: number): string {

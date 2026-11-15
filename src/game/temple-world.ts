@@ -2,11 +2,14 @@ import * as THREE from 'three'
 import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
-import { FrontCourtyard, PAVILION, STAND, TIANGONG, WISH_POOL } from './temple-courtyard'
+import { FrontCourtyard, GOLD_FURNACE, PAVILION, STAND, TIANGONG, WISH_POOL } from './temple-courtyard'
 
 export type ShrinePointId =
   | 'incense' | 'prayer' | 'offerings' | 'daily-lot' | 'chess'
   | 'lamps' | 'woodfish' | 'bell' | 'wishing-pool' | 'prayer-wall' | 'records' | 'tiangong'
+  | 'drum' | 'yuhuang' | 'gold-furnace'
+
+export type TimeOfDay = 'day' | 'dawn' | 'dusk' | 'night'
 
 export type ShrinePoint = {
   id: ShrinePointId
@@ -35,11 +38,15 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'prayer-wall', title: '祈願牆', subtitle: '閱讀此裝置上的祝願', radius: 3.0 },
   { id: 'records', title: '祈福紀錄', subtitle: '回看本機保存的參拜足跡', radius: 3.0 },
   { id: 'tiangong', title: '參拜玉皇上帝', subtitle: '於前庭天公爐前合掌敬拜', radius: 2.8 },
+  { id: 'drum', title: '鼓樓擊鼓', subtitle: '擊鼓鳴志，收攝心念', radius: 2.8 },
+  { id: 'yuhuang', title: '後殿凌霄寶殿', subtitle: '朝拜玉皇上帝，蒙沐浩恩', radius: 3.2 },
+  { id: 'gold-furnace', title: '八角金亭', subtitle: '化金祈福，添香油聚善緣', radius: 3.0 },
 ]
 const pointPositions: [number, number][] = [
   [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [WISH_POOL.x + 3.9, WISH_POOL.z], [14.6, 4.3], [15, 0.2],
   [TIANGONG.x - 3.0, TIANGONG.z],
+  [-12.4, -5.6], [0, -18.2], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
@@ -47,6 +54,7 @@ export const POINT_TARGETS: [number, number][] = [
   [0, -2.55], [0, -12.2], [-4.4, -4.2], [-12, 1.2], [PAVILION.x, PAVILION.z],
   [12.5, -1.6], [8.5, -8.5], [15.2, -8], [WISH_POOL.x, WISH_POOL.z], [17.5, 4.3], [17.2, 0.2],
   [TIANGONG.x, TIANGONG.z],
+  [-15.2, -8.0], [0, -24.4], [GOLD_FURNACE.x, GOLD_FURNACE.z],
 ]
 
 const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStandardMaterial =>
@@ -70,6 +78,7 @@ export class TempleWorld {
   private readonly roof = new THREE.Group()
   private readonly rearRoof = new THREE.Group()
   private readonly bell = new THREE.Group()
+  private readonly drum = new THREE.Group()
   private readonly woodfish = new THREE.Group()
   private readonly avatarStand = new THREE.Group()
   private readonly chibi = new Chibi()
@@ -77,8 +86,15 @@ export class TempleWorld {
   private readonly guideBeacon: THREE.Mesh
   private readonly incenseGlow: THREE.PointLight
   private readonly courtyard: FrontCourtyard
+  private readonly sun: THREE.DirectionalLight
+  private readonly hemiLight: THREE.HemisphereLight
+  private skyCv!: HTMLCanvasElement
+  private skyTex!: THREE.CanvasTexture
+  private cloudMat!: THREE.MeshBasicMaterial
+  private timeOfDay: TimeOfDay = 'day'
   private puffTimer = 0
   private bellImpulse = 0
+  private drumImpulse = 0
   private woodfishImpulse = 0
   private readonly lamps: { id: LampId; position: THREE.Vector3 }[] = [
     { id: 'peace', position: new THREE.Vector3(10, 0, -1.6) },
@@ -91,20 +107,21 @@ export class TempleWorld {
     // Elegant warm celestial sky & gentle horizon fog (澄澈淡碧與暖金宮闕天空色調)
     this.scene.background = new THREE.Color('#98b8cb')
     this.scene.fog = new THREE.Fog('#bfd4df', 65, 175)
-    this.scene.add(new THREE.HemisphereLight('#fbf4e8', '#636b69', 1.1))
-    const sun = new THREE.DirectionalLight('#fff0d0', 1.35)
-    sun.position.set(-18, 34, 30)
-    sun.target.position.set(0, 0, 12)
-    sun.castShadow = true
-    sun.shadow.mapSize.set(2048, 2048)
-    sun.shadow.camera.left = -40
-    sun.shadow.camera.right = 40
-    sun.shadow.camera.top = 52
-    sun.shadow.camera.bottom = -36
-    sun.shadow.camera.near = 1
-    sun.shadow.camera.far = 110
-    sun.shadow.normalBias = 0.035
-    this.scene.add(sun, sun.target)
+    this.hemiLight = new THREE.HemisphereLight('#fbf4e8', '#636b69', 1.1)
+    this.scene.add(this.hemiLight)
+    this.sun = new THREE.DirectionalLight('#fff0d0', 1.35)
+    this.sun.position.set(-18, 34, 30)
+    this.sun.target.position.set(0, 0, 12)
+    this.sun.castShadow = true
+    this.sun.shadow.mapSize.set(2048, 2048)
+    this.sun.shadow.camera.left = -40
+    this.sun.shadow.camera.right = 40
+    this.sun.shadow.camera.top = 52
+    this.sun.shadow.camera.bottom = -36
+    this.sun.shadow.camera.near = 1
+    this.sun.shadow.camera.far = 110
+    this.sun.shadow.normalBias = 0.035
+    this.scene.add(this.sun, this.sun.target)
 
     this.addSkyDome()
     this.addClouds()
@@ -683,27 +700,26 @@ export class TempleWorld {
     this.scene.add(lintel)
 
     // 2. Ceremonial Great Drum & Stand (大太鼓與雕花鼓架)
-    const drumGroup = new THREE.Group()
-    drumGroup.position.set(dx, 2.8, dz)
+    this.drum.position.set(dx, 2.8, dz)
 
     // Trestle stand (鼓架)
     const standLeg1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.6, 1.4), darkWood)
     standLeg1.position.set(-0.55, -0.6, 0)
     const standLeg2 = standLeg1.clone()
     standLeg2.position.set(0.55, -0.6, 0)
-    drumGroup.add(standLeg1, standLeg2)
+    this.drum.add(standLeg1, standLeg2)
 
     // Drum Barrel (朱漆桶狀鼓身，旋轉90度橫臥)
     const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 0.95, 20), makeMat('#8b261b', 0.68))
     barrel.rotation.z = Math.PI / 2
-    drumGroup.add(barrel)
+    this.drum.add(barrel)
 
     // Gold Bronze Drum Rivets (兩側金色鼓釘環)
     for (const side of [-0.46, 0.46]) {
       const rivetRing = new THREE.Mesh(new THREE.TorusGeometry(0.69, 0.035, 8, 20), gold)
       rivetRing.rotation.y = Math.PI / 2
       rivetRing.position.x = side
-      drumGroup.add(rivetRing)
+      this.drum.add(rivetRing)
     }
 
     // Drumheads (兩端牛皮鼓面與八卦太極彩繪意象)
@@ -711,11 +727,11 @@ export class TempleWorld {
       const skin = new THREE.Mesh(new THREE.CylinderGeometry(0.67, 0.67, 0.04, 20), makeMat('#e2d5bd', 0.9))
       skin.rotation.z = Math.PI / 2
       skin.position.x = side
-      drumGroup.add(skin)
+      this.drum.add(skin)
       const taiji = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.045, 12), gold)
       taiji.rotation.z = Math.PI / 2
       taiji.position.x = side
-      drumGroup.add(taiji)
+      this.drum.add(taiji)
     }
 
     // Drumsticks (鼓架旁雙置鼓槌)
@@ -725,9 +741,9 @@ export class TempleWorld {
     const stick2 = stick1.clone()
     stick2.position.set(0.65, 0.1, -0.35)
     stick2.rotation.z = 0.4
-    drumGroup.add(stick1, stick2)
+    this.drum.add(stick1, stick2)
 
-    this.scene.add(drumGroup)
+    this.scene.add(this.drum)
 
     // 3. Pavilion Roof (鼓樓飛簷瓦頂)
     const drumRoof = this.createRoof(4.2, 3.5, 4.1, 5.4)
@@ -968,7 +984,8 @@ export class TempleWorld {
   private addMarkers(): void {
     const colors: Record<ShrinePointId, string> = {
       incense: '#e8bb71', prayer: '#e8bb71', offerings: '#d8a45e', 'daily-lot': '#d8a45e', chess: '#a9c2a9',
-      lamps: '#edba61', woodfish: '#d68c63', bell: '#e8c77d', 'wishing-pool': '#a8d2c6', 'prayer-wall': '#e8c77d', records: '#e8c77d', tiangong: '#f0c070',
+      lamps: '#edba61', woodfish: '#d68c63', bell: '#e8c77d', 'wishing-pool': '#a8d2c6', 'prayer-wall': '#e8c77d',
+      records: '#e8c77d', tiangong: '#f0c070', drum: '#d68c63', yuhuang: '#f5d77f', 'gold-furnace': '#e27b4e',
     }
     for (const point of this.points) {
       const mat = new THREE.MeshBasicMaterial({ color: colors[point.id], transparent: true, opacity: 0.42, depthWrite: false })
@@ -1105,29 +1122,98 @@ export class TempleWorld {
 
   private addSkyDome(): void {
     // Atmospheric gradient dome canvas texture: zenith pale-azure to horizon warm-cream
-    const cv = document.createElement('canvas')
-    cv.width = 64
-    cv.height = 256
-    const ctx = cv.getContext('2d')!
-    const grad = ctx.createLinearGradient(0, 0, 0, 256)
-    grad.addColorStop(0, '#5a8fa8')    // Sky zenith deep clear azure
-    grad.addColorStop(0.35, '#86adbe') // Soft daytime blue
-    grad.addColorStop(0.72, '#c1d4dc') // Haze layer
-    grad.addColorStop(1, '#ebe4d3')    // Warm temple horizon
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, 64, 256)
-    const tex = new THREE.CanvasTexture(cv)
-    tex.colorSpace = THREE.SRGBColorSpace
+    this.skyCv = document.createElement('canvas')
+    this.skyCv.width = 64
+    this.skyCv.height = 256
+    this.renderSkyGradient('day')
+    this.skyTex = new THREE.CanvasTexture(this.skyCv)
+    this.skyTex.colorSpace = THREE.SRGBColorSpace
 
     const domeGeo = new THREE.SphereGeometry(180, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.52)
-    const domeMat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false, fog: false })
+    const domeMat = new THREE.MeshBasicMaterial({ map: this.skyTex, side: THREE.BackSide, depthWrite: false, fog: false })
     const dome = new THREE.Mesh(domeGeo, domeMat)
     dome.position.set(0, -6, 10)
     this.scene.add(dome)
   }
 
+  private renderSkyGradient(mode: TimeOfDay): void {
+    const ctx = this.skyCv.getContext('2d')!
+    const grad = ctx.createLinearGradient(0, 0, 0, 256)
+    if (mode === 'dawn') {
+      grad.addColorStop(0, '#2c3b59')
+      grad.addColorStop(0.35, '#8c4840')
+      grad.addColorStop(0.72, '#d47752')
+      grad.addColorStop(1, '#fad794')
+    } else if (mode === 'dusk') {
+      grad.addColorStop(0, '#1c1c38')
+      grad.addColorStop(0.35, '#5e2348')
+      grad.addColorStop(0.72, '#a63e3d')
+      grad.addColorStop(1, '#e67e22')
+    } else if (mode === 'night') {
+      grad.addColorStop(0, '#050811')
+      grad.addColorStop(0.35, '#0b1424')
+      grad.addColorStop(0.72, '#121e33')
+      grad.addColorStop(1, '#1b2a45')
+    } else {
+      // day
+      grad.addColorStop(0, '#5a8fa8')
+      grad.addColorStop(0.35, '#86adbe')
+      grad.addColorStop(0.72, '#c1d4dc')
+      grad.addColorStop(1, '#ebe4d3')
+    }
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, 64, 256)
+  }
+
+  getTimeOfDay(): TimeOfDay { return this.timeOfDay }
+
+  setTimeOfDay(mode: TimeOfDay): void {
+    this.timeOfDay = mode
+    this.renderSkyGradient(mode)
+    if (this.skyTex) this.skyTex.needsUpdate = true
+
+    if (mode === 'dawn') {
+      this.scene.background = new THREE.Color('#ba6a55')
+      ;(this.scene.fog as THREE.Fog).color.set('#c77a63')
+      this.sun.color.set('#ffcca0')
+      this.sun.intensity = 1.15
+      this.hemiLight.color.set('#ffd8b8')
+      this.hemiLight.groundColor.set('#4a3832')
+      this.hemiLight.intensity = 0.95
+      if (this.cloudMat) { this.cloudMat.color.set('#fedbc7'); this.cloudMat.opacity = 0.85 }
+    } else if (mode === 'dusk') {
+      this.scene.background = new THREE.Color('#6a2838')
+      ;(this.scene.fog as THREE.Fog).color.set('#7d3242')
+      this.sun.color.set('#ff7733')
+      this.sun.intensity = 0.95
+      this.hemiLight.color.set('#ff9966')
+      this.hemiLight.groundColor.set('#2d1e24')
+      this.hemiLight.intensity = 0.8
+      if (this.cloudMat) { this.cloudMat.color.set('#fca57c'); this.cloudMat.opacity = 0.88 }
+    } else if (mode === 'night') {
+      this.scene.background = new THREE.Color('#0b101c')
+      ;(this.scene.fog as THREE.Fog).color.set('#0f1626')
+      this.sun.color.set('#486088')
+      this.sun.intensity = 0.32
+      this.hemiLight.color.set('#24334d')
+      this.hemiLight.groundColor.set('#0d1117')
+      this.hemiLight.intensity = 0.45
+      if (this.cloudMat) { this.cloudMat.color.set('#45526c'); this.cloudMat.opacity = 0.4 }
+    } else {
+      // day
+      this.scene.background = new THREE.Color('#98b8cb')
+      ;(this.scene.fog as THREE.Fog).color.set('#bfd4df')
+      this.sun.color.set('#fff0d0')
+      this.sun.intensity = 1.35
+      this.hemiLight.color.set('#fbf4e8')
+      this.hemiLight.groundColor.set('#636b69')
+      this.hemiLight.intensity = 1.1
+      if (this.cloudMat) { this.cloudMat.color.set('#fefcf8'); this.cloudMat.opacity = 0.82 }
+    }
+  }
+
   private addClouds(): void {
-    const cloudMat = new THREE.MeshBasicMaterial({ color: '#fefcf8', transparent: true, opacity: 0.82, depthWrite: false })
+    this.cloudMat = new THREE.MeshBasicMaterial({ color: '#fefcf8', transparent: true, opacity: 0.82, depthWrite: false })
     // Seed clusters of stylized oriental cumulus clouds drifting across the sky
     const configs: [number, number, number, number][] = [
       [-45, 32, -35, 1.2],
@@ -1155,7 +1241,7 @@ export class TempleWorld {
         [-1.1, 0.8, 0.2, 1.9],
       ]
       for (const [px, py, pz, pr] of puffs) {
-        const puff = new THREE.Mesh(new THREE.SphereGeometry(pr, 10, 8), cloudMat)
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(pr, 10, 8), this.cloudMat)
         puff.position.set(px, py, pz)
         puff.scale.y = 0.62 // Flatter bottoms for floating cloud look
         g.add(puff)
@@ -1227,10 +1313,13 @@ export class TempleWorld {
     }
     if (action === 'woodfish') this.woodfishImpulse = 0.2
     if (action === 'bell') this.bellImpulse = 0.23
+    if (action === 'drum') this.drumImpulse = 0.35
     if (action === 'coin') this.dropCoin()
     if (action === 'lottery') this.spawnSmoke(new THREE.Vector3(-11.8, 1.8, 1.2))
     if (action === 'chess') this.spawnSmoke(new THREE.Vector3(PAVILION.x, 1.2, PAVILION.z))
     if (action === 'tiangong') { this.spawnSmoke(this.courtyard.tiangongSmoke.clone()); this.courtyard.tiangongGlow.intensity = 1.4 }
+    if (action === 'yuhuang') { this.spawnSmoke(new THREE.Vector3(0, 2.2, -23.5)) }
+    if (action === 'gold-furnace') { this.spawnSmoke(new THREE.Vector3(GOLD_FURNACE.x, 3.2, GOLD_FURNACE.z)) }
   }
 
   update(dt: number, time: number, playerPosition: THREE.Vector3, activePoint: ShrinePointId | null): void {
@@ -1255,8 +1344,11 @@ export class TempleWorld {
     if (this.puffTimer <= 0 && !this.reducedSmoke) { this.puffTimer = 0.8; this.spawnPuff(this.courtyard.tiangongSmoke) }
     this.woodfishImpulse = THREE.MathUtils.damp(this.woodfishImpulse, 0, 11, dt)
     this.bellImpulse = THREE.MathUtils.damp(this.bellImpulse, 0, 5.5, dt)
+    this.drumImpulse = THREE.MathUtils.damp(this.drumImpulse, 0, 7.5, dt)
     this.woodfish.rotation.x = Math.sin(this.woodfishImpulse * 7) * this.woodfishImpulse
     this.bell.rotation.z = Math.sin(this.bellImpulse * 10) * this.bellImpulse
+    const drumScale = 1 + Math.sin(this.drumImpulse * 22) * this.drumImpulse * 0.22
+    this.drum.scale.set(drumScale, drumScale, 1)
 
     for (const [id, marker] of this.markers) {
       const mat = this.markerMats.get(id)!

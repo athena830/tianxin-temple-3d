@@ -1,6 +1,6 @@
 import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId } from '../game/temple-data'
-import type { ShrinePoint, ShrinePointId } from '../game/temple-world'
-export type PanelId = ShrinePointId | 'consult'
+import type { ShrinePoint, ShrinePointId, TimeOfDay } from '../game/temple-world'
+export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
 const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
@@ -18,12 +18,15 @@ export type TempleUiActions = {
   explore(): void
   exitExplore(): void
   cancelGuide(): void
+  time(mode: TimeOfDay): void
 }
 
 export class TempleUi {
   screen = 'boot'
   private readonly root: HTMLElement
   private toastTimer = 0
+  private currentTime: TimeOfDay = 'day'
+  private lastBobei: { title: string; desc: string; cup1: 'yang' | 'yin'; cup2: 'yang' | 'yin' } | null = null
 
   constructor(private readonly store: TempleStore, private readonly actions: TempleUiActions) {
     this.root = document.getElementById('ui')!
@@ -51,6 +54,7 @@ export class TempleUi {
         <header class="hud-top">
           <div class="badge"><span class="seal small">玉</span><div><b>玉皇宮</b><small data-who></small></div></div>
           <div class="hud-buttons">
+            <button class="chip" data-act="time">☀️ 晴空</button>
             <button class="chip" data-act="map">參拜指引</button>
             <button class="chip" data-open="records">祈福紀錄</button>
             <button class="chip" data-open="prayer-wall">祈願牆</button>
@@ -58,18 +62,19 @@ export class TempleUi {
         </header>
         <nav class="map" hidden>
           <p>選擇目的地，跟著金色箭頭前往</p>
-          <button data-go="tiangong">參拜天公爐</button><button data-go="chess">天心仙姑問事亭</button><button data-go="incense">上香祈福</button><button data-go="prayer">寫下心願</button><button data-go="offerings">虛擬供奉</button>
-          <button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
-          <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="wishing-pool">蓮花許願池</button>
-          <button data-go="prayer-wall">祈願牆</button><button data-go="records">祈福紀錄</button>
+          <button data-go="tiangong">參拜天公爐</button><button data-go="gold-furnace">八角金亭（化金）</button><button data-go="chess">天心仙姑問事亭</button>
+          <button data-go="incense">上香祈福</button><button data-go="yuhuang">後殿凌霄寶殿</button><button data-go="prayer">寫下心願</button>
+          <button data-go="offerings">虛擬供奉</button><button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
+          <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="drum">鼓樓擊鼓</button>
+          <button data-go="wishing-pool">蓮花許願池</button><button data-go="prayer-wall">祈願牆</button><button data-go="records">祈福紀錄</button>
         </nav>
         <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact">互動</button></div>
         <div class="guide" hidden><span>前往</span><b data-guide-name></b><small data-guide-dist></small><button class="guide-x" data-act="guide-cancel" aria-label="取消指引">×</button></div>
         <div class="mode-bar">
           <button class="btn primary" data-act="explore" data-when="browse">開始探索</button>
         </div>
-        <p class="help" data-when="browse">WASD／方向鍵 移動・Shift 快走・右鍵拖曳 轉視角・滾輪 縮放・E 或點擊 互動</p>
-        <p class="help" data-when="explore">WASD／方向鍵 移動・Shift 快走・右鍵拖曳 轉視角・滾輪 縮放・E 或點擊 互動</p>
+        <p class="help" data-when="browse">滑鼠點擊／WASD 移動・右鍵拖曳 旋轉視角・滾輪 縮放・點擊／E 互動</p>
+        <p class="help" data-when="explore">滑鼠點擊／WASD 移動・右鍵拖曳 旋轉視角・滾輪 縮放・點擊／E 互動</p>
         <div class="touch"><div class="touch-stick"><i></i></div></div>
       </section>
       <section class="screen pause" data-screen="pause"><div class="title-card"><h2>暫歇片刻</h2><p class="lead">點擊下方按鈕繼續參拜。</p><button class="btn primary" data-act="resume">繼續參拜</button></div></section>
@@ -173,7 +178,35 @@ export class TempleUi {
         const today = d.dailyLot
         const lot = today && today.day === new Date().toLocaleDateString('sv-SE') ? today : null
         return `<p class="eyebrow">每日一籤</p><h2>每日抽籤</h2><p>每天可抽一支籤，籤詩僅作心靈參考。共 ${LOTS.length} 支籤。</p>${note}
-          ${lot ? this.lotCard(lot) : '<button class="btn primary" data-ritual="lottery">搖籤筒・求今日籤</button>'}`
+          ${lot ? this.lotCard(lot) : '<div class="row"><button class="btn primary" data-ritual="lottery">搖籤筒・求今日籤</button><button class="btn" data-open="bobei">先擲筊請示</button></div>'}`
+      }
+      case 'drum':
+        return `<p class="eyebrow">鼓樓・暮鼓閣</p><h2>擊鼓鳴志</h2><p>暮鼓晨鐘，收攝心念。大法鼓沉雄悠遠，擊鼓一聲，心定意寧，宏願堅定，聲震十方。</p>${note}
+          <div class="row"><button class="btn primary big" data-ritual="drum">咚・鳴鼓振志</button></div>`
+      case 'yuhuang':
+        return `<p class="eyebrow">後殿・凌霄寶殿</p><h2>朝拜玉皇上帝</h2><p>玄穹高上玉皇大天尊，統御諸天萬界。走到御前合掌俯首朝拜，心誠則靈，祈求闔家安泰、福澤延綿。</p>${note}
+          <div class="row"><button class="btn primary" data-ritual="yuhuang">至誠朝拜禮敬</button><button class="btn" data-open="bobei">擲筊請示</button></div>`
+      case 'gold-furnace':
+        return `<p class="eyebrow">前庭西側・八角金亭</p><h2>化金祈福・添香油</h2><p>八角金亭香火鼎盛，焚化祈福金銀紙入爐，通達上天。信眾參拜圓滿後，可虔心化金或隨喜添香油。</p>${note}
+          <div class="tiles">
+            <button class="tile" data-gold="祈福壽金"><b>祈福壽金</b><span>祈求闔家安泰，消災除障增福壽</span><small>點此焚化入金亭</small></button>
+            <button class="tile" data-gold="五路發財金"><b>五路發財金</b><span>正財偏財廣進，事業百業繁榮</span><small>點此焚化入金亭</small></button>
+            <button class="tile" data-gold="祈安補運金"><b>祈安補運金</b><span>補運解厄，逢凶化吉，行事順利</span><small>點此焚化入金亭</small></button>
+            <button class="tile" data-gold="添隨喜香油"><b>隨喜添香油</b><span>廣種福田，護持宮廟，同霑法喜</span><small>點此虔誠添奉</small></button>
+          </div>`
+      case 'bobei': {
+        const b = this.lastBobei
+        return `<p class="eyebrow">傳統民俗・跋桮</p><h2>擲筊請示神意</h2>
+          <p>在心中默念姓名、生辰、住址與所求之事，再行擲筊。筊杯一平一凸為「聖筊」、兩平為「笑筊」、兩凸為「陰筊」。</p>${note}
+          <div class="bobei-box">
+            <div class="bobei-cups">
+              <div class="bobei-cup ${b ? b.cup1 : 'yang'}">${b ? (b.cup1 === 'yang' ? '平 (陽)' : '凸 (陰)') : '平'}</div>
+              <div class="bobei-cup ${b ? b.cup2 : 'yin'}">${b ? (b.cup2 === 'yang' ? '平 (陽)' : '凸 (陰)') : '凸'}</div>
+            </div>
+            <div class="bobei-title">${b ? esc(b.title) : '雙手合捧筊杯'}</div>
+            <p class="bobei-desc">${b ? esc(b.desc) : '靜心冥想請示之事後，點擊下方按鈕擲筊。'}</p>
+          </div>
+          <div class="row"><button class="btn primary big" data-act="toss-bobei">🤲 虔心擲筊</button><button class="btn" data-open="daily-lot">抽今日籤詩</button></div>`
       }
       case 'tiangong':
         return `<p class="eyebrow">前庭天公爐</p><h2>參拜玉皇上帝</h2><p>立於天公爐前，雙手合十，向玉皇上帝敬拜。人物會面向天公爐合掌鞠躬，完成後即可繼續走動。</p>${note}
@@ -229,6 +262,55 @@ export class TempleUi {
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
+    else if (act === 'time') {
+      const cycle: TimeOfDay[] = ['day', 'dusk', 'night', 'dawn']
+      const next = cycle[(cycle.indexOf(this.currentTime) + 1) % cycle.length]
+      this.currentTime = next
+      const labels: Record<TimeOfDay, string> = { day: '☀️ 晴空', dusk: '🌇 夕陽', night: '🌙 夜晚', dawn: '🌅 晨曦' }
+      t.textContent = labels[next]
+      this.actions.time(next)
+      const toasts: Record<TimeOfDay, string> = {
+        day: '已切換為「晴空白雲」時段，陽光普照。',
+        dusk: '已切換為「夕陽餘暉」時段，晚霞漫天。',
+        night: '已切換為「夜間點燈」時段，宮燈齊明，金光熠熠。',
+        dawn: '已切換為「晨曦朝陽」時段，紫氣東來。',
+      }
+      this.toast(toasts[next])
+    }
+    else if (act === 'toss-bobei') {
+      const r = Math.random()
+      if (r < 0.5) {
+        this.lastBobei = {
+          title: '【聖 筊】（允筊）',
+          desc: '神明贊同欣允，所求大吉可行。心念端正，宏願必成。',
+          cup1: 'yang',
+          cup2: 'yin',
+        }
+      } else if (r < 0.75) {
+        this.lastBobei = {
+          title: '【笑 筊】',
+          desc: '神明微笑不語。機緣未定、或是信眾心中早已明白答案，無須猶豫。',
+          cup1: 'yang',
+          cup2: 'yang',
+        }
+      } else {
+        this.lastBobei = {
+          title: '【陰 筊】（怒筊）',
+          desc: '神明暫未贊同。時機未臻成熟，不可躁進，宜靜候佳期、多積福德。',
+          cup1: 'yin',
+          cup2: 'yin',
+        }
+      }
+      this.store.divineBobei(this.lastBobei.title, this.lastBobei.desc)
+      this.actions.ritual('bobei')
+      this.open('bobei', `${this.lastBobei.title}：${this.lastBobei.desc}`)
+    }
+    if (t.dataset.gold) {
+      const gold = t.dataset.gold
+      this.store.burnGold(gold)
+      this.actions.ritual('gold-furnace')
+      this.open('gold-furnace', `「${gold}」已虔化入八角金亭，化吉納祥，福澤深遠！`)
+    }
     if (t.dataset.char) { this.actions.choose(t.dataset.char as CharacterId); this.refreshCharacter() }
     if (t.dataset.open) this.open(t.dataset.open as PanelId)
     if (t.dataset.go) { this.root.querySelector<HTMLElement>('.map')!.hidden = true; this.actions.travel(t.dataset.go as ShrinePointId) }

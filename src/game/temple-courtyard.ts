@@ -14,6 +14,7 @@ export const TIANGONG = new THREE.Vector3(9, 0, 28)
 export const PAVILION = new THREE.Vector3(-12, 0, 30)
 export const WISH_POOL = new THREE.Vector3(-9.5, 0, 40)
 export const LOTUS_POND = new THREE.Vector3(11, 0, 39.5)
+export const GOLD_FURNACE = new THREE.Vector3(-19.5, 0, 38.0)
 
 export type BuildContext = {
   scene: THREE.Scene
@@ -49,6 +50,7 @@ export class FrontCourtyard {
     this.addPavilion()
     this.addWishingPool()
     this.addLotusPond()
+    this.addGoldFurnace()
     this.addPlanting()
   }
 
@@ -605,6 +607,77 @@ export class FrontCourtyard {
     this.c.scene.add(water)
     this.addLotusPads(x, z, 1.8, 9, 4, sx)
     this.c.physics.addStaticBox(new THREE.Vector3(x, 0.15, z), new THREE.Vector3(2.6 * sx * 1.85, 0.9, 4.6))
+  }
+
+  /**
+   * Traditional Octagonal Gold Furnace (八角祈福金亭 / 金爐):
+   * 位於前庭西側外緣，供信眾焚化祈福金銀紙、添香油錢祈福。
+   * 具有八角石基、八角紅磚金亭身、金爐口火焰輝光與八角雙簷金亭頂、寶葫蘆頂珠。
+   */
+  private addGoldFurnace(): void {
+    const { x, z } = GOLD_FURNACE
+    const stone = this.c.mat('#8d8070', 0.95)
+    const vermilion = this.c.mat('#8c2d22', 0.78)
+    const gold = this.c.mat(PAL.gold, 0.45, 0.3)
+    const darkBronze = this.c.mat('#433228', 0.6)
+
+    const g = new THREE.Group()
+    g.position.set(x, 0, z)
+
+    // 1. Octagonal Stone Base (八角雕花石台基)
+    const base1 = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.1, 0.35, 8), stone)
+    base1.position.y = 0.175
+    const base2 = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.85, 0.3, 8), stone)
+    base2.position.y = 0.5
+    g.add(base1, base2)
+
+    // 2. Octagonal Furnace Chamber (八角朱漆金亭爐身)
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.55, 2.0, 8), vermilion)
+    body.position.y = 1.65
+    g.add(body)
+
+    // 3. Arched Furnace Mouth with Fiery Embers (金爐投口與爐內熊熊烈火)
+    for (const angle of [0, Math.PI / 2]) {
+      const mouthFrame = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.85, 0.18), darkBronze)
+      mouthFrame.rotation.y = angle
+      mouthFrame.position.set(Math.sin(angle) * 1.42, 1.35, Math.cos(angle) * 1.42)
+      g.add(mouthFrame)
+    }
+
+    const fireGlowMat = new THREE.MeshBasicMaterial({ color: '#ff6611' })
+    const fireMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.65), fireGlowMat)
+    fireMesh.position.set(0, 1.35, 1.44)
+    g.add(fireMesh)
+
+    // Furnace Plaque: 「八 角 金 亭」
+    const furnacePlaque = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.2, 0.36),
+      this.c.text('八 角 金 亭', '#f2d288', '#2d180f')
+    )
+    furnacePlaque.position.set(0, 2.38, 1.42)
+    g.add(furnacePlaque)
+
+    // 4. Double-Tier Octagonal Roof (八角重簷歇山瓦頂)
+    const lowerRoof = new THREE.Mesh(new THREE.ConeGeometry(2.1, 0.75, 8), this.c.mat(PAL.wallCap, 0.75))
+    lowerRoof.position.y = 3.0
+    const upperRoof = new THREE.Mesh(new THREE.ConeGeometry(1.45, 0.65, 8), this.c.mat(PAL.wallCap, 0.75))
+    upperRoof.position.y = 3.65
+    g.add(lowerRoof, upperRoof)
+
+    // Golden Gourd Finial (寶頂金葫蘆)
+    const gourd1 = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), gold)
+    gourd1.position.y = 4.15
+    const gourd2 = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), gold)
+    gourd2.position.y = 4.45
+    g.add(gourd1, gourd2)
+
+    // Internal Fire Light
+    const fireLight = new THREE.PointLight('#ff7722', 0.85, 6, 2)
+    fireLight.position.set(0, 1.4, 1.2)
+    g.add(fireLight)
+
+    this.add(g)
+    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 1.8, 3.0)
   }
 
   private addPlanting(): void {

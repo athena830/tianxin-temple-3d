@@ -39,7 +39,7 @@ async function boot(): Promise<void> {
       if (input.method === 'touch' || document.body.classList.contains('has-touch')) {
         ui.toast('左下搖桿移動，右側拖曳轉視角')
       } else {
-        ui.toast('已穿過宮門。可用 WASD 或方向鍵走動，右鍵拖曳轉視角')
+        ui.toast('已穿過宮門。滑鼠點擊地面或 WASD 走動，右鍵拖曳轉視角')
       }
     },
     resume: () => { if (!game) return; ui.show('hud'); syncMode() },
@@ -49,11 +49,24 @@ async function boot(): Promise<void> {
     explore: startExplore,
     exitExplore,
     cancelGuide: () => game?.setGuide(null),
+    time: mode => game?.world.setTimeOfDay(mode),
     ritual: action => {
       if (!game) return
       const w = game.world
       if (action === 'incense') { store.offerIncense(); w.perform('incense'); audio.play('chime'); reopen('incense', '清香裊裊，願觀世音菩薩慈悲護佑，平安吉祥。') }
       else if (action === 'wish') { w.perform('wish'); audio.play('chime') }
+      else if (action === 'drum') { store.strikeDrum(); w.perform('drum'); audio.play('drum'); ui.toast('「咚——」鼓聲震天，暮鼓收心，萬緣放下。') }
+      else if (action === 'bobei') { audio.play('woodfish'); audio.play('coin') }
+      else if (action === 'gold-furnace') { w.perform('gold-furnace'); audio.play('chime') }
+      else if (action === 'yuhuang') {
+        if (game.worshipping) return
+        ui.closePanel(); game.closePanel(); syncMode()
+        w.perform('yuhuang'); audio.play('chime')
+        game.worship({ x: 0, z: -24.4 }, 3.0, () => {
+          store.worshipYuhuang(); audio.play('bell')
+          ui.toast('朝拜玉皇上帝：願蒙浩恩庇佑，吉星高照，百福駢臻。', 4800)
+        })
+      }
       else if (action === 'tiangong') {
         if (game.worshipping) return
         // Close the panel, face the urn, bow with palms together, then show the blessing and resume free movement.
