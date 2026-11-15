@@ -7,7 +7,7 @@ import type { Physics } from '../engine/physics'
  * The central stone road (|x| < ROAD_HALF) stays completely clear from the arch to the main hall.
  */
 export const ROAD_HALF = 2
-export const SITE = { halfX: 30, back: -27, front: 48 } as const
+export const SITE = { halfX: 30, back: -40, front: 48 } as const
 export const GATE_Z = 48
 export const STAND = new THREE.Vector3(0, 0, 51.6)
 export const TIANGONG = new THREE.Vector3(9, 0, 28)

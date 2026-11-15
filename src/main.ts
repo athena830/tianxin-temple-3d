@@ -62,7 +62,7 @@ async function boot(): Promise<void> {
         if (game.worshipping) return
         ui.closePanel(); game.closePanel(); syncMode()
         w.perform('yuhuang'); audio.play('chime')
-        game.worship({ x: 0, z: -24.4 }, 3.0, () => {
+        game.worship({ x: 0, z: -30.2 }, 3.0, () => {
           store.worshipYuhuang(); audio.play('bell')
           ui.toast('朝拜玉皇上帝：願蒙浩恩庇佑，吉星高照，百福駢臻。', 4800)
         })

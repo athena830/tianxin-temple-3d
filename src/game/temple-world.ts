@@ -46,7 +46,7 @@ const pointPositions: [number, number][] = [
   [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [WISH_POOL.x + 3.9, WISH_POOL.z], [14.6, 4.3], [15, 0.2],
   [TIANGONG.x - 3.0, TIANGONG.z],
-  [-12.4, -5.6], [0, -18.2], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
+  [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
@@ -54,7 +54,7 @@ export const POINT_TARGETS: [number, number][] = [
   [0, -2.55], [0, -12.2], [-4.4, -4.2], [-12, 1.2], [PAVILION.x, PAVILION.z],
   [12.5, -1.6], [8.5, -8.5], [15.2, -8], [WISH_POOL.x, WISH_POOL.z], [17.5, 4.3], [17.2, 0.2],
   [TIANGONG.x, TIANGONG.z],
-  [-15.2, -8.0], [0, -24.4], [GOLD_FURNACE.x, GOLD_FURNACE.z],
+  [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
 ]
 
 const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStandardMaterial =>
@@ -235,34 +235,42 @@ export class TempleWorld {
       hall.add(outerPost)
     }
 
-    // 2. Solid Back Wall with Passageway Doors to Rear Hall (神龕背牆與通往後殿之左右穿堂過水門)
+    // 2. Solid Back Wall with Wide Grand Passageway Doors to Rear Hall (神龕背牆與通往後殿之開闊穿堂大門)
     // Central Shrine Back Wall (中央主殿神龕實體背牆)
-    const backCenter = new THREE.Mesh(new THREE.BoxGeometry(11.2, 5.1, 0.6), makeMat('#543b2f'))
+    const backCenter = new THREE.Mesh(new THREE.BoxGeometry(8.2, 5.1, 0.6), makeMat('#543b2f'))
     backCenter.position.set(0, 2.55, -6.4)
     backCenter.castShadow = true
     backCenter.receiveShadow = true
     hall.add(backCenter)
-    this.physics.addStaticBox(new THREE.Vector3(0, 2.55, -13.4), new THREE.Vector3(11.2, 5.1, 0.6))
+    this.physics.addStaticBox(new THREE.Vector3(0, 2.55, -13.4), new THREE.Vector3(8.2, 5.1, 0.6))
 
-    // Left & Right Outer Back Walls (左右外側背牆與連通拱門)
+    // Left & Right Outer Back Walls (左右外側背牆與寬闊連通御門，通道寬達 3.3 公尺、通高 4.25 公尺)
     for (const side of [-1, 1]) {
-      const outerWall = new THREE.Mesh(new THREE.BoxGeometry(3.1, 5.1, 0.6), makeMat('#543b2f'))
-      outerWall.position.set(side * 8.05, 2.55, -6.4)
+      const outerWall = new THREE.Mesh(new THREE.BoxGeometry(2.2, 5.1, 0.6), makeMat('#543b2f'))
+      outerWall.position.set(side * 8.5, 2.55, -6.4)
       outerWall.castShadow = true
       outerWall.receiveShadow = true
       hall.add(outerWall)
-      this.physics.addStaticBox(new THREE.Vector3(side * 8.05, 2.55, -13.4), new THREE.Vector3(3.1, 5.1, 0.6))
+      this.physics.addStaticBox(new THREE.Vector3(side * 8.5, 2.55, -13.4), new THREE.Vector3(2.2, 5.1, 0.6))
 
-      // Arch door lintel above open passageway to rear courtyard
-      const doorLintel = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.4, 0.6), redDark)
-      doorLintel.position.set(side * 5.65, 4.4, -6.4)
+      // Grand arch door lintel spanning 3.3m wide open passageway
+      const doorLintel = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.85, 0.6), redDark)
+      doorLintel.position.set(side * 5.75, 4.68, -6.4)
       hall.add(doorLintel)
-      const doorSign = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.4, 0.38),
+
+      // Front & Rear Door Plaques: 「通 天」 / 「達 地」
+      const doorSignFront = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.2, 0.48),
         this.textMaterial(side === 1 ? '達 地' : '通 天', '#dfc17c', '#362117')
       )
-      doorSign.position.set(side * 5.65, 4.25, -6.08)
-      hall.add(doorSign)
+      doorSignFront.position.set(side * 5.75, 4.58, -6.08)
+      const doorSignBack = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.2, 0.48),
+        this.textMaterial(side === 1 ? '達 地' : '通 天', '#dfc17c', '#362117')
+      )
+      doorSignBack.rotation.y = Math.PI
+      doorSignBack.position.set(side * 5.75, 4.58, -6.72)
+      hall.add(doorSignFront, doorSignBack)
     }
 
     // 3. Solid Side Walls with Traditional Pilasters (左右兩側厚實大殿山牆)
@@ -565,109 +573,319 @@ export class TempleWorld {
 
   /**
    * Rear Hall (後殿 / 凌霄寶殿):
-   * 位於正殿正後方，全廟第二進神聖殿閣，供奉淵源更深之玉皇上帝。
-   * 設有台基石階、四大金柱、雕花隔扇、凌霄寶殿主匾、玉皇神龕金光道輪與重簷歇山殿頂。
+   * 全殿最高規格之第二進殿宇，供奉至高無上之玉皇上帝（玄穹高上玉皇大天尊）。
+   * 具備 24m 寬 x 16.5m 深之宏偉巨型殿閣台基、丹墀雲龍階、前庭天井過水連廊、
+   * 5.6m 寬 x 5.2m 高九龍金釘開闊大宮門、殿內八大通天金龍天柱、九五尊位三級御台、
+   * 九龍金椅、九疊金雕龍屏、雙環萬道金光神聖道輪、重簷九龍玉案與雙簷重簷廡殿九脊頂。
    */
   private addRearHall(): void {
     const rear = new THREE.Group()
-    rear.position.set(0, 0, -20.5)
+    rear.position.set(0, 0, -25.0)
     this.scene.add(rear)
 
     const red = makeMat(C.vermilion)
+    const redDark = makeMat('#792a20', 0.85)
     const wood = makeMat(C.wood)
     const darkWood = makeMat(C.darkWood, 0.88)
-    const gold = makeMat(C.gold, 0.48, 0.2)
+    const gold = makeMat(C.gold, 0.48, 0.28)
     const stonePlinth = makeMat('#9e9382', 0.94)
+    const balustradeMat = makeMat('#d6cfc2', 0.88)
     const jade = makeMat(C.jade, 0.4, 0.25)
 
-    // 1. Raised Terrace & Grand Approach Steps (後殿高聳基座與踏步)
-    const podium = new THREE.Mesh(new THREE.BoxGeometry(18.4, 0.42, 9.6), stonePlinth)
-    podium.position.set(0, 0.21, 0)
+    // 1. Grand Elevated Podium (凌霄寶殿宏偉巨型石台基: 寬 24.0m x 深 16.5m x 高 0.52m)
+    const podium = new THREE.Mesh(new THREE.BoxGeometry(24.0, 0.52, 16.5), stonePlinth)
+    podium.position.set(0, 0.26, 0)
     podium.receiveShadow = true
     rear.add(podium)
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.21, -20.5), new THREE.Vector3(18.4, 0.42, 9.6))
+    this.physics.addStaticBox(new THREE.Vector3(0, 0.26, -25.0), new THREE.Vector3(24.0, 0.52, 16.5))
 
-    // Front stone steps (三級登殿石階)
-    const steps = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.21, 1.2), stonePlinth)
-    steps.position.set(0, 0.105, 5.2)
-    steps.receiveShadow = true
-    rear.add(steps)
-
-    // 2. Solid Rear Boundary Wall (後殿厚實背牆)
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(17.6, 5.8, 0.6), makeMat('#543b2f'))
-    backWall.position.set(0, 2.9, -4.5)
-    backWall.castShadow = true
-    rear.add(backWall)
-    this.physics.addStaticBox(new THREE.Vector3(0, 2.9, -25.0), new THREE.Vector3(17.6, 5.8, 0.6))
-
-    // 3. Side Walls with Lattice Screens (後殿左右山牆與穿堂過水廊)
+    // Courtyard Atrium Stone Paving & Connecting Covered Walkways between Main Hall & Rear Hall (天井與左右連通穿堂迴廊)
     for (const side of [-1, 1]) {
-      const sx = side * 8.6
-      const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.55, 5.8, 9.2), darkWood)
-      sideWall.position.set(sx, 2.9, 0)
-      rear.add(sideWall)
-      this.physics.addStaticBox(new THREE.Vector3(sx, 2.9, -20.5), new THREE.Vector3(0.55, 5.8, 9.2))
+      // Covered walkway floor connecting Main Hall to Rear Hall
+      const corridorFloor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.25, 4.2), stonePlinth)
+      corridorFloor.position.set(side * 5.85, 0.125, 10.35)
+      rear.add(corridorFloor)
 
-      // Side connecting corridors (左右天井連通迴廊)
-      const corridor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.2, 5.8), stonePlinth)
-      corridor.position.set(side * 8.0, 0.1, 4.8)
-      rear.add(corridor)
-      const corridorRoof = this.createRoof(4.2, 6.2, 3.8, 4.8)
-      corridorRoof.position.set(side * 8.0, 0, -15.7)
-      this.scene.add(corridorRoof)
+      // Walkway Pillars
+      for (const cz of [8.8, 11.8]) {
+        const cPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 4.4, 10), red)
+        cPillar.position.set(side * 4.2, 2.2, cz)
+        rear.add(cPillar)
+        this.physics.addStaticCylinder(new THREE.Vector3(side * 4.2, 2.2, cz - 25.0), 0.26, 4.4)
+      }
+
+      // Walkway Roof
+      const corrRoof = this.createRoof(4.2, 4.8, 4.4, 5.5)
+      corrRoof.position.set(side * 5.85, 0, -14.65)
+      this.scene.add(corrRoof)
     }
 
-    // 4. Grand Front Columns (後殿四大金柱與橫樑)
-    for (const x of [-6.4, -2.8, 2.8, 6.4]) {
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.44, 5.6, 12), red)
-      col.position.set(x, 2.8, 4.3)
+    // 2. Approach Steps & Imperial Dragon Ramp (登殿大階梯、中央雲龍陛與漢白玉望柱欄杆)
+    // Central Imperial Dragon Ramp (中央丹墀雲龍陛)
+    const dragonRamp = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 1.8), makeMat('#5f7169', 0.88, 0.15))
+    dragonRamp.position.set(0, 0.26, 8.8)
+    dragonRamp.rotation.x = -0.22
+    dragonRamp.receiveShadow = true
+    rear.add(dragonRamp)
+    const dragonRelief = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 1.5),
+      this.textMaterial('丹 墀 雲 龍 陛', '#dfc47b', '#35433d')
+    )
+    dragonRelief.position.set(0, 0.33, 8.8)
+    dragonRelief.rotation.x = -Math.PI / 2 + 0.22
+    rear.add(dragonRelief)
+
+    // Left & Right Grand Approach Stone Steps (左右登殿三級石階)
+    for (const side of [-1, 1]) {
+      for (let s = 1; s <= 3; s++) {
+        const step = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.13, 0.55), stonePlinth)
+        step.position.set(side * 4.8, s * 0.13 - 0.065, 8.0 + (3 - s) * 0.45)
+        step.receiveShadow = true
+        rear.add(step)
+      }
+    }
+
+    // White Stone Balustrade (漢白玉雲紋望柱欄杆)
+    for (const side of [-1, 1]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.56, 0.16), balustradeMat)
+      rail.position.set(side * 7.5, 0.65, 8.1)
+      rear.add(rail)
+      for (let x = 3.6; x <= 11.4; x += 1.95) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.82, 0.22), balustradeMat)
+        post.position.set(side * x, 0.72, 8.1)
+        const lotusBud = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), balustradeMat)
+        lotusBud.position.set(side * x, 1.18, 8.1)
+        lotusBud.scale.set(0.9, 1.3, 0.9)
+        rear.add(post, lotusBud)
+      }
+    }
+
+    // 3. Grand Front Facade & Majestic Imperial Triple Doors (宏偉三川殿廓、5.6m 寬九龍大金門敞開)
+    const frontZ = 6.2
+    // Front eave six grand pillars (前簷六大金柱)
+    for (const x of [-10.5, -6.8, -2.8, 2.8, 6.8, 10.5]) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 6.4, 14), red)
+      col.position.set(x, 3.2, frontZ)
       col.castShadow = true
       rear.add(col)
-      this.physics.addStaticCylinder(new THREE.Vector3(x, 2.8, -16.2), 0.38, 5.6)
-      const colCap = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.18, 12), gold)
-      colCap.position.set(x, 5.2, 4.3)
+      this.physics.addStaticCylinder(new THREE.Vector3(x, 3.2, frontZ - 25.0), 0.44, 6.4)
+      const colCap = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.22, 14), gold)
+      colCap.position.set(x, 6.3, frontZ)
       rear.add(colCap)
     }
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(17.6, 0.5, 0.5), wood)
-    beam.position.set(0, 5.6, 4.3)
-    rear.add(beam)
 
-    // 5. Plaque of the Rear Hall: 「凌 霄 寶 殿」 (後殿主匾額)
-    const plaqueFrame = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.4, 0.16), darkWood)
-    plaqueFrame.position.set(0, 5.0, 4.58)
+    // Front architrave beam (前簷大通梁)
+    const frontBeam = new THREE.Mesh(new THREE.BoxGeometry(23.2, 0.62, 0.55), wood)
+    frontBeam.position.set(0, 6.45, frontZ)
+    rear.add(frontBeam)
+
+    // Central Grand Open Palace Portal (中央大敞御門，淨寬 5.6 公尺、通高 5.2 公尺)
+    // Left & Right Front Wall Panels (左右前壁堵與格扇窗，正中央 5.6m 完全通透大門洞直視金身御座)
+    for (const side of [-1, 1]) {
+      const wallPanel = new THREE.Mesh(new THREE.BoxGeometry(6.6, 5.2, 0.4), darkWood)
+      wallPanel.position.set(side * 7.5, 2.86, frontZ)
+      wallPanel.castShadow = true
+      rear.add(wallPanel)
+      this.physics.addStaticBox(new THREE.Vector3(side * 7.5, 2.86, frontZ - 25.0), new THREE.Vector3(6.6, 5.2, 0.4))
+
+      // Carved Gilded Window Screen (金雕花鳥連雲格扇窗)
+      const windowScreen = new THREE.Mesh(
+        new THREE.PlaneGeometry(3.6, 2.4),
+        this.textMaterial('五 福 臨 門', '#dfc17c', '#3e2417')
+      )
+      windowScreen.position.set(side * 7.2, 3.1, frontZ + 0.22)
+      rear.add(windowScreen)
+
+      // Grand Double Palace Doors (九路八十一金釘朱漆大內門，向殿內45度大氣敞開)
+      const doorLeaf = new THREE.Group()
+      doorLeaf.position.set(side * 2.75, 2.66, frontZ)
+      const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(2.3, 4.8, 0.12), makeMat('#8c261b', 0.72))
+      doorMesh.position.set(side * -1.15, 0, 0)
+      doorMesh.castShadow = true
+      doorLeaf.add(doorMesh)
+
+      // Golden Door Studs (金釘)
+      for (let r = -1.8; r <= 1.8; r += 0.9) {
+        for (let c = -1.8; c <= -0.5; c += 0.65) {
+          const stud = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), gold)
+          stud.position.set(side * c, r, 0.08)
+          doorLeaf.add(stud)
+        }
+      }
+      // Golden Ring Handle (金鋪首銜環)
+      const knocker = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 8, 16), gold)
+      knocker.position.set(side * -0.5, 0, 0.1)
+      doorLeaf.add(knocker)
+
+      // Open angle inward into hall
+      doorLeaf.rotation.y = side * 0.75
+      rear.add(doorLeaf)
+    }
+
+    // Door Portal Top Lintel (中門高聳額枋與斗栱組)
+    const portalLintel = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.9, 0.5), redDark)
+    portalLintel.position.set(0, 5.5, frontZ)
+    rear.add(portalLintel)
+
+    // 4. Grand Palace Plaque: 「凌 霄 寶 殿」 (殿前六尺金字主匾)
+    const plaqueFrame = new THREE.Mesh(new THREE.BoxGeometry(6.6, 1.6, 0.22), darkWood)
+    plaqueFrame.position.set(0, 5.8, frontZ + 0.38)
     rear.add(plaqueFrame)
+    const plaqueGoldBorder = new THREE.Mesh(new THREE.BoxGeometry(6.3, 1.35, 0.24), gold)
+    plaqueGoldBorder.position.set(0, 5.8, frontZ + 0.38)
+    rear.add(plaqueGoldBorder)
     const plaqueText = new THREE.Mesh(
-      new THREE.PlaneGeometry(4.5, 1.15),
-      this.textMaterial('凌 霄 寶 殿', '#f4d588', '#2a170f')
+      new THREE.PlaneGeometry(6.0, 1.15),
+      this.textMaterial('凌  霄  寶  殿', '#fced9c', '#200f08')
     )
-    plaqueText.position.set(0, 5.0, 4.67)
+    plaqueText.position.set(0, 5.8, frontZ + 0.52)
     rear.add(plaqueText)
 
-    // 6. Sacred Altar of the Supreme Celestial Sovereign (玉皇神龕金座)
-    const jadeAltar = new THREE.Mesh(new THREE.BoxGeometry(6.2, 1.1, 2.2), jade)
-    jadeAltar.position.set(0, 0.95, -2.8)
-    rear.add(jadeAltar)
+    // Front Dou-Gong Bracket Clusters (前簷斗栱組)
+    for (let x = -10.2; x <= 10.2; x += 1.7) {
+      const dg = new THREE.Group()
+      dg.position.set(x, 6.2, frontZ + 0.28)
+      const baseBlock = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.18, 0.38), gold)
+      const bowArm = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.14, 0.26), red)
+      bowArm.position.y = 0.14
+      dg.add(baseBlock, bowArm)
+      rear.add(dg)
+    }
 
-    // Golden Halo and Divine Throne (後殿金光道輪與神聖座席)
-    const throneBack = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.4, 0.25), darkWood)
-    throneBack.position.set(0, 3.1, -4.0)
-    rear.add(throneBack)
-    const halo = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.12, 12, 28), gold)
-    halo.position.set(0, 3.4, -3.8)
-    rear.add(halo)
-    const haloGlow = new THREE.Mesh(new THREE.CircleGeometry(1.5, 24), this.textMaterial('玄 穹 高 上', '#e5c07b', '#4a3319'))
-    haloGlow.position.set(0, 3.4, -3.85)
-    rear.add(haloGlow)
+    // 5. Solid Rear & Side Boundary Walls (後殿厚重殿牆，寬 23.2m x 高 6.8m)
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(23.2, 6.8, 0.65), makeMat('#543b2f'))
+    backWall.position.set(0, 3.4, -7.8)
+    backWall.castShadow = true
+    rear.add(backWall)
+    this.physics.addStaticBox(new THREE.Vector3(0, 3.4, -32.8), new THREE.Vector3(23.2, 6.8, 0.65))
 
-    const rearLight = new THREE.PointLight('#ffe6a8', 0.9, 14, 2)
-    rearLight.position.set(0, 3.8, -2.5)
+    for (const side of [-1, 1]) {
+      const sx = side * 11.6
+      const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.65, 6.8, 14.5), darkWood)
+      sideWall.position.set(sx, 3.4, -0.65)
+      sideWall.castShadow = true
+      rear.add(sideWall)
+      this.physics.addStaticBox(new THREE.Vector3(sx, 3.4, -25.65), new THREE.Vector3(0.65, 6.8, 14.5))
+    }
+
+    // 6. Inner Imperial Pillars (殿內四大通天金柱與金龍盤繞)
+    for (const x of [-6.2, 6.2]) {
+      for (const z of [2.2, -3.2]) {
+        const inCol = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.52, 6.4, 14), red)
+        inCol.position.set(x, 3.2, z)
+        inCol.castShadow = true
+        rear.add(inCol)
+        this.physics.addStaticCylinder(new THREE.Vector3(x, 3.2, z - 25.0), 0.46, 6.4)
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.2, 14), gold)
+        cap.position.set(x, 6.3, z)
+        rear.add(cap)
+
+        // Golden Dragon Ring & Cloud Ornament (金龍盤柱意象)
+        for (let h = 1.5; h <= 4.8; h += 1.5) {
+          const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 8, 16), gold)
+          ring.rotation.x = Math.PI / 2
+          ring.position.set(x, h, z)
+          rear.add(ring)
+        }
+      }
+    }
+
+    // 7. Sacred Imperial Dais & Golden Throne of 玉皇上帝 (九五尊位三級御台與九龍金椅)
+    const throneZ = -5.4
+    // 3-Tier Imperial Dais (九五至尊御台)
+    const dais1 = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.32, 4.8), stonePlinth)
+    dais1.position.set(0, 0.42, throneZ)
+    const dais2 = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.28, 3.8), darkWood)
+    dais2.position.set(0, 0.72, throneZ - 0.2)
+    const dais3 = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.24, 2.8), makeMat('#9a2b1f', 0.65))
+    dais3.position.set(0, 0.98, throneZ - 0.4)
+    rear.add(dais1, dais2, dais3)
+
+    // Nine-Dragon Imperial Screen (九龍金雕九五屏風)
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(8.4, 4.8, 0.35), darkWood)
+    screen.position.set(0, 3.2, throneZ - 1.8)
+    rear.add(screen)
+    const screenCenter = new THREE.Mesh(
+      new THREE.PlaneGeometry(7.8, 4.2),
+      this.textMaterial('玄 穹 高 上 玉 皇 大 天 尊', '#f5d588', '#26140d')
+    )
+    screenCenter.position.set(0, 3.2, throneZ - 1.6)
+    rear.add(screenCenter)
+
+    // Golden Dragon Throne (九龍至尊金椅)
+    const throneSeat = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.65, 1.4), gold)
+    throneSeat.position.set(0, 1.35, throneZ - 0.6)
+    const throneBack = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.25), gold)
+    throneBack.position.set(0, 2.3, throneZ - 1.25)
+    for (const side of [-1, 1]) {
+      const armrest = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.55, 1.3), gold)
+      armrest.position.set(side * 1.05, 1.75, throneZ - 0.6)
+      rear.add(armrest)
+    }
+    rear.add(throneSeat, throneBack)
+
+    // Sacred Golden Mandorla & Divine Halo (金光萬道神聖光輪)
+    const haloOuter = new THREE.Mesh(new THREE.TorusGeometry(2.3, 0.14, 12, 36), gold)
+    haloOuter.position.set(0, 3.8, throneZ - 1.45)
+    const haloInner = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.1, 12, 28), gold)
+    haloInner.position.set(0, 3.8, throneZ - 1.45)
+    const haloRay = new THREE.Mesh(new THREE.CircleGeometry(2.1, 32), this.textMaterial('萬 聖 尊 崇', '#f6dc9c', '#4a2d14'))
+    haloRay.position.set(0, 3.8, throneZ - 1.48)
+    rear.add(haloOuter, haloInner, haloRay)
+
+    // Divine Radiance Light
+    const rearLight = new THREE.PointLight('#ffe6a8', 1.5, 24, 2)
+    rearLight.position.set(0, 4.4, throneZ + 1.2)
     rear.add(rearLight)
 
-    // 7. Double-Eave Sweeping Roof (後殿重簷歇山頂)
-    const lowerRoof = this.createRoof(18.8, 10.8, 5.4, 7.3)
-    lowerRoof.position.set(0, 0, -20.5)
-    const upperRoof = this.createRoof(14.6, 7.8, 7.1, 9.2)
-    upperRoof.position.set(0, 0, -20.5)
+    // 8. Jade Imperial Offering Table (重簷九龍玉案供桌)
+    const altarZ = -2.2
+    const jadeAltar = new THREE.Mesh(new THREE.BoxGeometry(7.8, 1.25, 2.4), jade)
+    jadeAltar.position.set(0, 0.88, altarZ)
+    jadeAltar.castShadow = true
+    jadeAltar.receiveShadow = true
+    rear.add(jadeAltar)
+    this.physics.addStaticBox(new THREE.Vector3(0, 0.88, altarZ - 25.0), new THREE.Vector3(7.8, 1.25, 2.4))
+
+    // Altar ritual props (大金香爐、雙燭台)
+    const goldCenser = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 0.6, 16), gold)
+    goldCenser.position.set(0, 1.78, altarZ)
+    rear.add(goldCenser)
+    for (const side of [-1.8, 1.8]) {
+      const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 0.85, 10), makeMat(C.vermilion))
+      candle.position.set(side, 1.88, altarZ)
+      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshBasicMaterial({ color: '#ffb347' }))
+      flame.position.set(side, 2.38, altarZ)
+      rear.add(candle, flame)
+    }
+
+    // 9. Coffered Ceiling & Celestial Caisson (殿內平棋天花與中央八角九天星漢藻井)
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(22.6, 0.2, 14.8), makeMat('#42281b', 0.85))
+    ceiling.position.set(0, 6.45, -0.65)
+    ceiling.receiveShadow = true
+    rear.add(ceiling)
+
+    // Center Celestial Caisson (中央星漢八角重疊藻井)
+    const caisson = new THREE.Group()
+    caisson.position.set(0, 6.46, -0.5)
+    const caissonOuter = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.32, 5.6), darkWood)
+    const caissonRing1 = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.35, 8, 1, true), redDark)
+    caissonRing1.position.y = 0.25
+    const caissonRing2 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.0, 0.38, 8, 1, true), gold)
+    caissonRing2.position.y = 0.55
+    const caissonBoss = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.6, 8), gold)
+    caissonBoss.rotation.x = Math.PI
+    caissonBoss.position.y = 0.65
+    const caissonLight = new THREE.PointLight('#ffe496', 1.1, 14, 2)
+    caissonLight.position.y = 0.45
+    caisson.add(caissonOuter, caissonRing1, caissonRing2, caissonBoss, caissonLight)
+    rear.add(caisson)
+
+    // 10. Double-Eave Sweeping Imperial Roof (後殿重簷廡殿九脊頂: 下簷 26.8m x 18.5m, 上簷 20.8m x 13.5m, 高達 11.5m)
+    const lowerRoof = this.createRoof(26.8, 18.5, 6.6, 8.8)
+    lowerRoof.position.set(0, 0, -25.0)
+    const upperRoof = this.createRoof(20.8, 13.5, 8.6, 11.5)
+    upperRoof.position.set(0, 0, -25.0)
     this.rearRoof.add(lowerRoof, upperRoof)
     this.scene.add(this.rearRoof)
   }
@@ -1318,14 +1536,14 @@ export class TempleWorld {
     if (action === 'lottery') this.spawnSmoke(new THREE.Vector3(-11.8, 1.8, 1.2))
     if (action === 'chess') this.spawnSmoke(new THREE.Vector3(PAVILION.x, 1.2, PAVILION.z))
     if (action === 'tiangong') { this.spawnSmoke(this.courtyard.tiangongSmoke.clone()); this.courtyard.tiangongGlow.intensity = 1.4 }
-    if (action === 'yuhuang') { this.spawnSmoke(new THREE.Vector3(0, 2.2, -23.5)) }
+    if (action === 'yuhuang') { this.spawnSmoke(new THREE.Vector3(0, 2.6, -29.5)) }
     if (action === 'gold-furnace') { this.spawnSmoke(new THREE.Vector3(GOLD_FURNACE.x, 3.2, GOLD_FURNACE.z)) }
   }
 
   update(dt: number, time: number, playerPosition: THREE.Vector3, activePoint: ShrinePointId | null): void {
     const insideHall = playerPosition.z < 0 && playerPosition.z > -13.5 && Math.abs(playerPosition.x) < 9
     this.roof.visible = !insideHall
-    const insideRear = playerPosition.z < -16.5 && playerPosition.z > -25.5 && Math.abs(playerPosition.x) < 8.5
+    const insideRear = playerPosition.z < -16.5 && playerPosition.z > -33.5 && Math.abs(playerPosition.x) < 12.0
     this.rearRoof.visible = !insideRear
     this.incenseGlow.intensity = THREE.MathUtils.damp(this.incenseGlow.intensity, 0.22, 1.4, dt)
     this.courtyard.update(time)
