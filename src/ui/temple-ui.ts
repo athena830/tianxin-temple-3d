@@ -34,7 +34,7 @@ export class TempleUi {
           <div class="seal">玉</div>
           <p class="eyebrow">線上 3D 宮廟</p>
           <h1>玉皇宮</h1>
-          <p class="lead">心願有寄，平安相伴。穿過宮門，走進觀音佛祖主殿，以自己的步伐參拜祈福。</p>
+          <p class="lead">心願有寄，平安相伴。穿過宮門，走進觀世音菩薩主殿，以自己的步伐參拜祈福。</p>
           <button class="btn primary" data-act="begin">入宮祈福</button>
           <p class="note">祈願與紀錄僅保存在此瀏覽器中。</p>
         </div>
@@ -157,7 +157,7 @@ export class TempleUi {
     const note = message ? `<p class="result">${esc(message)}</p>` : ''
     switch (id) {
       case 'incense':
-        return `<p class="eyebrow">觀音佛祖主殿</p><h2>上香祈福</h2><p>雙手合十，靜心三息。點燃清香，向觀音佛祖說出心中的祝願。</p>${note}
+        return `<p class="eyebrow">觀世音菩薩主殿</p><h2>上香祈福</h2><p>雙手合十，靜心三息。點燃清香，向觀世音菩薩說出心中的祝願。</p>${note}
           <div class="row"><button class="btn primary" data-ritual="incense">敬上三炷清香</button><button class="btn" data-open="prayer">寫下心願</button></div>`
       case 'prayer':
         return `<p class="eyebrow">線上祈福</p><h2>寫下心願</h2><p>心願將留在本機的祈願牆，也會記入你的祈福紀錄。</p>${note}

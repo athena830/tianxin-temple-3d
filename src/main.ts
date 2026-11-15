@@ -36,7 +36,7 @@ async function boot(): Promise<void> {
       game?.enter(); ui.show('hud'); loop.resetAccumulator()
       // Touch devices go straight to exploring; desktop starts with a free mouse until the visitor opts in.
       if (input.method === 'touch' || document.body.classList.contains('has-touch')) { startExplore(); ui.toast('左下搖桿移動，右側拖曳轉視角') }
-      else { syncMode(); ui.toast('已穿過宮門。按「開始探索」後用 WASD 走動，沿石道前往觀音佛祖主殿') }
+      else { syncMode(); ui.toast('已穿過宮門。按「開始探索」後用 WASD 走動，沿石道前往觀世音菩薩主殿') }
     },
     resume: () => { if (!game) return; ui.show('hud'); syncMode() },
     openPanel: () => { game?.openPanel(); touch?.releaseStick(); syncMode() },
@@ -48,7 +48,7 @@ async function boot(): Promise<void> {
     ritual: action => {
       if (!game) return
       const w = game.world
-      if (action === 'incense') { store.offerIncense(); w.perform('incense'); audio.play('chime'); reopen('incense', '清香裊裊，願觀音佛祖慈悲護佑，平安吉祥。') }
+      if (action === 'incense') { store.offerIncense(); w.perform('incense'); audio.play('chime'); reopen('incense', '清香裊裊，願觀世音菩薩慈悲護佑，平安吉祥。') }
       else if (action === 'wish') { w.perform('wish'); audio.play('chime') }
       else if (action === 'tiangong') {
         if (game.worshipping) return
