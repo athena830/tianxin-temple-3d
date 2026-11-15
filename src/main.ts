@@ -135,6 +135,7 @@ async function boot(): Promise<void> {
   }
   g.onNear = point => ui.near(point)
   g.onGuide = (point, distance) => ui.guideTo(point, distance)
+  g.world.onNpcDialogue = (speaker, text) => ui.showNpcDialogue(speaker, text)
   g.onClickResult = result => {
     if (!result) return
     if (result.kind === 'open') ui.open(result.id)

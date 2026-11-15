@@ -79,6 +79,7 @@ export class TempleUi {
       </section>
       <section class="screen pause" data-screen="pause"><div class="title-card"><h2>暫歇片刻</h2><p class="lead">點擊下方按鈕繼續參拜。</p><button class="btn primary" data-act="resume">繼續參拜</button></div></section>
       <div class="panel-wrap" hidden><article class="panel"><button class="close" data-act="close" aria-label="關閉">×</button><div class="panel-body"></div></article></div>
+      <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
       <div class="toast" hidden></div>`
     this.root.addEventListener('click', e => this.onClick(e))
     this.root.addEventListener('submit', e => {
@@ -135,6 +136,20 @@ export class TempleUi {
     if (!point) return
     el.querySelector('[data-prompt-title]')!.textContent = point.title
     el.querySelector('[data-prompt-sub]')!.textContent = point.subtitle
+  }
+
+  private npcDialogueTimer = 0
+
+  showNpcDialogue(speaker: string, text: string, ms = 4800): void {
+    const bar = this.root.querySelector<HTMLElement>('.npc-dialogue-bar')
+    if (!bar) return
+    const nameEl = bar.querySelector<HTMLElement>('.npc-name')
+    const textEl = bar.querySelector<HTMLElement>('.npc-text')
+    if (nameEl) nameEl.textContent = `【${speaker}】`
+    if (textEl) textEl.textContent = `「${text}」`
+    bar.hidden = false
+    clearTimeout(this.npcDialogueTimer)
+    this.npcDialogueTimer = window.setTimeout(() => { bar.hidden = true }, ms)
   }
 
   toast(text: string, ms = 2600): void {

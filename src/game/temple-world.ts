@@ -119,6 +119,7 @@ export class TempleWorld {
   private dragonGuanyinUrnPos?: THREE.Vector3
   private dragonPuffTimer = 1.2
   readonly npcs: NpcManager
+  onNpcDialogue?: (speaker: string, text: string) => void
 
   constructor(private readonly physics: Physics) {
     // Elegant warm celestial sky & gentle horizon fog (澄澈淡碧與暖金宮闕天空色調)
@@ -156,6 +157,7 @@ export class TempleWorld {
     this.addMarkers()
     this.addGiantDragonGuanyin()
     this.npcs = new NpcManager(this.scene)
+    this.npcs.onSpeak = (speaker, text) => this.onNpcDialogue?.(speaker, text)
     this.avatarStand.add(this.chibi.root)
     this.scene.add(this.avatarStand)
     this.placeAvatarAtStand()

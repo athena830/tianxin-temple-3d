@@ -30,11 +30,11 @@ export const TEMPLE_WAYPOINTS: TempleWaypoint[] = [
   // 1. 前庭天公爐
   { name: '天公爐', zone: 'courtyard', pos: new THREE.Vector3(6.2, 0, 27.5), isWorship: true, worshipTarget: new THREE.Vector3(9.0, 0, 28.0) },
   // 2. 觀音大殿殿前（中門前）
-  { name: '主殿大門', zone: 'courtyard', pos: new THREE.Vector3(0, 0, 0.8), isWorship: true, worshipTarget: new THREE.Vector3(0, 0, -6.0) },
+  { name: '主殿大門', zone: 'courtyard', pos: new THREE.Vector3(0, 0, 1.2), isWorship: true, worshipTarget: new THREE.Vector3(0, 0, -6.0) },
   // 3. 觀音大殿龍邊前
-  { name: '主殿龍邊', zone: 'courtyard', pos: new THREE.Vector3(4.2, 0, 0.8), isWorship: true, worshipTarget: new THREE.Vector3(4.2, 0, -4.5) },
+  { name: '主殿龍邊', zone: 'courtyard', pos: new THREE.Vector3(4.5, 0, 1.2), isWorship: true, worshipTarget: new THREE.Vector3(4.5, 0, -4.5) },
   // 4. 觀音大殿虎邊前
-  { name: '主殿虎邊', zone: 'courtyard', pos: new THREE.Vector3(-4.2, 0, 0.8), isWorship: true, worshipTarget: new THREE.Vector3(-4.2, 0, -4.5) },
+  { name: '主殿虎邊', zone: 'courtyard', pos: new THREE.Vector3(-4.5, 0, 1.2), isWorship: true, worshipTarget: new THREE.Vector3(-4.5, 0, -4.5) },
   // 5. 蓮花許願池
   { name: '許願池', zone: 'courtyard', pos: new THREE.Vector3(-5.8, 0, 39.5), isWorship: true, worshipTarget: new THREE.Vector3(-9.5, 0, 39.5) },
   // 6. 八角金亭
@@ -89,7 +89,7 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
     name: '小林',
     title: '求籤青年',
     palette: 'scholar',
-    startPos: new THREE.Vector3(-5.0, 0, 38.0),
+    startPos: new THREE.Vector3(-5.2, 0, 38.5),
     startHeading: -Math.PI * 0.5,
     homeZone: 'wanderer',
     dialogues: {
@@ -115,13 +115,13 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
     name: '遊客小明',
     title: '參拜遊客',
     palette: 'vermillion',
-    startPos: new THREE.Vector3(-62.5, 0, 27.5),
+    startPos: new THREE.Vector3(-64.5, 0, 27.5),
     startHeading: 0,
     homeZone: 'sanctuary',
     dialogues: {
       idle: [
-        '哇！這座昇龍觀音真的有五層樓高，乘龍騰雲太酷了！',
-        '穿過那道【昇龍聖境】牌坊，好像走進世外桃源。',
+        '哇！這座昇龍觀音真的有五層樓高，乘龍騰雲太帥了！',
+        '穿過那道【昇龍聖境】牌坊，好像走進世外仙境。',
         '漢白玉大平台四周的通天石燈台好有古典美。',
         '抬頭仰望觀音菩薩，好有震撼立體感！',
       ],
@@ -132,7 +132,7 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
       ],
       approach: [
         '你好！你有去大平台看那尊巨型昇龍觀音了嗎？超宏偉的！',
-        '這座宮廟處處都是驚喜，拍照視野好棒！',
+        '這座宮廟處處都是驚喜，視野好棒！',
       ],
     },
   },
@@ -141,7 +141,7 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
     name: '張居士',
     title: '宮廟義工',
     palette: 'amber',
-    startPos: new THREE.Vector3(0, 0, 12.0),
+    startPos: new THREE.Vector3(0, 0, 16.0),
     startHeading: Math.PI,
     homeZone: 'courtyard',
     dialogues: {
@@ -167,7 +167,7 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
     name: '林小姐',
     title: '問事信女',
     palette: 'peach',
-    startPos: new THREE.Vector3(-9.2, 0, 28.0),
+    startPos: new THREE.Vector3(-10.2, 0, 28.5),
     startHeading: -Math.PI * 0.4,
     homeZone: 'courtyard',
     dialogues: {
@@ -192,7 +192,8 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
 
 /**
  * 2.5D 精緻對話泡泡文字（Speech Bubble Billboard）
- * 懸浮於 NPC 頭頂上方，具備圓潤邊框、對話尖角、名牌標籤、柔和陰影與呼吸浮動微動畫，永遠面向鏡頭。
+ * 100% 在世界空間運作，永遠平行垂直面向玩家螢幕視角，徹底根除傾斜與透視失真！
+ * 配備 1024x440 2x Retina 級解析度、純白底色、粗金彩邊框與大字號純黑清晰排版。
  */
 export class NpcSpeechBubble {
   readonly mesh: THREE.Mesh
@@ -205,11 +206,14 @@ export class NpcSpeechBubble {
 
   constructor() {
     this.canvas = document.createElement('canvas')
-    this.canvas.width = 512
-    this.canvas.height = 220
+    this.canvas.width = 1024
+    this.canvas.height = 440
     this.ctx = this.canvas.getContext('2d')!
     this.texture = new THREE.CanvasTexture(this.canvas)
     this.texture.colorSpace = THREE.SRGBColorSpace
+    this.texture.generateMipmaps = true
+    this.texture.minFilter = THREE.LinearMipmapLinearFilter
+    this.texture.magFilter = THREE.LinearFilter
 
     const mat = new THREE.MeshBasicMaterial({
       map: this.texture,
@@ -217,13 +221,13 @@ export class NpcSpeechBubble {
       depthWrite: false,
       side: THREE.DoubleSide,
     })
-    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.98), mat)
-    this.mesh.position.set(0, 1.95, 0)
+    // 3.3m x 1.42m 平面，大氣清晰，正常相機遠距下一目了然
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 1.42), mat)
     this.mesh.scale.set(0, 0, 0)
     this.mesh.visible = false
   }
 
-  show(speaker: string, text: string, duration = 4.8): void {
+  show(speaker: string, text: string, duration = 5.2): void {
     this.timer = duration
     this.targetScale = 1.0
     this.mesh.visible = true
@@ -237,88 +241,88 @@ export class NpcSpeechBubble {
 
   private renderCanvas(speaker: string, text: string): void {
     const ctx = this.ctx
-    ctx.clearRect(0, 0, 512, 220)
+    ctx.clearRect(0, 0, 1024, 440)
 
-    const x = 16
-    const y = 14
-    const w = 480
-    const h = 155
-    const r = 24
-    const tailX = 256
-    const tailY = 205
+    const x = 30
+    const y = 24
+    const w = 964
+    const h = 310
+    const r = 36
+    const tailX = 512
+    const tailY = 415
 
-    // 1. 柔和陰影效果
+    // 1. 柔和深色陰影
     ctx.save()
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.25)'
-    ctx.shadowBlur = 12
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)'
+    ctx.shadowBlur = 20
     ctx.shadowOffsetX = 0
-    ctx.shadowOffsetY = 4
+    ctx.shadowOffsetY = 8
 
-    // 2. 圓角對話框主體與底部對話尖角
+    // 2. 圓角對話框主體與向下的倒三角箭頭
     ctx.beginPath()
     ctx.moveTo(x + r, y)
     ctx.lineTo(x + w - r, y)
     ctx.arcTo(x + w, y, x + w, y + r, r)
     ctx.lineTo(x + w, y + h - r)
     ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
-    ctx.lineTo(tailX + 18, y + h)
+    ctx.lineTo(tailX + 36, y + h)
     ctx.lineTo(tailX, tailY)
-    ctx.lineTo(tailX - 18, y + h)
+    ctx.lineTo(tailX - 36, y + h)
     ctx.lineTo(x + r, y + h)
     ctx.arcTo(x, y + h, x, y + h - r, r)
     ctx.lineTo(x, y + r)
     ctx.arcTo(x, y, x + r, y, r)
     ctx.closePath()
 
-    // 暖象牙古宣紙底色
-    ctx.fillStyle = '#fffdf7'
+    // 純白明亮底色（高對比度，徹底擺脫背景遮擋與灰暗感）
+    ctx.fillStyle = '#ffffff'
     ctx.fill()
     ctx.restore()
 
-    // 3. 雙層金彩描邊
-    ctx.strokeStyle = '#d4a84e'
-    ctx.lineWidth = 4
+    // 3. 粗黑/金色彩邊框 (極致清晰)
+    ctx.strokeStyle = '#c88f28'
+    ctx.lineWidth = 7
     ctx.stroke()
     ctx.strokeStyle = '#fbf0cd'
-    ctx.lineWidth = 1.5
+    ctx.lineWidth = 2.5
     ctx.stroke()
 
     // 4. 發言人名牌徽章 (如 【 陳阿姨 】)
-    ctx.fillStyle = '#9e3223'
+    ctx.fillStyle = '#a9281a'
     ctx.beginPath()
-    ctx.roundRect(32, 24, 136, 32, 8)
+    ctx.roundRect(60, 45, 230, 56, 14)
     ctx.fill()
-    ctx.strokeStyle = '#f8df95'
-    ctx.lineWidth = 1.5
+    ctx.strokeStyle = '#ffdf88'
+    ctx.lineWidth = 2.5
     ctx.stroke()
 
-    ctx.fillStyle = '#fff4d6'
-    ctx.font = 'bold 18px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 30px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(speaker, 100, 40)
+    ctx.fillText(speaker, 175, 73)
 
-    // 5. 說話對話內容
-    ctx.fillStyle = '#2b1b14'
+    // 5. 說話對話內容（純黑粗體，極高對比，一眼看清）
+    ctx.fillStyle = '#0a0503'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
 
     if (text.length <= 13) {
-      ctx.font = 'bold 24px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
-      ctx.fillText(text, 36, 105)
+      ctx.font = 'bold 46px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
+      ctx.fillText(text, 68, 205)
     } else {
       const splitIdx = Math.ceil(text.length / 2)
       const line1 = text.slice(0, splitIdx)
       const line2 = text.slice(splitIdx)
-      ctx.font = 'bold 21px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
-      ctx.fillText(line1, 36, 84)
-      ctx.fillText(line2, 36, 122)
+      ctx.font = 'bold 38px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif'
+      ctx.fillText(line1, 68, 168)
+      ctx.fillText(line2, 68, 242)
     }
 
     this.texture.needsUpdate = true
   }
 
-  update(dt: number, time: number, camera?: THREE.Camera): void {
+  update(worldPos: THREE.Vector3, dt: number, time: number, camera?: THREE.Camera): void {
     if (this.timer > 0) {
       this.timer -= dt
       if (this.timer <= 0) {
@@ -331,7 +335,9 @@ export class NpcSpeechBubble {
 
     if (this.currentScale > 0.005) {
       this.mesh.visible = true
-      this.mesh.position.y = 1.95 + Math.sin(time * 2.8) * 0.035
+      // 世界坐標懸浮於 NPC 頭頂上方 2.25 米處，平滑呼吸上下浮動
+      this.mesh.position.set(worldPos.x, worldPos.y + 2.25 + Math.sin(time * 2.8) * 0.04, worldPos.z)
+      // 在世界空間中直接拷貝攝影機四元數，100% 永遠垂直面向鏡頭，絕對無任何傾斜或透視失真！
       if (camera) {
         this.mesh.quaternion.copy(camera.quaternion)
       }
@@ -354,6 +360,8 @@ export class NpcInstance {
   readonly bubble = new NpcSpeechBubble()
   readonly config: NpcConfig
 
+  onSpeak?: (speaker: string, text: string) => void
+
   private state: 'idle' | 'walk' | 'worship' = 'idle'
   private stateTimer = 2.0
   private pos = new THREE.Vector3()
@@ -366,6 +374,7 @@ export class NpcInstance {
   private worshipSaid = false
   private speechCooldown = 5.0
   private approachCooldown = 8.0
+  private lastPlayerPos = new THREE.Vector3()
 
   constructor(config: NpcConfig) {
     this.config = config
@@ -375,7 +384,6 @@ export class NpcInstance {
 
     this.chibi.setPalette(config.palette)
     this.root.add(this.chibi.root)
-    this.root.add(this.bubble.mesh)
 
     this.root.position.copy(this.pos)
     this.root.rotation.y = this.heading
@@ -424,12 +432,10 @@ export class NpcInstance {
   private pickNextDestination(): void {
     let pool = TEMPLE_WAYPOINTS.slice()
     if (this.config.homeZone === 'courtyard') {
-      // 80% 留在前庭，20% 前往聖境大平台
       if (Math.random() < 0.8) {
         pool = pool.filter(w => w.zone === 'courtyard')
       }
     } else if (this.config.homeZone === 'sanctuary') {
-      // 80% 留在聖境大平台，20% 前往前庭
       if (Math.random() < 0.8) {
         pool = pool.filter(w => w.zone === 'sanctuary')
       }
@@ -444,7 +450,17 @@ export class NpcInstance {
 
     const next = candidates[Math.floor(Math.random() * candidates.length)]
     this.currentWaypoint = next
-    this.pathWaypoints = this.planPath(this.pos, next.pos)
+
+    // 增加適度隨機偏移，防止 NPC 重疊聚集在同一點
+    const targetPos = next.pos.clone()
+    if (!next.isWorship) {
+      targetPos.x += (Math.random() - 0.5) * 2.2
+      targetPos.z += (Math.random() - 0.5) * 2.2
+    } else {
+      targetPos.x += (Math.random() - 0.5) * 1.4
+    }
+
+    this.pathWaypoints = this.planPath(this.pos, targetPos)
     this.walkSpeed = 1.5 + Math.random() * 0.4
     this.state = 'walk'
   }
@@ -454,12 +470,19 @@ export class NpcInstance {
     const lines = this.config.dialogues[category]
     if (!lines || lines.length === 0) return
     const line = lines[Math.floor(Math.random() * lines.length)]
-    this.bubble.show(this.config.name, line, 4.6)
+    this.bubble.show(this.config.name, line, 5.0)
     this.speechCooldown = 12.0 + Math.random() * 10.0
+
+    // 若玩家在聽覺範圍內 (18 米內)，同步播報至螢幕底部高清晰字幕列
+    if (this.pos.distanceTo(this.lastPlayerPos) <= 18.0) {
+      this.onSpeak?.(this.config.name, line)
+    }
   }
 
   update(dt: number, time: number, playerPos: THREE.Vector3, camera?: THREE.Camera): void {
-    this.bubble.update(dt, time, camera)
+    this.lastPlayerPos.copy(playerPos)
+    this.bubble.update(this.pos, dt, time, camera)
+
     if (this.speechCooldown > 0) this.speechCooldown -= dt
     if (this.approachCooldown > 0) this.approachCooldown -= dt
 
@@ -475,7 +498,6 @@ export class NpcInstance {
       this.chibi.animate(dt, time, 0, false, 0)
       this.stateTimer -= dt
 
-      // 閒置時有機率沉思說話
       if (this.speechCooldown <= 0 && Math.random() < 0.008) {
         this.say('idle')
       }
@@ -485,7 +507,6 @@ export class NpcInstance {
       }
     } else if (this.state === 'walk') {
       if (this.pathWaypoints.length === 0) {
-        // 已無路徑點，抵達終點
         if (this.currentWaypoint?.isWorship) {
           this.state = 'worship'
           this.totalWorshipTime = 6.0 + Math.random() * 2.5
@@ -522,16 +543,13 @@ export class NpcInstance {
         this.chibi.animate(dt, time, this.walkSpeed, false, 0)
       }
     } else if (this.state === 'worship') {
-      // 平滑轉向面對神壇 / 香爐
       this.heading = THREE.MathUtils.damp(this.heading, this.targetHeading, 7, dt)
       this.root.rotation.y = this.heading
 
       this.stateTimer -= dt
       const k = 1 - Math.max(0, this.stateTimer / this.totalWorshipTime)
-      // bowBlend 推進雙度虔誠俯首合掌躬身禮拜
       this.chibi.animate(dt, time, 0, false, k)
 
-      // 拜拜開始約 0.8 秒後發起參拜祈福對話泡泡
       if (!this.worshipSaid && k > 0.12) {
         this.worshipSaid = true
         this.say('worship', true)
@@ -550,12 +568,16 @@ export class NpcInstance {
  */
 export class NpcManager {
   readonly npcs: NpcInstance[] = []
+  onSpeak?: (speaker: string, text: string) => void
 
   constructor(private readonly scene: THREE.Scene) {
     for (const def of NPC_DEFINITIONS) {
       const npc = new NpcInstance(def)
+      npc.onSpeak = (speaker, text) => this.onSpeak?.(speaker, text)
       this.npcs.push(npc)
       this.scene.add(npc.root)
+      // 關鍵修復：將泡泡網格直接加入場景世界空間，避免受 NPC 父節點 Y 軸轉向影響而產生傾斜與透視失真！
+      this.scene.add(npc.bubble.mesh)
     }
   }
 
