@@ -93,7 +93,7 @@ export class TempleGame {
   async loadModels(assets: Assets): Promise<void> {
     // The visitor is the procedural chibi placeholder; only the Guanyin statue is a loaded model.
     try { this.world.setStatue((await assets.gltf(TEMPLE_MODEL_URLS.guanyin)).scene) }
-    catch (err) { console.warn('statue model failed', err) }
+    catch (err) { console.warn('statue model failed', err); this.world.showStatueImageFallback() }
   }
 
   get position(): THREE.Vector3 {

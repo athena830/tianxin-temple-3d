@@ -60,7 +60,12 @@ export const POINT_TARGETS: [number, number][] = [
 const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStandardMaterial =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness })
 
+/** Height of the 3D Guanyin figure above the lotus throne, in metres. */
+const GUANYIN_HEIGHT = 2.6
+
 export class TempleWorld {
+  private guanyinRoot: THREE.Group | null = null
+  private guanyinModelPlaced = false
   readonly scene = new THREE.Scene()
   readonly spawn = new THREE.Vector3(STAND.x, 1.2, STAND.z)
   readonly points: ShrinePoint[] = pointSpecs.map((point, i) => ({
@@ -538,6 +543,7 @@ export class TempleWorld {
 
     // Golden Bodhisattva Statue in Main Hall (大殿觀世音菩薩法相金身)
     const statue = this.createGuanyinStatue()
+    this.guanyinRoot = statue
     statue.position.set(0, 1.82, -5.7)
     hall.add(statue)
 
@@ -558,7 +564,8 @@ export class TempleWorld {
     this.addRoofFinial(hall, 0, 0)
 
     // Red Palace Lanterns (殿前紅色宮燈)
-    for (const x of [-6.3, -3.2, 0, 3.2, 6.3]) {
+    // No lantern on the central axis so the statue stays fully visible from the courtyard.
+    for (const x of [-6.3, -3.2, 3.2, 6.3]) {
       const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.34, 0.8, 10), makeMat(C.vermilionLight))
       lantern.position.set(x, 3.9, -0.4)
       hall.add(lantern)
@@ -1287,8 +1294,45 @@ export class TempleWorld {
     return new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
   }
 
-  setStatue(_source: THREE.Object3D): void {
-    // Retained for compatibility with optional external asset loader
+  /** Place the generated 3D Guanyin model on the lotus throne (觀世音菩薩立體法相). */
+  setStatue(source: THREE.Object3D): void {
+    const root = this.guanyinRoot
+    if (!root) return
+    const model = source.clone(true)
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3())
+    model.scale.setScalar(size.y > 0.01 ? GUANYIN_HEIGHT / size.y : 1.4)
+    const box = new THREE.Box3().setFromObject(model)
+    const center = box.getCenter(new THREE.Vector3())
+    // Model's authored front faces +X; turn it to face the worshippers (+Z of the hall).
+    const holder = new THREE.Group()
+    holder.rotation.y = -Math.PI / 2
+    model.position.set(-center.x, 0.35 - box.min.y, -center.z)
+    holder.add(model)
+    model.traverse(obj => {
+      if (!(obj instanceof THREE.Mesh)) return
+      obj.castShadow = true
+      obj.receiveShadow = true
+      // Matte finish: avoid the chest glare that the hall's point lights produced on the old image.
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+      for (const m of mats) if (m instanceof THREE.MeshStandardMaterial) { m.metalness = Math.min(m.metalness, 0.25); m.roughness = Math.max(m.roughness, 0.6) }
+    })
+    root.add(holder)
+    this.guanyinModelPlaced = true
+  }
+
+  /** Fallback when the 3D model cannot load: the flat golden image used before. */
+  showStatueImageFallback(): void {
+    const root = this.guanyinRoot
+    if (!root || this.guanyinModelPlaced) return
+    const statueH = 3.2
+    const statueW = statueH * (376 / 537)
+    new THREE.TextureLoader().load('./assets/guanyin-golden.png', tex => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide })
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), mat)
+      mesh.position.set(0, 0.32 + statueH / 2, 0)
+      root.add(mesh)
+    })
   }
 
   private createGuanyinStatue(): THREE.Group {
@@ -1302,36 +1346,15 @@ export class TempleWorld {
     lotusBase.castShadow = true
     root.add(lotusBase)
 
-    // 2. High-Resolution Golden Guanyin Statue Board (觀世音菩薩法相金身尊像)
-    // Aspect ratio: 376 / 537 = 0.700, Height: 3.2m, Width: 2.24m
-    const aspect = 376 / 537
-    const statueH = 3.2
-    const statueW = statueH * aspect
-
-    const loader = new THREE.TextureLoader()
-    loader.load('./assets/guanyin-golden.png', tex => {
-      tex.colorSpace = THREE.SRGBColorSpace
-      // Use MeshBasicMaterial to completely eliminate directional light and point light specular shine/glare on the chest
-      const statueMat = new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        alphaTest: 0.05,
-        side: THREE.DoubleSide,
-      })
-      const statueMesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), statueMat)
-      statueMesh.position.set(0, 0.32 + statueH / 2, 0)
-      statueMesh.castShadow = false
-      statueMesh.receiveShadow = false
-      root.add(statueMesh)
-    })
+    // 2. The 3D statue itself is added by setStatue() once the GLB model loads.
 
     // 3. Radiant Holy Backlight Halo (圓滿大放神光背光金輪)
     const halo = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.75, 36), haloMat)
-    halo.position.set(0, 2.15, -0.15)
+    halo.position.set(0, 2.1, -0.75)
     root.add(halo)
 
     const haloInner = new THREE.Mesh(new THREE.CircleGeometry(0.82, 36), new THREE.MeshBasicMaterial({ color: '#ffebb3', transparent: true, opacity: 0.3 }))
-    haloInner.position.set(0, 2.15, -0.14)
+    haloInner.position.set(0, 2.1, -0.74)
     root.add(haloInner)
 
     // Warm Divine Aura Light (微弱聖光，照亮四周神龕但不直接在畫像上反光)
