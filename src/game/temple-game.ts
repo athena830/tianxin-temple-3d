@@ -62,12 +62,24 @@ export class TempleGame {
   active: ShrinePoint | null = null
   /** Station the guide arrow currently points to. */
   guide: ShrinePoint | null = null
+  private targetDestination: THREE.Vector3 | null = null
+  private pendingStationId: ShrinePointId | null = null
+  private readonly clickMarker: THREE.Mesh
   onNear: (point: ShrinePoint | null) => void = () => undefined
   onGuide: (point: ShrinePoint | null, distance: number) => void = () => undefined
   onClickResult: (result: ClickResult) => void = () => undefined
 
   constructor(private readonly renderer: Renderer, private readonly input: Input, private readonly audio: Audio) {
     this.world = new TempleWorld(this.physics)
+    const markerGeo = new THREE.RingGeometry(0.18, 0.44, 24)
+    markerGeo.rotateX(-Math.PI / 2)
+    this.clickMarker = new THREE.Mesh(
+      markerGeo,
+      new THREE.MeshBasicMaterial({ color: '#f5d688', transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false })
+    )
+    this.clickMarker.visible = false
+    this.clickMarker.renderOrder = 4
+    this.world.scene.add(this.clickMarker)
     const s = this.world.spawn
     this.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(s.x, s.y, s.z))
     this.collider = this.physics.world.createCollider(RAPIER.ColliderDesc.capsule(HALF_HEIGHT, RADIUS).setFriction(0), this.body)
@@ -163,11 +175,47 @@ export class TempleGame {
       this.heading += diff * Math.min(1, dt * 8)
       if (this.ritualLeft <= 0) { this.ritualLeft = 0; const done = this.ritualDone; this.ritualDone = null; done?.() }
     }
-    const moving = this.mode === 'explore' && this.ritualLeft <= 0
+    const moving = (this.mode === 'explore' || this.mode === 'browse') && this.ritualLeft <= 0
+    const hasKeyMove = Math.hypot(this.input.move.x, this.input.move.y) > 0.05
+    if (hasKeyMove) {
+      this.targetDestination = null
+      this.pendingStationId = null
+      this.clickMarker.visible = false
+    }
+
+    if (this.clickMarker.visible) {
+      const pulse = 1.0 + Math.sin(this.time * 6) * 0.12
+      this.clickMarker.scale.set(pulse, pulse, pulse)
+      this.clickMarker.rotation.z += dt * 1.6
+    }
+
+    const t = this.body.translation()
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw))
     const wish = new THREE.Vector3()
-    if (moving) wish.addScaledVector(right, this.input.move.x).addScaledVector(forward, this.input.move.y)
+
+    if (moving) {
+      if (hasKeyMove) {
+        wish.addScaledVector(right, this.input.move.x).addScaledVector(forward, this.input.move.y)
+      } else if (this.targetDestination) {
+        const toTarget = new THREE.Vector3(
+          this.targetDestination.x - t.x,
+          0,
+          this.targetDestination.z - t.z
+        )
+        const dist = toTarget.length()
+        if (dist < 0.45) {
+          this.targetDestination = null
+          this.clickMarker.visible = false
+          if (this.pendingStationId) {
+            window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.pendingStationId }))
+            this.pendingStationId = null
+          }
+        } else {
+          wish.copy(toTarget.normalize())
+        }
+      }
+    }
     const amount = Math.min(1, wish.length())
     if (amount > 0.01) wish.normalize()
     const speed = moving ? (this.input.held('sprint') ? CONFIG.player.sprintSpeed : CONFIG.player.walkSpeed) * amount : 0
@@ -176,7 +224,6 @@ export class TempleGame {
     const desired = { x: wish.x * speed * dt, y: this.vy * dt, z: wish.z * speed * dt }
     this.controller.computeColliderMovement(this.collider, desired)
     const m = this.controller.computedMovement()
-    const t = this.body.translation()
     const next = { x: t.x + m.x, y: t.y + m.y, z: t.z + m.z }
     if (next.y < -5) { const s = this.world.spawn; next.x = s.x; next.y = s.y; next.z = s.z }
     this.body.setNextKinematicTranslation(next)
@@ -203,31 +250,56 @@ export class TempleGame {
     if (free && clicks.length) this.onClickResult(this.pick(clicks[clicks.length - 1]))
   }
 
-  /** Resolve a canvas click to a station; open it when close enough. */
+  /** Resolve a canvas click to a station; open it when close enough or walk to clicked point. */
   pick(client: { x: number; y: number }): ClickResult {
     const rect = this.renderer.gl.domElement.getBoundingClientRect()
     const ndc = new THREE.Vector2(((client.x - rect.left) / rect.width) * 2 - 1, -((client.y - rect.top) / rect.height) * 2 + 1)
     this.raycaster.setFromCamera(ndc, this.camera)
-    const ignore = new Set(this.world.pickIgnore)
+    const ignore = new Set([...this.world.pickIgnore, this.clickMarker])
     const visible = (o: THREE.Object3D | null): boolean => {
       for (let n = o; n; n = n.parent) { if (!n.visible || ignore.has(n)) return false }
       return true
     }
     const hit = this.raycaster.intersectObjects(this.world.scene.children, true).find(h => h.object instanceof THREE.Mesh && visible(h.object))
     if (!hit) return null
+
+    // 1. Check if clicked on or near a shrine interactive station
     let best: ShrinePoint | null = null
     let bestD = 2.4
+    let targetApproach: [number, number] | null = null
     this.world.points.forEach((point, i) => {
       const [tx, tz] = POINT_TARGETS[i]
       const d = Math.min(Math.hypot(hit.point.x - point.position.x, hit.point.z - point.position.z), Math.hypot(hit.point.x - tx, hit.point.z - tz))
-      if (d < bestD) { bestD = d; best = point }
+      if (d < bestD) { bestD = d; best = point; targetApproach = [tx, tz] }
     })
     const point = best as ShrinePoint | null
-    if (!point) return null
     const p = this.body.translation()
-    const reach = Math.hypot(point.position.x - p.x, point.position.z - p.z)
-    if (reach <= point.radius + CLICK_REACH) return { kind: 'open', id: point.id }
-    return { kind: 'far', point }
+
+    if (point) {
+      const reach = Math.hypot(point.position.x - p.x, point.position.z - p.z)
+      if (reach <= point.radius + CLICK_REACH) {
+        this.targetDestination = null
+        this.clickMarker.visible = false
+        return { kind: 'open', id: point.id }
+      }
+      // Clicked a station farther away: auto-walk to it with click marker!
+      const destX = targetApproach ? targetApproach[0] : point.position.x
+      const destZ = targetApproach ? targetApproach[1] : point.position.z
+      this.targetDestination = new THREE.Vector3(destX, hit.point.y, destZ)
+      this.pendingStationId = point.id
+      this.clickMarker.position.set(destX, hit.point.y + 0.04, destZ)
+      this.clickMarker.visible = true
+      return { kind: 'far', point }
+    }
+
+    // 2. Clicked on ground / road / courtyard / steps: walk to clicked position!
+    if (hit.point.y < 2.5 && (!hit.face || hit.face.normal.y > 0.4)) {
+      this.targetDestination = new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z)
+      this.pendingStationId = null
+      this.clickMarker.position.set(hit.point.x, hit.point.y + 0.04, hit.point.z)
+      this.clickMarker.visible = true
+    }
+    return null
   }
 
   /**

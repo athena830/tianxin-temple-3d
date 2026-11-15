@@ -116,7 +116,7 @@ async function boot(): Promise<void> {
   g.onClickResult = result => {
     if (!result) return
     if (result.kind === 'open') ui.open(result.id)
-    else { ui.toast(`「${result.point.title}」還有一段距離，請再走近一點`); g.setGuide(result.point.id) }
+    else { ui.toast(`前往「${result.point.title}」...`); g.setGuide(result.point.id) }
   }
   // Click anywhere on canvas immediately ensures explore mode is active
   canvas.addEventListener('pointerdown', () => {

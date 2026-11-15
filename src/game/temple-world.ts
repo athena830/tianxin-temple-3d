@@ -262,48 +262,23 @@ export class TempleWorld {
     // 4. Front Facade: Three Distinct Temple Portals (大廟正殿三川殿三門古制格局)
     // 面向大殿（南朝北）：右邊(+X)為龍門(入口)、中央(X=0)為中門(神明出入聖道)、左邊(-X)為虎門(出口)
 
-    // A. 中門（中央大門敞開：兩扇朱紅九路金釘大門向內敞開迎神納福）
-    const centerDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(4.4, 4.6, 0.32), redDark)
-    centerDoorFrame.position.set(0, 2.3, 5.2)
-    hall.add(centerDoorFrame)
-
-    // Two opened vermilion door leaves with golden studs (兩扇朱紅大門向內側敞開)
-    for (const dSide of [-1, 1]) {
-      const doorLeaf = new THREE.Mesh(new THREE.BoxGeometry(1.85, 4.0, 0.12), makeMat('#702219', 0.8))
-      doorLeaf.position.set(dSide * 1.85, 2.15, 4.3)
-      doorLeaf.rotation.y = dSide * 1.35
-      hall.add(doorLeaf)
-      // Golden studs on open doors
-      for (let row = 0; row < 5; row += 1) {
-        for (let col = 0; col < 3; col += 1) {
-          const stud = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), gold)
-          const localX = (col - 1) * 0.5
-          const localY = (row - 2) * 0.7
-          stud.position.set(
-            dSide * 1.85 + Math.cos(dSide * 1.35) * localX,
-            2.15 + localY,
-            4.3 - Math.sin(dSide * 1.35) * localX + 0.07
-          )
-          hall.add(stud)
-        }
-      }
-    }
-
-    // Low Door Threshold (平緩門檻)
-    const threshold = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.16, 0.28), darkWood)
-    threshold.position.set(0, 0.22, 5.28)
-    hall.add(threshold)
-
-    // Center Door Lintel & Main Plaque (中門門額：「中 門」)
+    // A. 中門（中央開放式敞開大門：通透明亮無遮擋，可直接由廟埕中軸線瞻仰大殿觀世音菩薩神像）
+    // 頂部中門橫樑與「玉 皇 宮」金字大匾
     const centerLintel = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.75, 0.38), darkWood)
     centerLintel.position.set(0, 4.5, 5.24)
     hall.add(centerLintel)
+
     const centerPlaque = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.4, 0.65),
-      this.textMaterial('中 門', '#f5d688', '#2d180f')
+      new THREE.PlaneGeometry(3.0, 0.72),
+      this.textMaterial('玉 皇 宮', '#f6d78c', '#2c170f')
     )
     centerPlaque.position.set(0, 4.5, 5.45)
     hall.add(centerPlaque)
+
+    // 平緩石台基底（完全開放式，視野通透直達大殿觀音聖像）
+    const threshold = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.08, 0.28), stonePlinth)
+    threshold.position.set(0, 0.18, 5.28)
+    hall.add(threshold)
 
     // B. 右邊龍門（面向大殿右邊 +X 側，敞開通行）
     const dragonPortalLintel = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.9, 0.36), redDark)
