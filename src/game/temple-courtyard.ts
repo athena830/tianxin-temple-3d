@@ -37,6 +37,7 @@ export class FrontCourtyard {
   readonly tiangongSmoke = new THREE.Vector3(TIANGONG.x, 2.45, TIANGONG.z)
   readonly tiangongGlow: THREE.PointLight
   private readonly lanternMats: THREE.MeshStandardMaterial[] = []
+  private fairyMesh?: THREE.Mesh
 
   constructor(private readonly c: BuildContext) {
     this.addGround()
@@ -372,6 +373,7 @@ export class FrontCourtyard {
     const light = new THREE.PointLight('#f5c87b', 0.55, 8, 2)
     light.position.set(cx, postH - 0.3, cz)
     this.c.scene.add(light)
+    this.addTianxinFairy(cx, cz)
     // Lanterns at the two open-side outer corners (high under the eave), and lotus pots by the entry.
     for (const a of [30, 90, 330]) { const p = corner(a * deg, r + 0.9); this.lantern(p.x, postH - 0.25, p.z, 0.24) }
     for (const dz of [-2.6, 2.6]) this.lotusPot(cx + r + 1.45, cz + dz)
@@ -388,6 +390,34 @@ export class FrontCourtyard {
     sign.rotation.y = -0.35
     this.add(sign)
     this.c.physics.addStaticBox(new THREE.Vector3(-4.0, 1, 35.5), new THREE.Vector3(0.3, 2, 0.3))
+  }
+
+  private addTianxinFairy(cx: number, cz: number): void {
+    const loader = new THREE.TextureLoader()
+    loader.load('./assets/tianxin-fairy.png', tex => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      // Height 1.45m, preserving aspect ratio of (290 / 511)
+      const aspect = 290 / 511
+      const fairyH = 1.45
+      const fairyW = fairyH * aspect
+      const geo = new THREE.PlaneGeometry(fairyW, fairyH)
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.05,
+        roughness: 0.65,
+        metalness: 0.05,
+        side: THREE.DoubleSide,
+      })
+      const mesh = new THREE.Mesh(geo, mat)
+      // Placed behind the chessboard facing visitors entering the pavilion from the road (+X / +Z)
+      mesh.position.set(cx - 0.95, 0.4 + fairyH / 2, cz)
+      mesh.rotation.y = Math.PI / 2
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      this.fairyMesh = mesh
+      this.c.scene.add(mesh)
+    })
   }
 
   private boardTexture(): THREE.CanvasTexture {
@@ -576,5 +606,8 @@ export class FrontCourtyard {
   update(time: number): void {
     this.tiangongGlow.intensity = 0.5 + Math.sin(time * 2.2) * 0.06
     for (const m of this.lanternMats) m.emissiveIntensity = 0.5 + Math.sin(time * 1.7) * 0.05
+    if (this.fairyMesh) {
+      this.fairyMesh.position.y = 0.4 + 1.45 / 2 + Math.sin(time * 1.8) * 0.02
+    }
   }
 }
