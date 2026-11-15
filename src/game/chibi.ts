@@ -15,6 +15,18 @@ export const CHIBI_PALETTES: Record<string, ChibiPalette> = {
   peach: { robe: '#cf7569', sash: '#f4e0d4', hair: '#221714' },
   lavender: { robe: '#85739a', sash: '#e6ded3', hair: '#221926' },
   amber: { robe: '#a67b41', sash: '#59381e', hair: '#271c15' },
+  pine: { robe: '#3a5f45', sash: '#d4ad64', hair: '#201b17' },
+  rose: { robe: '#b85468', sash: '#faede8', hair: '#2a1c1a' },
+  indigo: { robe: '#304768', sash: '#d8caa6', hair: '#1a1816' },
+  gold: { robe: '#c69532', sash: '#702d20', hair: '#281c14' },
+  terracotta: { robe: '#92523e', sash: '#decab0', hair: '#271d18' },
+  azure: { robe: '#4f859d', sash: '#ece6d8', hair: '#1c1b20' },
+  crimson: { robe: '#8e2724', sash: '#e4c472', hair: '#221513' },
+  silver: { robe: '#8e989d', sash: '#353a3e', hair: '#2a2826' },
+  plum: { robe: '#5c3d56', sash: '#ded0c4', hair: '#241a22' },
+  ochre: { robe: '#a6722d', sash: '#4b321c', hair: '#271c15' },
+  teal: { robe: '#366e66', sash: '#e8dcbe', hair: '#1b221e' },
+  charcoal: { robe: '#3a3a42', sash: '#b09972', hair: '#1c1c1e' },
 }
 
 const std = (color: string, roughness = 0.75) => new THREE.MeshStandardMaterial({ color, roughness })
