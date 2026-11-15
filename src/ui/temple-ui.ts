@@ -67,10 +67,9 @@ export class TempleUi {
         <div class="guide" hidden><span>前往</span><b data-guide-name></b><small data-guide-dist></small><button class="guide-x" data-act="guide-cancel" aria-label="取消指引">×</button></div>
         <div class="mode-bar">
           <button class="btn primary" data-act="explore" data-when="browse">開始探索</button>
-          <button class="chip exit" data-act="exit" data-when="explore">退出探索<kbd class="key">Esc</kbd></button>
         </div>
-        <p class="help" data-when="browse">按「開始探索」後即可走動・右鍵拖曳轉視角・滾輪縮放・點擊設施互動</p>
-        <p class="help" data-when="explore">WASD／方向鍵 移動・Shift 快走・右鍵拖曳 轉視角・滾輪 縮放・E 或點擊 互動・Esc 退出探索</p>
+        <p class="help" data-when="browse">WASD／方向鍵 移動・Shift 快走・右鍵拖曳 轉視角・滾輪 縮放・E 或點擊 互動</p>
+        <p class="help" data-when="explore">WASD／方向鍵 移動・Shift 快走・右鍵拖曳 轉視角・滾輪 縮放・E 或點擊 互動</p>
         <div class="touch"><div class="touch-stick"><i></i></div></div>
       </section>
       <section class="screen pause" data-screen="pause"><div class="title-card"><h2>暫歇片刻</h2><p class="lead">點擊下方按鈕繼續參拜。</p><button class="btn primary" data-act="resume">繼續參拜</button></div></section>

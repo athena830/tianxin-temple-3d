@@ -34,9 +34,13 @@ async function boot(): Promise<void> {
     enter: () => {
       audio.unlock(); audio.startMusic()
       game?.enter(); ui.show('hud'); loop.resetAccumulator()
-      // Touch devices go straight to exploring; desktop starts with a free mouse until the visitor opts in.
-      if (input.method === 'touch' || document.body.classList.contains('has-touch')) { startExplore(); ui.toast('左下搖桿移動，右側拖曳轉視角') }
-      else { syncMode(); ui.toast('已穿過宮門。按「開始探索」後用 WASD 走動，沿石道前往觀世音菩薩主殿') }
+      // Directly start exploring for all devices: seamless entry without an extra "開始探索" prompt
+      startExplore()
+      if (input.method === 'touch' || document.body.classList.contains('has-touch')) {
+        ui.toast('左下搖桿移動，右側拖曳轉視角')
+      } else {
+        ui.toast('已穿過宮門。可用 WASD 或方向鍵走動，右鍵拖曳轉視角')
+      }
     },
     resume: () => { if (!game) return; ui.show('hud'); syncMode() },
     openPanel: () => { game?.openPanel(); touch?.releaseStick(); syncMode() },
@@ -114,6 +118,10 @@ async function boot(): Promise<void> {
     if (result.kind === 'open') ui.open(result.id)
     else { ui.toast(`「${result.point.title}」還有一段距離，請再走近一點`); g.setGuide(result.point.id) }
   }
+  // Click anywhere on canvas immediately ensures explore mode is active
+  canvas.addEventListener('pointerdown', () => {
+    if (game && game.mode === 'browse') startExplore()
+  })
   window.addEventListener('temple:interact', e => ui.open((e as CustomEvent<ShrinePointId>).detail))
   window.addEventListener('temple:interact-touch', () => { if (g.active && (g.mode === 'explore' || g.mode === 'browse')) ui.open(g.active.id) })
 
