@@ -211,6 +211,10 @@ export class TempleUi {
       case 'tiangong':
         return `<p class="eyebrow">前庭天公爐</p><h2>參拜玉皇上帝</h2><p>立於天公爐前，雙手合十，向玉皇上帝敬拜。人物會面向天公爐合掌鞠躬，完成後即可繼續走動。</p>${note}
           <div class="row"><button class="btn primary" data-ritual="tiangong">合掌敬拜</button></div>`
+      case 'guanyin-dragon':
+        return `<p class="eyebrow">廟埕廣場・2.5D 巨型實體立牌</p><h2>參拜昇龍觀音</h2>
+          <p>五層樓高（15 單位）乘龍觀音菩薩金身，立於三層立體雕花蓮台基座之上，周遭金色神光粒子繚繞，神威顯赫。面向法相至誠合掌禮敬，祈求風調雨順、消災降福、吉慶安泰。</p>${note}
+          <div class="row"><button class="btn primary big" data-ritual="guanyin-dragon">🙏 至誠朝拜昇龍觀音</button><button class="btn" data-open="bobei">擲筊請示</button></div>`
       case 'consult':
         return `<p class="eyebrow">天心仙姑問事亭</p><h2>問事服務介紹</h2>
           <p>天心仙姑問事亭位於前庭左側，是天心仙姑專屬的象棋卜卦與問事服務空間。</p>

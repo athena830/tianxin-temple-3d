@@ -7,7 +7,7 @@ import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
 import { TIANGONG } from './game/temple-courtyard'
 import type { TempleGame } from './game/temple-game'
-import type { ShrinePointId } from './game/temple-world'
+import { DRAGON_GUANYIN_POS, type ShrinePointId } from './game/temple-world'
 import { TempleUi } from './ui/temple-ui'
 import { TouchControls } from './ui/touch'
 
@@ -75,6 +75,15 @@ async function boot(): Promise<void> {
         game.worship(TIANGONG, 2.6, () => {
           store.worshipTiangong(); audio.play('bell')
           ui.toast('敬拜玉皇上帝：願天公庇佑，風調雨順，闔家平安。', 4800)
+        })
+      }
+      else if (action === 'guanyin-dragon') {
+        if (game.worshipping) return
+        ui.closePanel(); game.closePanel(); syncMode()
+        w.perform('guanyin-dragon'); audio.play('chime')
+        game.worship(DRAGON_GUANYIN_POS, 4.6, () => {
+          store.worshipDragonGuanyin(); audio.play('bell')
+          ui.toast('參拜昇龍觀音：仰望五層樓高觀音菩薩乘龍騰雲，祈願吉祥如意、百福駢臻。', 4800)
         })
       }
       else if (action.startsWith('offer-')) {

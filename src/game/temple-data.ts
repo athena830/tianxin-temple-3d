@@ -195,6 +195,7 @@ export class TempleStore {
   offerIncense(): void { this.addRecord('上香祈福', '於觀世音菩薩主殿敬香。') }
   worshipTiangong(): void { this.addRecord('參拜天公爐', '於前庭天公爐向玉皇上帝合掌敬拜。') }
   worshipYuhuang(): void { this.addRecord('凌霄朝拜', '於後殿凌霄寶殿至誠禮拜玉皇上帝，蒙沐聖眷，萬事禎祥。') }
+  worshipDragonGuanyin(): void { this.addRecord('參拜昇龍觀音', '於廟埕廣場仰望參拜五層樓高昇龍觀音金身，乘龍騰雲，祈願吉祥如意、百福駢臻。') }
   burnGold(type: string): void { this.addRecord('八角金爐化金', `虔化「${type}」入八角金亭，化吉納祥，福澤延綿。`) }
   divineBobei(resultText: string, detail: string): void { this.addRecord('擲筊請示', `${resultText}：${detail}`) }
 }

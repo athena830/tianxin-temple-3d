@@ -4,10 +4,12 @@ import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
 import { FrontCourtyard, GOLD_FURNACE, PAVILION, STAND, TIANGONG, WISH_POOL } from './temple-courtyard'
 
+export const DRAGON_GUANYIN_POS = new THREE.Vector3(0, 0, 16)
+
 export type ShrinePointId =
   | 'incense' | 'prayer' | 'offerings' | 'daily-lot' | 'chess'
   | 'lamps' | 'woodfish' | 'bell' | 'wishing-pool' | 'prayer-wall' | 'records' | 'tiangong'
-  | 'drum' | 'yuhuang' | 'gold-furnace'
+  | 'drum' | 'yuhuang' | 'gold-furnace' | 'guanyin-dragon'
 
 export type TimeOfDay = 'day' | 'dawn' | 'dusk' | 'night'
 
@@ -41,12 +43,14 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'drum', title: '鼓樓擊鼓', subtitle: '擊鼓鳴志，收攝心念', radius: 2.8 },
   { id: 'yuhuang', title: '後殿凌霄寶殿', subtitle: '朝拜玉皇上帝，蒙沐浩恩', radius: 3.2 },
   { id: 'gold-furnace', title: '八角金亭', subtitle: '化金祈福，添香油聚善緣', radius: 3.0 },
+  { id: 'guanyin-dragon', title: '參拜昇龍觀音', subtitle: '仰望五層樓高乘龍觀音金身', radius: 4.8 },
 ]
 const pointPositions: [number, number][] = [
   [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [WISH_POOL.x + 3.9, WISH_POOL.z], [14.6, 4.3], [15, 0.2],
   [TIANGONG.x - 3.0, TIANGONG.z],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
+  [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z + 5.5],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
@@ -55,6 +59,7 @@ export const POINT_TARGETS: [number, number][] = [
   [12.5, -1.6], [8.5, -8.5], [15.2, -8], [WISH_POOL.x, WISH_POOL.z], [17.5, 4.3], [17.2, 0.2],
   [TIANGONG.x, TIANGONG.z],
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
+  [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
 ]
 
 const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStandardMaterial =>
@@ -102,6 +107,11 @@ export class TempleWorld {
     { id: 'study', position: new THREE.Vector3(15, 0, -1.6) },
   ]
   private readonly clouds: { mesh: THREE.Group; speed: number; x: number; z: number; y: number }[] = []
+  private dragonGuanyinBillboard?: THREE.Mesh
+  private auraParticles?: THREE.Points
+  private auraParticleData?: { radius: number; angle: number; speed: number; rotSpeed: number }[]
+  private dragonGuanyinUrnPos?: THREE.Vector3
+  private dragonPuffTimer = 1.2
 
   constructor(private readonly physics: Physics) {
     // Elegant warm celestial sky & gentle horizon fog (澄澈淡碧與暖金宮闕天空色調)
@@ -137,6 +147,7 @@ export class TempleWorld {
     this.addSideArchitecture()
     this.addRitualProps()
     this.addMarkers()
+    this.addGiantDragonGuanyin()
     this.avatarStand.add(this.chibi.root)
     this.scene.add(this.avatarStand)
     this.placeAvatarAtStand()
@@ -1251,6 +1262,7 @@ export class TempleWorld {
       incense: '#e8bb71', prayer: '#e8bb71', offerings: '#d8a45e', 'daily-lot': '#d8a45e', chess: '#a9c2a9',
       lamps: '#edba61', woodfish: '#d68c63', bell: '#e8c77d', 'wishing-pool': '#a8d2c6', 'prayer-wall': '#e8c77d',
       records: '#e8c77d', tiangong: '#f0c070', drum: '#d68c63', yuhuang: '#f5d77f', 'gold-furnace': '#e27b4e',
+      'guanyin-dragon': '#ffea70',
     }
     for (const point of this.points) {
       const mat = new THREE.MeshBasicMaterial({ color: colors[point.id], transparent: true, opacity: 0.42, depthWrite: false })
@@ -1893,6 +1905,147 @@ export class TempleWorld {
     return root
   }
 
+  private addGiantDragonGuanyin(): void {
+    const pos = DRAGON_GUANYIN_POS
+    const root = new THREE.Group()
+    root.position.copy(pos)
+
+    const stoneMat = makeMat('#8c8072', 0.9, 0.05)
+    const waistMat = makeMat('#3b2b20', 0.85, 0.1)
+    const goldMat = makeMat('#e5b84c', 0.35, 0.5)
+    const balustradeMat = makeMat('#d8d1c5', 0.85)
+
+    // 1. 3D 實體蓮花台基座（Three.js CylinderGeometry 三層八角/圓形立體石造基座，高 2.5 單位、半徑 4 單位）
+    // 底層石造大台基 (Tier 1)
+    const tier1 = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.5, 0.8, 16), stoneMat)
+    tier1.position.y = 0.4
+    tier1.castShadow = true
+    tier1.receiveShadow = true
+    root.add(tier1)
+
+    // 底層台基外緣踏步
+    const tier1Step = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.8, 0.25, 16), stoneMat)
+    tier1Step.position.y = 0.125
+    tier1Step.receiveShadow = true
+    root.add(tier1Step)
+
+    // 中層束腰雕花基座 (Tier 2)
+    const tier2 = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.8, 0.8, 16), waistMat)
+    tier2.position.y = 1.2
+    tier2.castShadow = true
+    tier2.receiveShadow = true
+    root.add(tier2)
+
+    // 頂層金雕九品蓮花座 (Tier 3)
+    const tier3 = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.4, 0.9, 24), goldMat)
+    tier3.position.y = 2.05
+    tier3.castShadow = true
+    root.add(tier3)
+
+    // 仰蓮金瓣裝飾（環繞蓮花座上緣，生動展開）
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2
+      const petal = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.75, 4), goldMat)
+      petal.rotation.x = Math.PI / 2 + 0.35
+      petal.rotation.y = a
+      petal.position.set(Math.cos(a) * 3.15, 2.35, Math.sin(a) * 3.15)
+      root.add(petal)
+    }
+
+    // 漢白玉石欄杆與蓮花望柱（環繞底層台基外緣，保留正面參拜缺口）
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2
+      if (Math.abs(a - Math.PI / 2) < 0.38) continue // 保留南向正面開口迎香客
+      const postX = Math.cos(a) * 4.4
+      const postZ = Math.sin(a) * 4.4
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.65, 0.18), balustradeMat)
+      post.position.set(postX, 0.8, postZ)
+      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), balustradeMat)
+      bud.position.set(postX, 1.16, postZ)
+      bud.scale.set(0.9, 1.3, 0.9)
+      root.add(post, bud)
+    }
+
+    // 加上實體碰撞 (Collision) 防止玩家穿透基座
+    this.physics.addStaticCylinder(pos, 4.3, 2.5)
+
+    // 2. 巨型透明材質立牌 (Billboard，高 13 單位、寬 8 單位，置於基座正上方)
+    const loader = new THREE.TextureLoader()
+    const guanyinTex = loader.load('./guanyin.png', undefined, undefined, () => {
+      loader.load('/guanyin.png', t2 => {
+        t2.colorSpace = THREE.SRGBColorSpace
+        planeMat.map = t2
+        planeMat.needsUpdate = true
+      })
+    })
+    guanyinTex.colorSpace = THREE.SRGBColorSpace
+
+    const planeMat = new THREE.MeshBasicMaterial({
+      map: guanyinTex,
+      transparent: true,
+      alphaTest: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: true,
+    })
+
+    const billboard = new THREE.Mesh(new THREE.PlaneGeometry(8.0, 13.0), planeMat)
+    // 基座高 2.5 單位，立牌高 13 單位，中心點置於 y = 2.5 + 6.5 = 9.0，頂端高達 15.5 單位（五層樓高）
+    billboard.position.set(0, 9.0, 0)
+    billboard.castShadow = true
+    root.add(billboard)
+    this.dragonGuanyinBillboard = billboard
+
+    // 3. 底部青銅九龍香爐與香火煙霧
+    const urn = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 0.65, 12), makeMat('#523e2b', 0.6, 0.4))
+    urn.position.set(0, 0.35, 4.7)
+    const urnRim = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.06, 8, 16), makeMat('#b59248', 0.4, 0.5))
+    urnRim.rotation.x = Math.PI / 2
+    urnRim.position.set(0, 0.68, 4.7)
+    const ember = new THREE.Mesh(new THREE.CircleGeometry(0.48, 12), new THREE.MeshBasicMaterial({ color: '#ff5522' }))
+    ember.rotation.x = -Math.PI / 2
+    ember.position.set(0, 0.69, 4.7)
+    root.add(urn, urnRim, ember)
+    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x, 0.75, pos.z + 4.7)
+
+    // 4. 金光神聖氛圍燈 (Golden Aura PointLight)
+    const auraLight = new THREE.PointLight('#ffdb70', 1.25, 14, 2)
+    auraLight.position.set(0, 3.5, 0)
+    root.add(auraLight)
+
+    // 5. 動態氣場：基座周圍緩慢上升的金色粒子特效 (Golden Ascending Aura Particles)
+    const particleCount = 200
+    const positions = new Float32Array(particleCount * 3)
+    this.auraParticleData = []
+    for (let i = 0; i < particleCount; i++) {
+      const radius = 0.6 + Math.random() * 3.4
+      const angle = Math.random() * Math.PI * 2
+      const y = 2.5 + Math.random() * 13.5
+      positions[i * 3] = Math.cos(angle) * radius
+      positions[i * 3 + 1] = y
+      positions[i * 3 + 2] = Math.sin(angle) * radius
+      this.auraParticleData.push({
+        radius,
+        angle,
+        speed: 0.65 + Math.random() * 0.9,
+        rotSpeed: (Math.random() - 0.5) * 0.8,
+      })
+    }
+    const particleGeo = new THREE.BufferGeometry()
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    const particleMat = new THREE.PointsMaterial({
+      color: '#ffe066',
+      size: 0.32,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+    this.auraParticles = new THREE.Points(particleGeo, particleMat)
+    root.add(this.auraParticles)
+
+    this.scene.add(root)
+  }
+
   private addSkyDome(): void {
     // Atmospheric gradient dome canvas texture: zenith pale-azure to horizon warm-cream
     this.skyCv = document.createElement('canvas')
@@ -2039,7 +2192,12 @@ export class TempleWorld {
   animateAvatar(dt: number, time: number, speed: number, reducedMotion: boolean, bow = 0): void { this.chibi.animate(dt, time, speed, reducedMotion, bow) }
   setCharacter(id: string): void { this.chibi.setPalette(id) }
   /** Objects excluded from click picking (the visitor and guidance helpers). */
-  get pickIgnore(): THREE.Object3D[] { return [this.avatarStand, this.guideArrow, this.guideBeacon] }
+  get pickIgnore(): THREE.Object3D[] {
+    const list: THREE.Object3D[] = [this.avatarStand, this.guideArrow, this.guideBeacon]
+    if (this.dragonGuanyinBillboard) list.push(this.dragonGuanyinBillboard)
+    if (this.auraParticles) list.push(this.auraParticles)
+    return list
+  }
   /** Point a guide arrow from the visitor toward a station; null hides it. */
   setGuide(from: THREE.Vector3 | null, to: THREE.Vector3 | null, time: number): void {
     const show = !!from && !!to
@@ -2093,15 +2251,53 @@ export class TempleWorld {
     if (action === 'tiangong') { this.spawnSmoke(this.courtyard.tiangongSmoke.clone()); this.courtyard.tiangongGlow.intensity = 1.4 }
     if (action === 'yuhuang') { this.spawnSmoke(new THREE.Vector3(0, 2.6, -29.5)) }
     if (action === 'gold-furnace') { this.spawnSmoke(new THREE.Vector3(GOLD_FURNACE.x, 3.2, GOLD_FURNACE.z)) }
+    if (action === 'guanyin-dragon') {
+      if (this.dragonGuanyinUrnPos) this.spawnSmoke(this.dragonGuanyinUrnPos.clone())
+    }
   }
 
-  update(dt: number, time: number, playerPosition: THREE.Vector3, activePoint: ShrinePointId | null): void {
+  update(dt: number, time: number, playerPosition: THREE.Vector3, activePoint: ShrinePointId | null, camera?: THREE.Camera): void {
     const insideHall = playerPosition.z < 0 && playerPosition.z > -13.5 && Math.abs(playerPosition.x) < 9
     this.roof.visible = !insideHall
     const insideRear = playerPosition.z < -16.5 && playerPosition.z > -33.5 && Math.abs(playerPosition.x) < 12.0
     this.rearRoof.visible = !insideRear
     this.incenseGlow.intensity = THREE.MathUtils.damp(this.incenseGlow.intensity, 0.22, 1.4, dt)
     this.courtyard.update(time)
+
+    // Y 軸鎖定面向攝影機（Y-axis Billboard）：水平旋轉永遠面向鏡頭，固定俯仰角（Pitch），產生壯闊立體壓迫感
+    if (this.dragonGuanyinBillboard && camera) {
+      const camPos = camera.position
+      const angle = Math.atan2(camPos.x - DRAGON_GUANYIN_POS.x, camPos.z - DRAGON_GUANYIN_POS.z)
+      this.dragonGuanyinBillboard.rotation.y = angle
+      this.dragonGuanyinBillboard.rotation.x = 0
+      this.dragonGuanyinBillboard.rotation.z = 0
+    }
+
+    // 動態氣場：金色神光粒子向上螺旋升騰
+    if (this.auraParticles && this.auraParticleData) {
+      const posAttr = this.auraParticles.geometry.attributes.position as THREE.BufferAttribute
+      const arr = posAttr.array as Float32Array
+      for (let i = 0; i < this.auraParticleData.length; i++) {
+        const p = this.auraParticleData[i]
+        p.angle += p.rotSpeed * dt
+        let y = arr[i * 3 + 1] + p.speed * dt
+        if (y > 16.0) {
+          y = 2.5
+          p.radius = 0.6 + Math.random() * 3.4
+        }
+        arr[i * 3] = Math.cos(p.angle) * p.radius
+        arr[i * 3 + 1] = y
+        arr[i * 3 + 2] = Math.sin(p.angle) * p.radius
+      }
+      posAttr.needsUpdate = true
+    }
+
+    // 昇龍觀音青銅香爐裊裊香煙
+    this.dragonPuffTimer -= dt
+    if (this.dragonPuffTimer <= 0 && !this.reducedSmoke && this.dragonGuanyinUrnPos) {
+      this.dragonPuffTimer = 1.3
+      this.spawnPuff(this.dragonGuanyinUrnPos)
+    }
 
     // Gentle cloud drifting animation across celestial dome
     for (const c of this.clouds) {

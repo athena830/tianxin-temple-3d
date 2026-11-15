@@ -369,7 +369,7 @@ export class TempleGame {
       this.hideOccluders()
       this.world.setGuide(this.guide ? feet : null, this.guide ? this.guide.position : null, this.time)
     }
-    this.world.update(frameSeconds, this.time, p, this.inTemple ? this.active?.id ?? null : null)
+    this.world.update(frameSeconds, this.time, p, this.inTemple ? this.active?.id ?? null : null, this.camera)
     this.renderer.render(this.world.scene, this.camera)
   }
 }
