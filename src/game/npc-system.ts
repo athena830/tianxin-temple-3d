@@ -27,9 +27,7 @@ export type TempleWaypoint = {
 }
 
 export const TEMPLE_WAYPOINTS: TempleWaypoint[] = [
-  // 1. 前庭天公爐
-  { name: '天公爐', zone: 'courtyard', pos: new THREE.Vector3(6.2, 0, 27.5), isWorship: true, worshipTarget: new THREE.Vector3(9.0, 0, 28.0) },
-  // 2. 觀音大殿殿前（中門前）
+  // 1. 觀音大殿殿前（中門前）
   { name: '主殿大門', zone: 'courtyard', pos: new THREE.Vector3(0, 0, 1.2), isWorship: true, worshipTarget: new THREE.Vector3(0, 0, -6.0) },
   // 3. 觀音大殿龍邊前
   { name: '主殿龍邊', zone: 'courtyard', pos: new THREE.Vector3(4.5, 0, 1.2), isWorship: true, worshipTarget: new THREE.Vector3(4.5, 0, -4.5) },
@@ -69,7 +67,7 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
     dialogues: {
       idle: [
         '大殿香火真鼎盛，心裡好安寧。',
-        '先拜天公，再拜觀音菩薩，禮數要周全。',
+        '誠心向觀世音菩薩、玉皇上帝祈求，平安是福。',
         '門神秦叔寶跟尉遲恭畫得真威風！',
         '今天廟裡好熱鬧，神聖祥和。',
       ],

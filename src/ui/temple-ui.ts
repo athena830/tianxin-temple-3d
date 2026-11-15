@@ -62,7 +62,7 @@ export class TempleUi {
         </header>
         <nav class="map" hidden>
           <p>選擇目的地，跟著金色箭頭前往</p>
-          <button data-go="tiangong">參拜天公爐</button><button data-go="gold-furnace">八角金亭（化金）</button><button data-go="chess">天心仙姑問事亭</button>
+          <button data-go="guanyin-dragon">參拜昇龍觀音</button><button data-go="gold-furnace">八角金亭（化金）</button><button data-go="chess">天心仙姑問事亭</button>
           <button data-go="incense">上香祈福</button><button data-go="yuhuang">後殿凌霄寶殿</button><button data-go="prayer">寫下心願</button>
           <button data-go="offerings">虛擬供奉</button><button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
           <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="drum">鼓樓擊鼓</button>

@@ -5,7 +5,6 @@ import { Input } from './engine/input'
 import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
-import { TIANGONG } from './game/temple-courtyard'
 import type { TempleGame } from './game/temple-game'
 import { DRAGON_GUANYIN_POS, type ShrinePointId } from './game/temple-world'
 import { TempleUi } from './ui/temple-ui'
@@ -65,16 +64,6 @@ async function boot(): Promise<void> {
         game.worship({ x: 0, z: -30.2 }, 3.0, () => {
           store.worshipYuhuang(); audio.play('bell')
           ui.toast('朝拜玉皇上帝：願蒙浩恩庇佑，吉星高照，百福駢臻。', 4800)
-        })
-      }
-      else if (action === 'tiangong') {
-        if (game.worshipping) return
-        // Close the panel, face the urn, bow with palms together, then show the blessing and resume free movement.
-        ui.closePanel(); game.closePanel(); syncMode()
-        w.perform('tiangong'); audio.play('chime')
-        game.worship(TIANGONG, 2.6, () => {
-          store.worshipTiangong(); audio.play('bell')
-          ui.toast('敬拜玉皇上帝：願天公庇佑，風調雨順，闔家平安。', 4800)
         })
       }
       else if (action === 'guanyin-dragon') {

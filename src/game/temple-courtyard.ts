@@ -10,7 +10,6 @@ export const ROAD_HALF = 2
 export const SITE = { halfX: 30, back: -40, front: 48 } as const
 export const GATE_Z = 48
 export const STAND = new THREE.Vector3(0, 0, 51.6)
-export const TIANGONG = new THREE.Vector3(9, 0, 28)
 export const PAVILION = new THREE.Vector3(-12, 0, 30)
 export const WISH_POOL = new THREE.Vector3(-9.5, 0, 40)
 export const LOTUS_POND = new THREE.Vector3(11, 0, 39.5)
@@ -34,9 +33,6 @@ const yAxis = new THREE.Vector3(0, 1, 0)
 const rotY = (a: number) => new THREE.Quaternion().setFromAxisAngle(yAxis, a)
 
 export class FrontCourtyard {
-  /** Smoke emitter above the Tiangong urn. */
-  readonly tiangongSmoke = new THREE.Vector3(TIANGONG.x, 2.45, TIANGONG.z)
-  readonly tiangongGlow: THREE.PointLight
   private readonly lanternMats: THREE.MeshStandardMaterial[] = []
   private fairyMesh?: THREE.Mesh
 
@@ -46,7 +42,6 @@ export class FrontCourtyard {
     this.addRoad()
     this.addGateArch()
     this.addScreenWall()
-    this.tiangongGlow = this.addTiangongUrn()
     this.addPavilion()
     this.addWishingPool()
     this.addLotusPond()
@@ -301,71 +296,6 @@ export class FrontCourtyard {
     tassel.rotation.x = Math.PI
     g.add(body, capT, capB, cord, tassel)
     this.add(g, false)
-  }
-
-  /** Large bronze Tiangong urn on a stone base, with a small roofed crown and continuous incense smoke. */
-  private addTiangongUrn(): THREE.PointLight {
-    const { x, z } = TIANGONG
-    const bronze = this.c.mat(PAL.bronze, 0.38, 0.55)
-    const gold = this.c.mat(PAL.gold, 0.42, 0.36)
-    const stone = this.c.mat('#a49a87', 0.92)
-    const g = new THREE.Group()
-    g.position.set(x, 0, z)
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.95, 0.5, 8), stone)
-    base.position.y = 0.25
-    const tier = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.45, 0.3, 8), stone)
-    tier.position.y = 0.65
-    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 0.82, 1.0, 20), bronze)
-    bowl.position.y = 1.3
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.1, 8, 28), gold)
-    rim.rotation.x = Math.PI / 2
-    rim.position.y = 1.8
-    const band = new THREE.Mesh(new THREE.TorusGeometry(0.97, 0.06, 6, 28), gold)
-    band.rotation.x = Math.PI / 2
-    band.position.y = 1.15
-    g.add(base, tier, bowl, rim, band)
-    for (const side of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.07, 8, 14), bronze)
-      ear.position.set(0, 1.85, side * 1.15)
-      g.add(ear)
-    }
-    for (let i = 0; i < 4; i += 1) {
-      const a = Math.PI / 4 + (i * Math.PI) / 2
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.75, 6), bronze)
-      post.position.set(Math.cos(a) * 0.72, 2.18, Math.sin(a) * 0.72)
-      g.add(post)
-    }
-    const crown = new THREE.Mesh(new THREE.ConeGeometry(1.05, 0.62, 8), bronze)
-    crown.position.y = 2.85
-    const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), gold)
-    pearl.position.y = 3.3
-    g.add(crown, pearl)
-    for (let i = 0; i < 9; i += 1) {
-      const a = (i / 9) * Math.PI * 2
-      const r = i === 0 ? 0 : 0.32
-      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.62, 5), this.c.mat('#c89154'))
-      stick.position.set(Math.cos(a) * r, 2.05, Math.sin(a) * r)
-      const ember = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 5), new THREE.MeshBasicMaterial({ color: '#ffb45f' }))
-      ember.position.set(stick.position.x, 2.37, stick.position.z)
-      g.add(stick, ember)
-    }
-    this.add(g)
-    // Name label on the base, facing the road (-X).
-    const label = new THREE.Mesh(new THREE.PlaneGeometry(1.25, 0.34), this.c.text('天 公 爐', '#f2d690', '#4b3022'))
-    label.position.set(x - 1.86, 0.27, z)
-    label.rotation.y = -Math.PI / 2
-    this.c.scene.add(label)
-    // Worship mat where visitors stand.
-    const mat = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.1), this.c.mat('#8e2f24', 0.95))
-    mat.rotation.x = -Math.PI / 2
-    mat.position.set(x - 3.0, 0.03, z)
-    mat.receiveShadow = true
-    this.c.scene.add(mat)
-    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 1.9, 3)
-    const glow = new THREE.PointLight('#f1a754', 0.5, 9, 2)
-    glow.position.set(x, 2.3, z)
-    this.c.scene.add(glow)
-    return glow
   }
 
   /**
@@ -986,7 +916,6 @@ export class FrontCourtyard {
   }
 
   update(time: number): void {
-    this.tiangongGlow.intensity = 0.5 + Math.sin(time * 2.2) * 0.06
     for (const m of this.lanternMats) m.emissiveIntensity = 0.5 + Math.sin(time * 1.7) * 0.05
     if (this.fairyMesh) {
       this.fairyMesh.position.y = 0.4 + 1.45 / 2 + Math.sin(time * 1.8) * 0.02

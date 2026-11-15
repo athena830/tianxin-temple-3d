@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
-import { FrontCourtyard, GOLD_FURNACE, PAVILION, STAND, TIANGONG, WISH_POOL } from './temple-courtyard'
+import { FrontCourtyard, GOLD_FURNACE, PAVILION, STAND, WISH_POOL } from './temple-courtyard'
 import { NpcManager } from './npc-system'
 
 export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0, 31.0)
@@ -40,7 +40,6 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'wishing-pool', title: '蓮花許願池', subtitle: '投入一枚祈福銅錢', radius: 2.8 },
   { id: 'prayer-wall', title: '祈願牆', subtitle: '閱讀此裝置上的祝願', radius: 3.0 },
   { id: 'records', title: '祈福紀錄', subtitle: '回看本機保存的參拜足跡', radius: 3.0 },
-  { id: 'tiangong', title: '參拜玉皇上帝', subtitle: '於前庭天公爐前合掌敬拜', radius: 2.8 },
   { id: 'drum', title: '鼓樓擊鼓', subtitle: '擊鼓鳴志，收攝心念', radius: 2.8 },
   { id: 'yuhuang', title: '後殿凌霄寶殿', subtitle: '朝拜玉皇上帝，蒙沐浩恩', radius: 3.2 },
   { id: 'gold-furnace', title: '八角金亭', subtitle: '化金祈福，添香油聚善緣', radius: 3.0 },
@@ -49,7 +48,6 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
 const pointPositions: [number, number][] = [
   [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [WISH_POOL.x + 3.9, WISH_POOL.z], [14.6, 4.3], [15, 0.2],
-  [TIANGONG.x - 3.0, TIANGONG.z],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x + 5.5, DRAGON_GUANYIN_POS.z],
 ]
@@ -58,7 +56,6 @@ const pointPositions: [number, number][] = [
 export const POINT_TARGETS: [number, number][] = [
   [0, -2.55], [0, -12.2], [-4.4, -4.2], [-12, 1.2], [PAVILION.x, PAVILION.z],
   [12.5, -1.6], [8.5, -8.5], [15.2, -8], [WISH_POOL.x, WISH_POOL.z], [17.5, 4.3], [17.2, 0.2],
-  [TIANGONG.x, TIANGONG.z],
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
 ]
@@ -103,7 +100,6 @@ export class TempleWorld {
   private skyTex!: THREE.CanvasTexture
   private cloudMat!: THREE.MeshBasicMaterial
   private timeOfDay: TimeOfDay = 'day'
-  private puffTimer = 0
   private bellImpulse = 0
   private drumImpulse = 0
   private woodfishImpulse = 0
@@ -2283,7 +2279,6 @@ export class TempleWorld {
     if (action === 'coin') this.dropCoin()
     if (action === 'lottery') this.spawnSmoke(new THREE.Vector3(-11.8, 1.8, 1.2))
     if (action === 'chess') this.spawnSmoke(new THREE.Vector3(PAVILION.x, 1.2, PAVILION.z))
-    if (action === 'tiangong') { this.spawnSmoke(this.courtyard.tiangongSmoke.clone()); this.courtyard.tiangongGlow.intensity = 1.4 }
     if (action === 'yuhuang') { this.spawnSmoke(new THREE.Vector3(0, 2.6, -29.5)) }
     if (action === 'gold-furnace') { this.spawnSmoke(new THREE.Vector3(GOLD_FURNACE.x, 3.2, GOLD_FURNACE.z)) }
     if (action === 'guanyin-dragon') {
@@ -2344,9 +2339,6 @@ export class TempleWorld {
       c.mesh.position.x = c.x
       c.mesh.position.y = c.y + Math.sin(time * 0.35 + c.z) * 0.35
     }
-    // A thin, continuous thread of smoke above the Tiangong urn.
-    this.puffTimer -= dt
-    if (this.puffTimer <= 0 && !this.reducedSmoke) { this.puffTimer = 0.8; this.spawnPuff(this.courtyard.tiangongSmoke) }
     this.woodfishImpulse = THREE.MathUtils.damp(this.woodfishImpulse, 0, 11, dt)
     this.bellImpulse = THREE.MathUtils.damp(this.bellImpulse, 0, 5.5, dt)
     this.drumImpulse = THREE.MathUtils.damp(this.drumImpulse, 0, 7.5, dt)
