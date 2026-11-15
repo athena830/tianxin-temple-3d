@@ -46,6 +46,7 @@ export class FrontCourtyard {
     this.addGateArch()
     this.tiangongGlow = this.addTiangongUrn()
     this.addPavilion()
+    this.addShenglongGuanyin()
     this.addWishingPool()
     this.addLotusPond()
     this.addPlanting()
@@ -418,6 +419,58 @@ export class FrontCourtyard {
       this.fairyMesh = mesh
       this.c.scene.add(mesh)
     })
+  }
+
+  private addShenglongGuanyin(): void {
+    // Placed in the garden space next to Tianxin pavilion (-18.2, 0, 24.5), facing forward-right toward the approach (+X / +Z)
+    const gx = -18.2
+    const gz = 24.5
+    const root = new THREE.Group()
+    root.position.set(gx, 0, gz)
+    root.rotation.y = Math.PI / 4
+
+    // 1. Elevated Hexagonal Granite Terrace (八角青石台座與欄杆)
+    const stoneMat = this.c.mat('#a69c89', 0.9)
+    const basePodium = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 0.35, 8), stoneMat)
+    basePodium.position.y = 0.175
+    basePodium.receiveShadow = true
+    root.add(basePodium)
+
+    const lotusPlinth = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 0.3, 16), this.c.mat(PAL.gold, 0.45, 0.4))
+    lotusPlinth.position.y = 0.45
+    lotusPlinth.receiveShadow = true
+    root.add(lotusPlinth)
+
+    // 2. High-Resolution Shenglong Guanyin Board (昇龍觀音法相尊容)
+    // Aspect ratio: 540 / 985 = 0.548, Height: 4.5m, Width: 2.46m
+    const aspect = 540 / 985
+    const statueH = 4.5
+    const statueW = statueH * aspect
+
+    const loader = new THREE.TextureLoader()
+    loader.load('./assets/shenglong-guanyin.png', tex => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.05,
+        side: THREE.DoubleSide,
+      })
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), mat)
+      mesh.position.set(0, 0.6 + statueH / 2, 0)
+      mesh.castShadow = false
+      mesh.receiveShadow = false
+      root.add(mesh)
+    })
+
+    // 3. Gentle Aura Ambient Light (祥瑞神光與石燈照耀)
+    const aura = new THREE.PointLight('#ffe4a0', 1.0, 9, 2)
+    aura.position.set(0, 2.5, 0.8)
+    root.add(aura)
+
+    // Stone barrier pillars & steps
+    this.c.scene.add(root)
+    this.c.physics.addStaticCylinder(new THREE.Vector3(gx, 1.2, gz), 1.8, 2.4)
   }
 
   private boardTexture(): THREE.CanvasTexture {
