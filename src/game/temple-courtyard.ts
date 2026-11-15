@@ -12,7 +12,7 @@ export const GATE_Z = 48
 export const STAND = new THREE.Vector3(0, 0, 51.6)
 export const PAVILION = new THREE.Vector3(-12, 0, 30)
 export const WISH_POOL = new THREE.Vector3(-9.5, 0, 40)
-export const LOTUS_POND = new THREE.Vector3(11, 0, 39.5)
+export const LOTUS_POND = new THREE.Vector3(12.0, 0, 38.0)
 export const GOLD_FURNACE = new THREE.Vector3(-19.5, 0, 38.0)
 
 export type BuildContext = {
@@ -489,22 +489,56 @@ export class FrontCourtyard {
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.4, z), 0.5, 0.8)
   }
 
-  private lotusFlower(x: number, y: number, z: number, s: number): THREE.Group {
+  private lotusFlower(x: number, y: number, z: number, s: number, color = PAL.lotus): THREE.Group {
     const f = new THREE.Group()
     f.position.set(x, y, z)
-    const petalMat = this.c.mat(PAL.lotus, 0.6)
+    const petalMat = this.c.mat(color, 0.6)
+    // Outer petals (6 petals, spreading)
     for (let i = 0; i < 6; i += 1) {
       const p = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 6), petalMat)
       const a = (i / 6) * Math.PI * 2
-      p.scale.set(0.45, 0.9, 0.3)
-      p.position.set(Math.cos(a) * s * 0.55, s * 0.6, Math.sin(a) * s * 0.55)
-      p.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5)
+      p.scale.set(0.48, 0.92, 0.28)
+      p.position.set(Math.cos(a) * s * 0.6, s * 0.55, Math.sin(a) * s * 0.6)
+      p.rotation.set(Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55)
+      f.add(p)
+    }
+    // Inner petals (5 petals, upright cup)
+    for (let i = 0; i < 5; i += 1) {
+      const p = new THREE.Mesh(new THREE.SphereGeometry(s * 0.85, 8, 6), petalMat)
+      const a = (i / 5) * Math.PI * 2 + 0.35
+      p.scale.set(0.42, 0.88, 0.26)
+      p.position.set(Math.cos(a) * s * 0.38, s * 0.65, Math.sin(a) * s * 0.38)
+      p.rotation.set(Math.sin(a) * 0.32, 0, -Math.cos(a) * 0.32)
       f.add(p)
     }
     const heart = new THREE.Mesh(new THREE.SphereGeometry(s * 0.35, 8, 6), this.c.mat('#e8c35c', 0.5))
-    heart.position.y = s * 0.5
+    heart.position.y = s * 0.55
     f.add(heart)
     return f
+  }
+
+  private lotusBud(x: number, y: number, z: number, s: number, color = '#ea91a3'): THREE.Group {
+    const g = new THREE.Group()
+    g.position.set(x, y, z)
+    const budMat = this.c.mat(color, 0.6)
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(s * 0.45, s * 1.3, 8), budMat)
+    cone.position.y = s * 0.65
+    const base = new THREE.Mesh(new THREE.SphereGeometry(s * 0.42, 8, 6), this.c.mat(PAL.lotusPad, 0.7))
+    base.position.y = s * 0.2
+    g.add(cone, base)
+    return g
+  }
+
+  private lotusSeedpod(x: number, y: number, z: number, s: number): THREE.Group {
+    const g = new THREE.Group()
+    g.position.set(x, y, z)
+    const pod = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.55, s * 0.24, s * 0.7, 8), this.c.mat('#728a42', 0.6))
+    pod.position.y = s * 0.4
+    const top = new THREE.Mesh(new THREE.CircleGeometry(s * 0.52, 8), this.c.mat('#a4a046', 0.5))
+    top.rotation.x = -Math.PI / 2
+    top.position.y = s * 0.75
+    g.add(pod, top)
+    return g
   }
 
   /** Lotus wishing pool, moved off the central road to the left side of the courtyard. */
@@ -521,7 +555,7 @@ export class FrontCourtyard {
     rim.rotation.x = Math.PI / 2
     rim.position.set(x, 0.32, z)
     this.c.scene.add(rim)
-    this.addLotusPads(x, z, 1.7, 5, 2)
+    this.addLotusPads(x, z, 1.8, 12, 5)
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.04, z), 2.42, 0.6)
   }
 
@@ -538,21 +572,276 @@ export class FrontCourtyard {
     }
   }
 
-  /** Decorative lotus pond, right of the road, mirroring the wishing pool. */
+  /**
+   * Grand Scenic Lotus Pond (前庭東側・盛景九曲荷花池):
+   * 擴建後的壯麗荷花池，尺寸拓展至約 10.4m × 7.4m，採古典漢白玉雕石蓮瓣護欄圍砌。
+   * 池內碧波如翠、池底深淺漸層，生長著 54 餘片高低錯落的蓮葉（包含浮水葉與高聳挺水葉），
+   * 盛開著 28 朵千姿百態的仙蓮（粉紅盛開荷花、聖潔出水白蓮、胭脂艷紅蓮、亭亭玉立荷苞與如意蓮蓬）。
+   * 池畔點綴天然太湖石假山與水榭石燈籠，夜幕降臨散發水面溫潤微光。
+   */
   private addLotusPond(): void {
     const { x, z } = LOTUS_POND
-    const sx = 1.4
-    const basin = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.45, 0.62, 32), this.c.mat('#b4a07d'))
-    basin.scale.x = sx
-    basin.position.set(x, -0.08, z)
-    this.add(basin)
-    const water = new THREE.Mesh(new THREE.CircleGeometry(2.3, 36), new THREE.MeshStandardMaterial({ color: PAL.water, roughness: 0.25, metalness: 0.15 }))
+    const rx = 5.2
+    const rz = 3.7
+    const g = new THREE.Group()
+    g.position.set(x, 0, z)
+
+    // 1. Tiered Carved Stone Basin Foundation (基座與外池壁)
+    const stonePlinth = this.c.mat('#8c8072', 0.95)
+    const stoneWall = this.c.mat('#a89b88', 0.9)
+    const whiteMarble = this.c.mat('#dcd3c4', 0.7)
+    const darkFloor = this.c.mat('#1b302a', 0.95)
+
+    // Lower plinth
+    const plinth = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.22, 48), stonePlinth)
+    plinth.scale.set(rx + 0.35, 1, rz + 0.35)
+    plinth.position.y = 0.11
+    g.add(plinth)
+
+    // Main basin wall
+    const wall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.46, 48), stoneWall)
+    wall.scale.set(rx + 0.15, 1, rz + 0.15)
+    wall.position.y = 0.23
+    g.add(wall)
+
+    // Deep pond floor
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.35, 48), darkFloor)
+    floor.scale.set(rx - 0.2, 1, rz - 0.2)
+    floor.position.y = 0.05
+    g.add(floor)
+
+    // Carved copestone rim (漢白玉壓頂雕石圈)
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.14, 10, 48), whiteMarble)
+    rim.rotation.x = Math.PI / 2
+    rim.scale.set(rx + 0.08, rz + 0.08, 1)
+    rim.position.y = 0.46
+    g.add(rim)
+
+    // 2. 16 Carved Stone Baluster Posts (漢白玉望柱與雕花柱頭)
+    const postCount = 16
+    for (let i = 0; i < postCount; i += 1) {
+      const a = (i / postCount) * Math.PI * 2
+      const px = Math.cos(a) * (rx + 0.12)
+      const pz = Math.sin(a) * (rz + 0.12)
+      const post = new THREE.Group()
+      post.position.set(px, 0, pz)
+
+      // Post pedestal
+      const pBase = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), stoneWall)
+      pBase.position.y = 0.32
+      // Post column
+      const pCol = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.38, 0.18), whiteMarble)
+      pCol.position.y = 0.58
+      // Lotus finial (蓮花苞柱頭)
+      const finialBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 0.08, 8), this.c.mat(PAL.gold, 0.5, 0.3))
+      finialBase.position.y = 0.81
+      const finial = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), whiteMarble)
+      finial.scale.set(0.9, 1.3, 0.9)
+      finial.position.y = 0.92
+      post.add(pBase, pCol, finialBase, finial)
+      g.add(post)
+    }
+
+    // Balustrade panels (中間雕石欄板)
+    for (let i = 0; i < postCount; i += 1) {
+      const a1 = (i / postCount) * Math.PI * 2
+      const a2 = ((i + 1) / postCount) * Math.PI * 2
+      const p1x = Math.cos(a1) * (rx + 0.08)
+      const p1z = Math.sin(a1) * (rz + 0.08)
+      const p2x = Math.cos(a2) * (rx + 0.08)
+      const p2z = Math.sin(a2) * (rz + 0.08)
+      const mx = (p1x + p2x) / 2
+      const mz = (p1z + p2z) / 2
+      const segLen = Math.hypot(p2x - p1x, p2z - p1z)
+      const segAngle = Math.atan2(p2z - p1z, p2x - p1x)
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.28, 0.1), this.c.mat('#cfc6b5', 0.8))
+      panel.position.set(mx, 0.44, mz)
+      panel.rotation.y = -segAngle
+      g.add(panel)
+    }
+
+    // 3. Taihu Scholar Stones (太湖石假山景觀) & Waterside Lantern
+    const rockMat = this.c.mat('#6e655a', 0.92)
+    const mossMat = this.c.mat('#55634e', 0.88)
+    const rocks = [
+      { geom: new THREE.DodecahedronGeometry(0.9, 1), scale: [1.1, 1.45, 0.95], pos: [rx * 0.72, 0.62, -rz * 0.22], rot: [0.2, 0.7, -0.1], mat: rockMat },
+      { geom: new THREE.IcosahedronGeometry(0.7, 0), scale: [1.25, 0.85, 1.1], pos: [rx * 0.68, 0.42, rz * 0.26], rot: [-0.3, 0.4, 0.2], mat: mossMat },
+      { geom: new THREE.DodecahedronGeometry(0.52, 1), scale: [0.95, 1.1, 1.05], pos: [rx * 0.52, 0.36, -rz * 0.55], rot: [0.1, -0.6, 0.3], mat: rockMat },
+    ]
+    for (const r of rocks) {
+      const m = new THREE.Mesh(r.geom, r.mat)
+      m.scale.set(r.scale[0], r.scale[1], r.scale[2])
+      m.position.set(r.pos[0], r.pos[1], r.pos[2])
+      m.rotation.set(r.rot[0], r.rot[1], r.rot[2])
+      g.add(m)
+    }
+
+    // Traditional Stone Water Lantern atop rock (池畔水榭石燈籠)
+    const lanternBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.18, 6), stoneWall)
+    lanternBase.position.set(rx * 0.72, 1.42, -rz * 0.22)
+    const lanternWindow = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.24, 0.28), this.c.mat('#f0c36b', 0.4, 0.2))
+    lanternWindow.position.set(rx * 0.72, 1.62, -rz * 0.22)
+    const lanternRoof = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.22, 6), stoneWall)
+    lanternRoof.position.set(rx * 0.72, 1.84, -rz * 0.22)
+    g.add(lanternBase, lanternWindow, lanternRoof)
+
+    const lanternLight = new THREE.PointLight('#ffbe55', 0.8, 6, 2)
+    lanternLight.position.set(rx * 0.72, 1.62, -rz * 0.22)
+    g.add(lanternLight)
+
+    this.add(g)
+
+    // 4. Tranquil Jade Water Surface (碧波如鏡池水)
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: '#2a5b51',
+      roughness: 0.16,
+      metalness: 0.26,
+      transparent: true,
+      opacity: 0.94,
+    })
+    const water = new THREE.Mesh(new THREE.CircleGeometry(1, 48), waterMat)
     water.rotation.x = -Math.PI / 2
-    water.scale.x = sx
-    water.position.set(x, 0.25, z)
+    water.scale.set(rx - 0.06, rz - 0.06, 1)
+    water.position.set(x, 0.28, z)
     this.c.scene.add(water)
-    this.addLotusPads(x, z, 1.8, 9, 4, sx)
-    this.c.physics.addStaticBox(new THREE.Vector3(x, 0.15, z), new THREE.Vector3(2.6 * sx * 1.85, 0.9, 4.6))
+
+    // 5. Abundant Lotus Flora (繁茂蓮葉群與千姿仙蓮)
+    this.addGrandLotusFlora(x, z, rx - 0.55, rz - 0.5)
+
+    // 6. Physics Collision Barrier (防止玩家墜入深池)
+    this.c.physics.addStaticBox(
+      new THREE.Vector3(x, 0.45, z),
+      new THREE.Vector3((rx + 0.15) * 2, 0.95, (rz + 0.15) * 2)
+    )
+  }
+
+  /**
+   * Generates a lush, varied lotus ecosystem across the grand pond:
+   * - 54 Lotus Pads: mixed sizes (0.28m to 0.68m), varied greens, natural notched geometry.
+   *   18 pads stand upright on slender stems (挺水葉, 0.16m - 0.34m above water).
+   *   36 pads float serenely on the water surface (浮水葉).
+   * - 28 Lotus Blossoms, Buds & Seedpods:
+   *   - 11 Classic Pink Blooming Lotuses (粉紅盛開重瓣大荷花)
+   *   - 6 Sacred White Lotuses (白玉出水仙蓮)
+   *   - 4 Crimson-Tipped Lotuses (胭脂艷紅蓮)
+   *   - 4 Slender Upright Lotus Buds (亭亭玉立含苞待放)
+   *   - 3 Ripened Golden-Green Seedpods (綠玉如意蓮蓬)
+   */
+  private addGrandLotusFlora(cx: number, cz: number, spreadX: number, spreadZ: number): void {
+    const padCount = 54
+    const padColors = [PAL.lotusPad, '#4d7c43', '#669c57', '#3c6633', '#5a8c50']
+
+    // Seeded pseudo-random using golden ratio distribution
+    const padPositions: { x: number; z: number; y: number; r: number; elevated: boolean }[] = []
+
+    for (let i = 0; i < padCount; i += 1) {
+      const phi = i * 2.39996 + 0.5
+      const radFrac = Math.sqrt((i + 0.8) / padCount) * 0.92
+      const px = cx + Math.cos(phi) * spreadX * radFrac
+      const pz = cz + Math.sin(phi) * spreadZ * radFrac
+
+      // Avoid rock cluster area around eastern sector
+      if (px > cx + spreadX * 0.48 && pz < cz + spreadZ * 0.3 && pz > cz - spreadZ * 0.5) {
+        continue
+      }
+
+      const padR = 0.28 + ((i * 7) % 5) * 0.08 + (i % 3) * 0.06
+      const color = padColors[i % padColors.length]
+      const isElevated = i % 3 === 0
+      const stemH = isElevated ? 0.16 + (i % 4) * 0.06 : 0
+      const py = 0.29 + stemH
+
+      padPositions.push({ x: px, z: pz, y: py, r: padR, elevated: isElevated })
+
+      // Pad mesh
+      const padGeom = new THREE.CircleGeometry(padR, 14, 0.25, Math.PI * 2 - 0.25)
+      const padMesh = new THREE.Mesh(padGeom, this.c.mat(color, 0.7))
+      padMesh.rotation.x = -Math.PI / 2
+      padMesh.rotation.z = phi
+      if (isElevated) {
+        padMesh.rotation.x += ((i % 5) - 2) * 0.06
+        padMesh.rotation.y += ((i % 3) - 1) * 0.05
+      }
+      padMesh.position.set(px, py, pz)
+      this.c.scene.add(padMesh)
+
+      // Slender stem down to water if elevated
+      if (isElevated) {
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.016, 0.018, stemH + 0.08, 6),
+          this.c.mat('#3b5e32', 0.8)
+        )
+        stem.position.set(px, 0.25 + stemH / 2, pz)
+        this.c.scene.add(stem)
+      }
+    }
+
+    // 28 Flowers, Buds and Seedpods distributed across lush pads
+    const flowerTypes: { type: 'pink' | 'white' | 'crimson' | 'bud' | 'seedpod'; color?: string; size: number }[] = [
+      // 11 Pink blooming lotuses
+      { type: 'pink', color: '#ea9fb0', size: 0.24 },
+      { type: 'pink', color: '#f2a8b8', size: 0.26 },
+      { type: 'pink', color: '#e58e9f', size: 0.23 },
+      { type: 'pink', color: '#f0a3b3', size: 0.25 },
+      { type: 'pink', color: '#e894a5', size: 0.22 },
+      { type: 'pink', color: '#f3b0be', size: 0.27 },
+      { type: 'pink', color: '#ea99a8', size: 0.24 },
+      { type: 'pink', color: '#eb9cae', size: 0.25 },
+      { type: 'pink', color: '#f1abb9', size: 0.23 },
+      { type: 'pink', color: '#e792a3', size: 0.26 },
+      { type: 'pink', color: '#f5b4c2', size: 0.24 },
+
+      // 6 Sacred White lotuses
+      { type: 'white', color: '#fbf8f0', size: 0.24 },
+      { type: 'white', color: '#fffdf8', size: 0.26 },
+      { type: 'white', color: '#f7f4ea', size: 0.23 },
+      { type: 'white', color: '#faf6ee', size: 0.25 },
+      { type: 'white', color: '#fffcf5', size: 0.22 },
+      { type: 'white', color: '#f8f4ec', size: 0.25 },
+
+      // 4 Crimson-tipped lotuses
+      { type: 'crimson', color: '#d85c76', size: 0.24 },
+      { type: 'crimson', color: '#ce4f69', size: 0.26 },
+      { type: 'crimson', color: '#e06680', size: 0.23 },
+      { type: 'crimson', color: '#d35670', size: 0.25 },
+
+      // 4 Slender upright buds
+      { type: 'bud', color: '#e2889a', size: 0.18 },
+      { type: 'bud', color: '#ea91a3', size: 0.20 },
+      { type: 'bud', color: '#dc7a8c', size: 0.19 },
+      { type: 'bud', color: '#e58c9e', size: 0.18 },
+
+      // 3 Seedpods
+      { type: 'seedpod', size: 0.18 },
+      { type: 'seedpod', size: 0.21 },
+      { type: 'seedpod', size: 0.19 },
+    ]
+
+    for (let j = 0; j < flowerTypes.length; j += 1) {
+      const ft = flowerTypes[j]
+      const padIdx = (j * 2 + 1) % padPositions.length
+      const p = padPositions[padIdx]
+      const fx = p.x + ((j * 3) % 5 - 2) * 0.08
+      const fz = p.z + ((j * 4) % 5 - 2) * 0.08
+      const stemH = 0.12 + (j % 5) * 0.05
+      const fy = 0.29 + stemH
+
+      // Slender stem
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.018, stemH + 0.08, 6),
+        this.c.mat('#446b38', 0.8)
+      )
+      stem.position.set(fx, 0.26 + stemH / 2, fz)
+      this.c.scene.add(stem)
+
+      if (ft.type === 'bud') {
+        this.c.scene.add(this.lotusBud(fx, fy, fz, ft.size, ft.color))
+      } else if (ft.type === 'seedpod') {
+        this.c.scene.add(this.lotusSeedpod(fx, fy, fz, ft.size))
+      } else {
+        this.c.scene.add(this.lotusFlower(fx, fy, fz, ft.size, ft.color))
+      }
+    }
   }
 
   /**

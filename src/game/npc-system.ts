@@ -35,6 +35,8 @@ export const TEMPLE_WAYPOINTS: TempleWaypoint[] = [
   { name: '主殿虎邊', zone: 'courtyard', pos: new THREE.Vector3(-4.5, 0, 1.2), isWorship: true, worshipTarget: new THREE.Vector3(-4.5, 0, -4.5) },
   // 5. 蓮花許願池
   { name: '許願池', zone: 'courtyard', pos: new THREE.Vector3(-5.8, 0, 39.5), isWorship: true, worshipTarget: new THREE.Vector3(-9.5, 0, 39.5) },
+  // 5b. 前庭東側盛景蓮花池
+  { name: '盛景蓮花池', zone: 'courtyard', pos: new THREE.Vector3(5.6, 0, 38.0), isWorship: false },
   // 6. 八角金亭
   { name: '八角金亭', zone: 'courtyard', pos: new THREE.Vector3(-16.0, 0, 38.0), isWorship: true, worshipTarget: new THREE.Vector3(-19.5, 0, 38.0) },
   // 7. 天心仙姑問事亭
@@ -68,6 +70,7 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
       idle: [
         '大殿香火真鼎盛，心裡好安寧。',
         '誠心向觀世音菩薩、玉皇上帝祈求，平安是福。',
+        '滿池荷花朵朵盛開，幽香撲鼻，真是賞心悅目。',
         '門神秦叔寶跟尉遲恭畫得真威風！',
         '今天廟裡好熱鬧，神聖祥和。',
       ],
@@ -93,6 +96,7 @@ export const NPC_DEFINITIONS: NpcConfig[] = [
     dialogues: {
       idle: [
         '聽說天心宮的籤詩很靈驗，待會來抽一支。',
+        '東邊這座大蓮花池開得好繁盛，粉白蓮花隨風輕搖，太美了！',
         '這條松樹步道走起來好舒服，有淡淡清香～',
         '五層樓高的昇龍觀音好雄偉，氣勢非凡！',
         '漫步在宮廟裡，心情整個放鬆了。',
