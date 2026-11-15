@@ -619,87 +619,51 @@ export class TempleWorld {
 
   private createGuanyinStatue(): THREE.Group {
     const root = new THREE.Group()
-    const goldMat = new THREE.MeshStandardMaterial({ color: '#f3c86b', roughness: 0.32, metalness: 0.55 })
-    const jadeMat = new THREE.MeshStandardMaterial({ color: '#7ba08c', roughness: 0.28, metalness: 0.15 })
-    const whiteMat = new THREE.MeshStandardMaterial({ color: '#f5f2eb', roughness: 0.45, metalness: 0.1 })
-    const haloMat = new THREE.MeshBasicMaterial({ color: '#ffe49e', transparent: true, opacity: 0.65, side: THREE.DoubleSide })
+    const goldMat = new THREE.MeshStandardMaterial({ color: '#dca44b', roughness: 0.35, metalness: 0.6 })
+    const haloMat = new THREE.MeshBasicMaterial({ color: '#ffeaad', transparent: true, opacity: 0.55, side: THREE.DoubleSide })
 
-    // 1. Multi-tier Lotus Throne (九品重瓣蓮花寶座)
-    const lotusBase = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.45, 0.32, 20), goldMat)
-    lotusBase.position.y = 0.16
+    // 1. Multi-tier Lotus Throne (金雕蓮花寶台基座)
+    const lotusBase = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 0.35, 24), goldMat)
+    lotusBase.position.y = 0.18
     lotusBase.castShadow = true
     root.add(lotusBase)
 
-    for (let i = 0; i < 12; i += 1) {
-      const a = (i * Math.PI * 2) / 12
-      const petal = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.45, 6), jadeMat)
-      petal.position.set(Math.cos(a) * 1.15, 0.35, Math.sin(a) * 1.15)
-      petal.rotation.set(Math.sin(a) * 0.4, -a, -Math.cos(a) * 0.4)
-      petal.scale.set(1.4, 0.8, 0.6)
-      root.add(petal)
-    }
+    // 2. High-Resolution Golden Guanyin Statue Board (觀世音菩薩法相金身尊像)
+    // Aspect ratio: 376 / 537 = 0.700, Height: 3.2m, Width: 2.24m
+    const aspect = 376 / 537
+    const statueH = 3.2
+    const statueW = statueH * aspect
 
-    // 2. Meditating Robed Body (菩薩跏趺端坐法身)
-    const lowerBody = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.95, 0.65, 16), whiteMat)
-    lowerBody.position.y = 0.65
-    lowerBody.scale.set(1.3, 1, 0.9)
-    lowerBody.castShadow = true
-    root.add(lowerBody)
+    const loader = new THREE.TextureLoader()
+    loader.load('./assets/guanyin-golden.png', tex => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      const statueMat = new THREE.MeshStandardMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.05,
+        roughness: 0.35,
+        metalness: 0.25,
+        side: THREE.DoubleSide,
+      })
+      const statueMesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), statueMat)
+      statueMesh.position.set(0, 0.32 + statueH / 2, 0)
+      statueMesh.castShadow = true
+      statueMesh.receiveShadow = true
+      root.add(statueMesh)
+    })
 
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.58, 0.95, 14), whiteMat)
-    torso.position.y = 1.35
-    torso.castShadow = true
-    root.add(torso)
-
-    // Golden Kasaya Sash / Necklace (金胸飾瓔珞與寶衣)
-    const sash = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.045, 6, 20), goldMat)
-    sash.position.set(0, 1.4, 0.15)
-    sash.rotation.x = Math.PI / 4
-    root.add(sash)
-
-    // 3. Hands in Meditation Mudra holding Willow & Pure Vase (妙法合十持柳淨瓶印)
-    const hands = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), goldMat)
-    hands.position.set(0, 1.1, 0.45)
-    root.add(hands)
-
-    // Pure Water Vase (羊脂玉淨瓶)
-    const vase = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.35, 10), jadeMat)
-    vase.position.set(0.16, 1.25, 0.45)
-    root.add(vase)
-
-    // Willow branch (楊柳枝)
-    const willow = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.4, 6), jadeMat)
-    willow.position.set(0.18, 1.45, 0.45)
-    willow.rotation.z = -0.3
-    root.add(willow)
-
-    // 4. Serene Head & Crown (慈悲慈顏法相與金冠佛冕)
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 14), goldMat)
-    head.position.y = 2.05
-    head.scale.set(0.95, 1.1, 0.95)
-    head.castShadow = true
-    root.add(head)
-
-    // Golden Crown with Amitabha emblem (寶冠佛冕)
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.28, 0.45, 12), goldMat)
-    crown.position.y = 2.45
-    root.add(crown)
-    const crownPeak = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.35, 8), goldMat)
-    crownPeak.position.y = 2.75
-    root.add(crownPeak)
-
-    // 5. Radiant Holy Backlight Halo (圓滿大放神光背光圓輪)
-    const halo = new THREE.Mesh(new THREE.RingGeometry(0.55, 1.25, 32), haloMat)
-    halo.position.set(0, 1.95, -0.45)
+    // 3. Radiant Holy Backlight Halo (圓滿大放神光背光金輪)
+    const halo = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.75, 36), haloMat)
+    halo.position.set(0, 2.15, -0.15)
     root.add(halo)
 
-    const haloInner = new THREE.Mesh(new THREE.CircleGeometry(0.52, 32), new THREE.MeshBasicMaterial({ color: '#ffecba', transparent: true, opacity: 0.35 }))
-    haloInner.position.set(0, 1.95, -0.44)
+    const haloInner = new THREE.Mesh(new THREE.CircleGeometry(0.82, 36), new THREE.MeshBasicMaterial({ color: '#ffebb3', transparent: true, opacity: 0.3 }))
+    haloInner.position.set(0, 2.15, -0.14)
     root.add(haloInner)
 
-    // Warm Divine Aura Light (神聖法相暖光)
-    const statueGlow = new THREE.PointLight('#ffe6a3', 1.2, 8, 2)
-    statueGlow.position.set(0, 2.0, 0.6)
+    // Warm Divine Aura Light (觀世音菩薩慈悲聖光)
+    const statueGlow = new THREE.PointLight('#ffe6a3', 1.5, 10, 2)
+    statueGlow.position.set(0, 2.2, 0.7)
     root.add(statueGlow)
 
     return root
