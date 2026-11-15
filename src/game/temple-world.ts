@@ -275,7 +275,7 @@ export class TempleWorld {
 
     // Grand Hall Roof (大殿重檐歇山式大屋頂)
     const roof = this.createRoof(20.6, 16.2, 5.35, 8.2)
-    roof.position.set(0, 4.9, -7)
+    roof.position.set(0, 0, -7)
     this.roof.add(roof)
     this.roof.position.y = 0
     this.scene.add(this.roof)
@@ -332,7 +332,7 @@ export class TempleWorld {
       this.scene.add(corridorCeiling)
 
       const roof = this.createRoof(5.6, 17.2, 3.3, 5.0)
-      roof.position.set(x, 2.7, -3.7)
+      roof.position.set(x, 0, -3.7)
       this.scene.add(roof)
     }
     for (let x = -6; x <= 6; x += 3) {
@@ -474,7 +474,7 @@ export class TempleWorld {
     this.bell.add(clapper)
     this.scene.add(this.bell)
     const bellRoof = this.createRoof(4.2, 3.5, 4.1, 5.4)
-    bellRoof.position.set(15.2, 3.85, -8)
+    bellRoof.position.set(15.2, 0, -8)
     this.scene.add(bellRoof)
 
     // Prayer wall panel.
