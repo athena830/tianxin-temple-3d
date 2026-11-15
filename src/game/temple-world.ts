@@ -310,6 +310,43 @@ export class TempleWorld {
     threshold.position.set(0, 0.18, 5.28)
     hall.add(threshold)
 
+    // 大殿正門雙扇與傳統武門神（秦叔寶、尉遲恭）：扇門向內側微開約 45 度，中央保留 2.34m 寬敞通道，直視觀音聖相
+    for (const side of [-1, 1]) {
+      const doorLeaf = new THREE.Group()
+      doorLeaf.position.set(side * 2.18, 2.38, 5.25)
+
+      // 朱漆大門扇本體
+      const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(1.42, 3.86, 0.08), makeMat('#802117', 0.65))
+      doorMesh.position.set(side * -0.71, 0, 0)
+      doorMesh.castShadow = true
+      doorLeaf.add(doorMesh)
+
+      // 傳統門神彩繪板（龍邊 +X：秦叔寶，虎邊 -X：尉遲恭）
+      const godMat = this.doorGodMaterial(side === 1 ? 'qin' : 'yuchi')
+      const godPlane = new THREE.Mesh(new THREE.PlaneGeometry(1.36, 3.76), godMat)
+      godPlane.position.set(side * -0.71, 0, 0.045)
+      doorLeaf.add(godPlane)
+
+      // 金鋪首銜環
+      const knockerRing = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.026, 8, 16), gold)
+      knockerRing.position.set(side * -0.32, 0, 0.065)
+      const knockerBase = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.04, 12), gold)
+      knockerBase.rotation.x = Math.PI / 2
+      knockerBase.position.set(side * -0.32, 0, 0.055)
+      doorLeaf.add(knockerRing, knockerBase)
+
+      // 金門釘（分佈於門扇外側邊緣飾帶）
+      for (const y of [-1.5, -0.75, 0.75, 1.5]) {
+        const stud = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), gold)
+        stud.position.set(side * -1.32, y, 0.05)
+        doorLeaf.add(stud)
+      }
+
+      // 向大殿內側敞開約 45 度（保留中央通道 2.34m，迎賓氣度尊貴非凡）
+      doorLeaf.rotation.y = -side * 0.78
+      hall.add(doorLeaf)
+    }
+
     // B. 右邊龍門（面向大殿右邊 +X 側，敞開通行）
     const dragonPortalLintel = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.9, 0.36), redDark)
     dragonPortalLintel.position.set(6.75, 4.35, 5.2)
@@ -707,7 +744,7 @@ export class TempleWorld {
       windowScreen.position.set(side * 7.4, 3.1, frontZ + 0.22)
       rear.add(windowScreen)
 
-      // Grand Double Palace Doors (九路八十一金釘朱漆大內門，向殿內兩側靠牆敞開，完全不阻擋人物走動)
+      // Grand Double Palace Doors (九龍殿大御門與天宮護法門神：王靈官、馬天君)
       const doorLeaf = new THREE.Group()
       doorLeaf.position.set(side * 3.2, 2.66, frontZ)
       const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(2.3, 4.8, 0.12), makeMat('#8c261b', 0.72))
@@ -715,9 +752,15 @@ export class TempleWorld {
       doorMesh.castShadow = true
       doorLeaf.add(doorMesh)
 
-      // Golden Door Studs (金釘)
+      // 天宮護法門神彩繪板（龍邊 +X：都天靈官・王靈官，虎邊 -X：華光天王・馬天君）
+      const godMat = this.doorGodMaterial(side === 1 ? 'wang' : 'ma')
+      const godPlane = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 4.5), godMat)
+      godPlane.position.set(side * -1.15, 0, 0.065)
+      doorLeaf.add(godPlane)
+
+      // Golden Door Studs (金釘 - 鑲嵌於大御門外側邊緣飾帶)
       for (let r = -1.8; r <= 1.8; r += 0.9) {
-        for (let c = -1.8; c <= -0.5; c += 0.65) {
+        for (const c of [-2.18, -0.12]) {
           const stud = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), gold)
           stud.position.set(side * c, r, 0.08)
           doorLeaf.add(stud)
@@ -725,11 +768,11 @@ export class TempleWorld {
       }
       // Golden Ring Handle (金鋪首銜環)
       const knocker = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 8, 16), gold)
-      knocker.position.set(side * -0.5, 0, 0.1)
+      knocker.position.set(side * -0.42, 0, 0.09)
       doorLeaf.add(knocker)
 
-      // Swung open deeply inward along the wall
-      doorLeaf.rotation.y = side * 1.35
+      // 朝向殿內靠兩側敞開約 43 度（保留中央 3.06m 宏偉走道，信眾暢行瞻仰玉皇上帝）
+      doorLeaf.rotation.y = -side * 0.76
       rear.add(doorLeaf)
     }
 
@@ -1292,6 +1335,514 @@ export class TempleWorld {
     const texture = new THREE.CanvasTexture(canvas)
     texture.colorSpace = THREE.SRGBColorSpace
     return new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+  }
+
+  private doorGodMaterial(god: 'qin' | 'yuchi' | 'wang' | 'ma'): THREE.MeshStandardMaterial {
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 1024
+    const ctx = canvas.getContext('2d')!
+
+    // 1. Base Vermilion Lacquer & Double Gold Border (朱漆底色與金邊回紋)
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, 1024)
+    bgGrad.addColorStop(0, '#58120b')
+    bgGrad.addColorStop(0.5, '#781a13')
+    bgGrad.addColorStop(1, '#3a0805')
+    ctx.fillStyle = bgGrad
+    ctx.fillRect(0, 0, 512, 1024)
+
+    // Outer & Inner Gold Filigree Borders (金泥雙線外框)
+    ctx.strokeStyle = '#d4af37'
+    ctx.lineWidth = 10
+    ctx.strokeRect(16, 16, 480, 992)
+    ctx.strokeStyle = '#f5df8b'
+    ctx.lineWidth = 3
+    ctx.strokeRect(26, 26, 460, 972)
+
+    // Four Corner Auspicious Ruyi / Cloud Knots (四角如意祥雲金飾)
+    const drawCornerKnot = (x: number, y: number, flipX: number, flipY: number) => {
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.scale(flipX, flipY)
+      ctx.strokeStyle = '#dfba54'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.moveTo(0, 36)
+      ctx.bezierCurveTo(24, 36, 36, 24, 36, 0)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(18, 18, 8, 0, Math.PI * 2)
+      ctx.fillStyle = '#dfba54'
+      ctx.fill()
+      ctx.restore()
+    }
+    drawCornerKnot(30, 30, 1, 1)
+    drawCornerKnot(482, 30, -1, 1)
+    drawCornerKnot(30, 994, 1, -1)
+    drawCornerKnot(482, 994, -1, -1)
+
+    // 2. Top Divine Name Plaque (頂部神號金字名匾)
+    ctx.fillStyle = '#220b08'
+    ctx.fillRect(80, 42, 352, 68)
+    ctx.strokeStyle = '#f1d478'
+    ctx.lineWidth = 4
+    ctx.strokeRect(80, 42, 352, 68)
+    ctx.strokeStyle = '#992117'
+    ctx.lineWidth = 2
+    ctx.strokeRect(86, 48, 340, 56)
+
+    const titles = {
+      qin: '門神・秦叔寶',
+      yuchi: '門神・尉遲恭',
+      wang: '都天靈官・王元帥',
+      ma: '華光天王・馬元帥',
+    }
+    ctx.fillStyle = '#fcebb6'
+    ctx.font = 'bold 34px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.shadowColor = '#000000'
+    ctx.shadowBlur = 6
+    ctx.fillText(titles[god], 256, 76)
+    ctx.shadowBlur = 0
+
+    // 3. Golden Divine Halo (威武神聖光輪)
+    const halo = ctx.createRadialGradient(256, 275, 30, 256, 275, 145)
+    halo.addColorStop(0, 'rgba(255, 238, 170, 0.65)')
+    halo.addColorStop(0.5, 'rgba(235, 185, 75, 0.35)')
+    halo.addColorStop(1, 'rgba(200, 140, 40, 0)')
+    ctx.fillStyle = halo
+    ctx.beginPath()
+    ctx.arc(256, 275, 145, 0, Math.PI * 2)
+    ctx.fill()
+
+    // 4. Floating Divine Silk Ribbons (五彩霞帔飛帛)
+    ctx.strokeStyle = god === 'qin' || god === 'wang' ? '#c0392b' : '#2980b9'
+    ctx.lineWidth = 14
+    ctx.lineCap = 'round'
+    // Left ribbon
+    ctx.beginPath()
+    ctx.moveTo(180, 230)
+    ctx.bezierCurveTo(70, 290, 60, 450, 110, 590)
+    ctx.bezierCurveTo(140, 680, 80, 770, 95, 870)
+    ctx.stroke()
+    // Right ribbon
+    ctx.beginPath()
+    ctx.moveTo(332, 230)
+    ctx.bezierCurveTo(442, 290, 452, 450, 402, 590)
+    ctx.bezierCurveTo(372, 680, 432, 770, 417, 870)
+    ctx.stroke()
+
+    // Inner gold ribbon accent
+    ctx.strokeStyle = '#f5d469'
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.moveTo(180, 230)
+    ctx.bezierCurveTo(70, 290, 60, 450, 110, 590)
+    ctx.bezierCurveTo(140, 680, 80, 770, 95, 870)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(332, 230)
+    ctx.bezierCurveTo(442, 290, 452, 450, 402, 590)
+    ctx.bezierCurveTo(372, 680, 432, 770, 417, 870)
+    ctx.stroke()
+
+    // 5. Robe & Battle Apron (戰袍戰裙)
+    const robeColor = god === 'qin' ? '#1e5f38' : god === 'yuchi' ? '#1c345b' : god === 'wang' ? '#8a1d12' : '#2d686f'
+    ctx.fillStyle = robeColor
+    ctx.beginPath()
+    ctx.moveTo(160, 390)
+    ctx.lineTo(352, 390)
+    ctx.lineTo(390, 780)
+    ctx.bezierCurveTo(300, 810, 212, 810, 122, 780)
+    ctx.closePath()
+    ctx.fill()
+
+    // Golden hem border
+    ctx.strokeStyle = '#dfba54'
+    ctx.lineWidth = 6
+    ctx.stroke()
+
+    // 6. Golden Pauldrons & Armor (獸首吞肩與鎖子黃金甲)
+    // Shoulders
+    ctx.fillStyle = '#c89632'
+    ctx.beginPath()
+    ctx.arc(148, 360, 38, 0, Math.PI * 2)
+    ctx.arc(364, 360, 38, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#ffe28a'
+    ctx.lineWidth = 4
+    ctx.stroke()
+
+    // Body Armor
+    ctx.fillStyle = '#b88628'
+    ctx.beginPath()
+    ctx.moveTo(170, 340)
+    ctx.lineTo(342, 340)
+    ctx.lineTo(326, 520)
+    ctx.lineTo(186, 520)
+    ctx.closePath()
+    ctx.fill()
+
+    // Chainmail / Scale texture
+    ctx.strokeStyle = '#f6d57b'
+    ctx.lineWidth = 2
+    for (let row = 360; row < 510; row += 16) {
+      for (let col = 190; col < 320; col += 20) {
+        ctx.beginPath()
+        ctx.arc(col + (row % 32 === 0 ? 0 : 10), row, 8, 0, Math.PI)
+        ctx.stroke()
+      }
+    }
+
+    // Mirror of Protection (護心寶鏡)
+    const mirrorGrad = ctx.createRadialGradient(256, 425, 4, 256, 425, 34)
+    mirrorGrad.addColorStop(0, '#ffffff')
+    mirrorGrad.addColorStop(0.3, '#f5e8b0')
+    mirrorGrad.addColorStop(0.7, '#c69528')
+    mirrorGrad.addColorStop(1, '#684508')
+    ctx.fillStyle = mirrorGrad
+    ctx.beginPath()
+    ctx.arc(256, 425, 34, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#faeaae'
+    ctx.lineWidth = 4
+    ctx.stroke()
+
+    // Broad Gold Belt with Jade Buckle (金蠻帶、玉帶)
+    ctx.fillStyle = '#c5942e'
+    ctx.fillRect(180, 520, 152, 28)
+    ctx.strokeStyle = '#fff0ba'
+    ctx.lineWidth = 3
+    ctx.strokeRect(180, 520, 152, 28)
+    ctx.fillStyle = '#3ca06c'
+    ctx.fillRect(238, 522, 36, 24)
+    ctx.strokeStyle = '#f8df86'
+    ctx.strokeRect(238, 522, 36, 24)
+
+    // 7. Head, Face & Headdress (神盔金冠與威嚴法相)
+    // Phoenix Wing Golden Helmet (鳳翅紫金盔)
+    ctx.fillStyle = '#caa13b'
+    ctx.beginPath()
+    ctx.moveTo(186, 250)
+    ctx.bezierCurveTo(186, 150, 326, 150, 326, 250)
+    ctx.closePath()
+    ctx.fill()
+    ctx.strokeStyle = '#ffea9f'
+    ctx.lineWidth = 4
+    ctx.stroke()
+
+    // Helmet Peak & Red Plume (盔頂朱纓)
+    ctx.fillStyle = '#d63031'
+    ctx.beginPath()
+    ctx.moveTo(256, 160)
+    ctx.bezierCurveTo(240, 120, 272, 120, 256, 95)
+    ctx.bezierCurveTo(290, 125, 275, 145, 256, 160)
+    ctx.fill()
+
+    // Side Phoenix Wings on Helmet (雙鳳翅)
+    ctx.fillStyle = '#e5b84c'
+    ctx.beginPath()
+    ctx.moveTo(188, 230)
+    ctx.quadraticCurveTo(140, 180, 160, 140)
+    ctx.quadraticCurveTo(176, 185, 196, 215)
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(324, 230)
+    ctx.quadraticCurveTo(372, 180, 352, 140)
+    ctx.quadraticCurveTo(336, 185, 316, 215)
+    ctx.fill()
+    ctx.stroke()
+
+    // Face Contours
+    const faceColors = {
+      qin: '#fcd3b6',
+      yuchi: '#313a48',
+      wang: '#bf2c1d',
+      ma: '#f7ede3',
+    }
+    ctx.fillStyle = faceColors[god]
+    ctx.beginPath()
+    ctx.ellipse(256, 260, 48, 56, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#5a2512'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // Eyes, Brows & Facial Features
+    if (god === 'qin') {
+      // 秦瓊：端正鳳目、長眉威儀
+      ctx.strokeStyle = '#1b1b1b'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(224, 244); ctx.lineTo(248, 240)
+      ctx.moveTo(288, 244); ctx.lineTo(264, 240)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(226, 252); ctx.quadraticCurveTo(238, 248, 248, 252)
+      ctx.moveTo(286, 252); ctx.quadraticCurveTo(274, 248, 264, 252)
+      ctx.stroke()
+      // Long Five-strand flowing black beard (五柳長髯)
+      ctx.fillStyle = '#111111'
+      ctx.beginPath()
+      ctx.moveTo(234, 280)
+      ctx.quadraticCurveTo(230, 360, 244, 430)
+      ctx.quadraticCurveTo(256, 370, 256, 285)
+      ctx.quadraticCurveTo(256, 370, 268, 430)
+      ctx.quadraticCurveTo(282, 360, 278, 280)
+      ctx.fill()
+    } else if (god === 'yuchi') {
+      // 尉遲恭：鐵面環眼、虯鬚如戟
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(236, 250, 10, 0, Math.PI * 2)
+      ctx.arc(276, 250, 10, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#0a0a0d'
+      ctx.beginPath()
+      ctx.arc(236, 250, 5, 0, Math.PI * 2)
+      ctx.arc(276, 250, 5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#08080a'
+      ctx.lineWidth = 5
+      ctx.beginPath()
+      ctx.moveTo(220, 238); ctx.lineTo(248, 242)
+      ctx.moveTo(292, 238); ctx.lineTo(264, 242)
+      ctx.stroke()
+      // Dense bristling curly beard
+      ctx.fillStyle = '#090a0d'
+      ctx.beginPath()
+      ctx.moveTo(220, 270)
+      ctx.bezierCurveTo(190, 320, 210, 420, 256, 435)
+      ctx.bezierCurveTo(302, 420, 322, 320, 292, 270)
+      ctx.closePath()
+      ctx.fill()
+    } else if (god === 'wang') {
+      // 王靈官：赤面三目、雷火神鬚
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(236, 252, 9, 0, Math.PI * 2)
+      ctx.arc(276, 252, 9, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#ffd11a'
+      ctx.beginPath()
+      ctx.arc(236, 252, 5, 0, Math.PI * 2)
+      ctx.arc(276, 252, 5, 0, Math.PI * 2)
+      ctx.fill()
+      // Third Eye on Forehead (天目金瞳)
+      ctx.fillStyle = '#ffe033'
+      ctx.beginPath()
+      ctx.ellipse(256, 232, 6, 11, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#8a160d'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      // Fiery Red Beard (赤鬚如火)
+      ctx.fillStyle = '#8a1c12'
+      ctx.beginPath()
+      ctx.moveTo(226, 275)
+      ctx.bezierCurveTo(205, 330, 225, 410, 256, 430)
+      ctx.bezierCurveTo(287, 410, 307, 330, 286, 275)
+      ctx.closePath()
+      ctx.fill()
+    } else {
+      // 馬天君：白面三目、英氣勃發
+      ctx.strokeStyle = '#1b1b1b'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(224, 248); ctx.quadraticCurveTo(236, 244, 248, 248)
+      ctx.moveTo(288, 248); ctx.quadraticCurveTo(276, 244, 264, 248)
+      ctx.stroke()
+      // Third Eye (額開天目)
+      ctx.fillStyle = '#00e1d9'
+      ctx.beginPath()
+      ctx.ellipse(256, 230, 5, 10, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#1a5d5a'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      // Trim black beard
+      ctx.fillStyle = '#1a1a1a'
+      ctx.beginPath()
+      ctx.moveTo(242, 282)
+      ctx.quadraticCurveTo(240, 330, 256, 370)
+      ctx.quadraticCurveTo(272, 330, 270, 282)
+      ctx.fill()
+    }
+
+    // 8. Weapons (神兵法器)
+    if (god === 'qin') {
+      // 秦瓊：熟銅金鐧 (Golden Mace)
+      ctx.save()
+      ctx.translate(345, 500)
+      ctx.rotate(-0.25)
+      ctx.fillStyle = '#f3ca4d'
+      ctx.fillRect(-10, -220, 20, 330)
+      ctx.strokeStyle = '#9c7014'
+      ctx.lineWidth = 3
+      ctx.strokeRect(-10, -220, 20, 330)
+      ctx.beginPath()
+      ctx.moveTo(-10, -220)
+      ctx.lineTo(0, -250)
+      ctx.lineTo(10, -220)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+      ctx.fillStyle = '#7a190f'
+      ctx.fillRect(-18, 110, 36, 14)
+      ctx.fillStyle = '#2c1e19'
+      ctx.fillRect(-7, 124, 14, 55)
+      ctx.fillStyle = '#f3ca4d'
+      ctx.beginPath()
+      ctx.arc(0, 185, 14, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    } else if (god === 'yuchi') {
+      // 尉遲恭：十三節雌雄鋼鞭 (Steel Bamboo-joint Whip)
+      ctx.save()
+      ctx.translate(165, 500)
+      ctx.rotate(0.25)
+      for (let i = 0; i < 11; i++) {
+        const yPos = -220 + i * 28
+        ctx.fillStyle = '#596573'
+        ctx.fillRect(-9, yPos, 18, 24)
+        ctx.strokeStyle = '#b8c6d6'
+        ctx.lineWidth = 2
+        ctx.strokeRect(-9, yPos, 18, 24)
+        ctx.fillStyle = '#c79c36'
+        ctx.fillRect(-12, yPos + 22, 24, 6)
+      }
+      ctx.fillStyle = '#788796'
+      ctx.beginPath()
+      ctx.moveTo(-9, -220)
+      ctx.lineTo(0, -248)
+      ctx.lineTo(9, -220)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#1c1c1f'
+      ctx.fillRect(-7, 95, 14, 60)
+      ctx.fillStyle = '#c79c36'
+      ctx.beginPath()
+      ctx.arc(0, 160, 14, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    } else if (god === 'wang') {
+      // 王靈官：降魔雷火金鞭 (Thunder Fire Gold Whip)
+      ctx.save()
+      ctx.translate(345, 490)
+      ctx.rotate(-0.28)
+      for (let i = 0; i < 9; i++) {
+        const yPos = -210 + i * 32
+        ctx.fillStyle = '#ffd13b'
+        ctx.fillRect(-11, yPos, 22, 27)
+        ctx.strokeStyle = '#d47817'
+        ctx.lineWidth = 2
+        ctx.strokeRect(-11, yPos, 22, 27)
+        ctx.fillStyle = '#ff4d15'
+        ctx.fillRect(-14, yPos + 25, 28, 7)
+      }
+      ctx.fillStyle = '#ffd13b'
+      ctx.beginPath()
+      ctx.moveTo(-11, -210)
+      ctx.lineTo(0, -245)
+      ctx.lineTo(11, -210)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#421008'
+      ctx.fillRect(-8, 85, 16, 60)
+      ctx.fillStyle = '#ffd13b'
+      ctx.beginPath()
+      ctx.arc(0, 150, 14, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    } else {
+      // 馬天君：三尖兩刃神槍 / 金槍 (Divine Spear)
+      ctx.save()
+      ctx.translate(165, 490)
+      ctx.rotate(0.24)
+      ctx.fillStyle = '#3a2014'
+      ctx.fillRect(-6, -180, 12, 340)
+      ctx.fillStyle = '#e8eff7'
+      ctx.beginPath()
+      ctx.moveTo(0, -260)
+      ctx.lineTo(14, -200)
+      ctx.lineTo(6, -180)
+      ctx.lineTo(-6, -180)
+      ctx.lineTo(-14, -200)
+      ctx.closePath()
+      ctx.fill()
+      ctx.strokeStyle = '#ffd700'
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.fillStyle = '#d63031'
+      ctx.beginPath()
+      ctx.moveTo(-14, -180)
+      ctx.lineTo(14, -180)
+      ctx.lineTo(20, -145)
+      ctx.lineTo(0, -135)
+      ctx.lineTo(-20, -145)
+      ctx.closePath()
+      ctx.fill()
+      ctx.restore()
+    }
+
+    // 9. Black Royal Boots (厚底皂靴)
+    ctx.fillStyle = '#111317'
+    const drawBoot = (bx: number, by: number) => {
+      ctx.beginPath()
+      ctx.rect(bx, by, 65, 36)
+      ctx.fill()
+      ctx.fillStyle = '#e8d5a2'
+      ctx.fillRect(bx, by + 30, 65, 6)
+      ctx.fillStyle = '#111317'
+    }
+    drawBoot(175, 785)
+    drawBoot(272, 785)
+
+    // 10. Swirling Auspicious Clouds at Bottom (五彩祥雲)
+    const cloudColors = ['#fcedb8', '#e8c974', '#e2886a', '#a4d4ae']
+    const drawCloudPuff = (cx: number, cy: number, r: number, col: string) => {
+      ctx.fillStyle = col
+      ctx.beginPath()
+      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    drawCloudPuff(130, 845, 38, cloudColors[0])
+    drawCloudPuff(175, 835, 46, cloudColors[1])
+    drawCloudPuff(230, 848, 42, cloudColors[2])
+    drawCloudPuff(286, 835, 48, cloudColors[1])
+    drawCloudPuff(342, 846, 44, cloudColors[3])
+    drawCloudPuff(385, 845, 36, cloudColors[0])
+
+    // 11. Bottom Auspicious Blessing Plaque (底部吉語紅底金匾)
+    ctx.fillStyle = '#220b08'
+    ctx.fillRect(96, 905, 320, 60)
+    ctx.strokeStyle = '#f1d478'
+    ctx.lineWidth = 4
+    ctx.strokeRect(96, 905, 320, 60)
+
+    const blessings = {
+      qin: '四 季 平 安',
+      yuchi: '萬 事 如 意',
+      wang: '靈 官 護 道',
+      ma: '天 宮 鎮 煞',
+    }
+    ctx.fillStyle = '#fcebb6'
+    ctx.font = 'bold 30px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(blessings[god], 256, 935)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    return new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: 0.55,
+      metalness: 0.15,
+      toneMapped: false,
+    })
   }
 
   /** Place the generated 3D Guanyin model on the lotus throne (觀世音菩薩立體法相). */
