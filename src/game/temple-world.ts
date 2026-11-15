@@ -158,19 +158,28 @@ export class TempleWorld {
     hall.add(podium)
     this.physics.addStaticBox(new THREE.Vector3(0, 0.14, -7.3), new THREE.Vector3(20.4, 0.28, 14.8))
 
-    // Front approach stone steps (左右踏步石階)
-    for (const sx of [-2.4, 2.4]) {
-      const step1 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.8), stonePlinth)
-      step1.position.set(sx, 0.07, 7.5)
-      step1.receiveShadow = true
-      hall.add(step1)
-      const step2 = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.14, 0.5), stonePlinth)
-      step2.position.set(sx, 0.21, 6.9)
-      step2.receiveShadow = true
-      hall.add(step2)
-    }
+    // Front approach stone steps (龍門入口踏步、中央雲龍陛、虎門出口踏步)
+    // 右邊龍門（入口）專屬登殿石階
+    const stepRight1 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.8), stonePlinth)
+    stepRight1.position.set(6.75, 0.07, 7.5)
+    stepRight1.receiveShadow = true
+    hall.add(stepRight1)
+    const stepRight2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.5), stonePlinth)
+    stepRight2.position.set(6.75, 0.21, 6.9)
+    stepRight2.receiveShadow = true
+    hall.add(stepRight2)
 
-    // Imperial Dragon Path Stone Relief (大殿中央御路龍陛石雕 / 丹墀雲龍階石)
+    // 左邊虎門（出口）專屬離殿石階
+    const stepLeft1 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.8), stonePlinth)
+    stepLeft1.position.set(-6.75, 0.07, 7.5)
+    stepLeft1.receiveShadow = true
+    hall.add(stepLeft1)
+    const stepLeft2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.5), stonePlinth)
+    stepLeft2.position.set(-6.75, 0.21, 6.9)
+    stepLeft2.receiveShadow = true
+    hall.add(stepLeft2)
+
+    // Imperial Dragon Path Stone Relief (大殿中央中門御路龍陛石雕 / 丹墀雲龍階石)
     const dragonRamp = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.25), makeMat('#5f7169', 0.88, 0.15))
     dragonRamp.position.set(0, 0.16, 7.15)
     dragonRamp.rotation.x = -0.19
@@ -184,15 +193,15 @@ export class TempleWorld {
     dragonRelief.rotation.x = -Math.PI / 2 + 0.19
     hall.add(dragonRelief)
 
-    // White Stone Balustrades with Lotus Finials (月台漢白玉望柱與雲紋欄板)
+    // White Stone Balustrades with Lotus Finials (月台漢白玉望柱與雲紋欄板，護衛於壁堵前方，保留龍門與虎門通暢)
     const balustradeMat = makeMat('#d6cfc2', 0.88)
     for (const side of [-1, 1]) {
-      // Front railing panels
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.52, 0.14), balustradeMat)
-      rail.position.set(side * 6.8, 0.44, 7.0)
+      // Railing panels between Center Gate and Side Gates
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.52, 0.14), balustradeMat)
+      rail.position.set(side * 3.6, 0.44, 7.0)
       hall.add(rail)
       // Lotus Finial Posts (蓮花望柱)
-      for (const x of [side * 4.2, side * 6.8, side * 9.4]) {
+      for (const x of [side * 2.0, side * 3.6, side * 5.2]) {
         const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.72, 0.2), balustradeMat)
         post.position.set(x, 0.5, 7.0)
         const lotusBud = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), balustradeMat)
@@ -200,6 +209,13 @@ export class TempleWorld {
         lotusBud.scale.set(0.9, 1.3, 0.9)
         hall.add(post, lotusBud)
       }
+      // Outer flanking railings
+      const outerRail = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.52, 0.14), balustradeMat)
+      outerRail.position.set(side * 8.9, 0.44, 7.0)
+      hall.add(outerRail)
+      const outerPost = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.72, 0.2), balustradeMat)
+      outerPost.position.set(side * 9.6, 0.5, 7.0)
+      hall.add(outerPost)
     }
 
     // 2. Solid Back Wall with Passageway Doors to Rear Hall (神龕背牆與通往後殿之左右穿堂過水門)
@@ -243,24 +259,161 @@ export class TempleWorld {
       this.physics.addStaticBox(new THREE.Vector3(sx, 2.55, -7.4), new THREE.Vector3(0.55, 5.1, 12.6))
     }
 
-    // 4. Front Facade: Lattice Screens & Three-Bay San-Chuan Doorways (正面立面：左右三川門雕花隔扇與中央敞開大門)
-    for (const side of [-1, 1]) {
-      // Screen wall panels between outer columns
-      const screenWall = new THREE.Mesh(new THREE.BoxGeometry(4.8, 4.8, 0.28), redDark)
-      screenWall.position.set(side * 6.5, 2.4, 5.2)
-      screenWall.castShadow = true
-      screenWall.receiveShadow = true
-      hall.add(screenWall)
-      this.physics.addStaticBox(new THREE.Vector3(side * 6.5, 2.4, -1.8), new THREE.Vector3(4.8, 4.8, 0.28))
+    // 4. Front Facade: Three Distinct Temple Portals (大廟正殿三川殿三門古制格局)
+    // 面向大殿（南朝北）：右邊(+X)為龍門(入口)、中央(X=0)為中門(神明出入聖道)、左邊(-X)為虎門(出口)
 
-      // Decorative lattice window overlay with San-Chuan Door inscriptions (三川門牌額：入龍門・迎祥納福 / 出虎門・辟邪解厄)
-      const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.6, 0.12), makeMat('#2b1c14'))
-      windowFrame.position.set(side * 6.5, 3.1, 5.38)
-      hall.add(windowFrame)
-      const doorTitle = side === 1 ? '入 龍 門 ・ 迎 祥 納 福' : '出 虎 門 ・ 辟 邪 解 厄'
-      const lattice = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 2.3), this.textMaterial(doorTitle, '#e5c07b', '#362117'))
-      lattice.position.set(side * 6.5, 3.1, 5.46)
-      hall.add(lattice)
+    // A. 中門（中央神明出入聖道：朱紅九路八十一金釘厚實雙開大門，凡人勿行）
+    const centerDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(4.4, 4.6, 0.32), redDark)
+    centerDoorFrame.position.set(0, 2.3, 5.2)
+    hall.add(centerDoorFrame)
+
+    // Double closed vermilion doors with gold studs (兩扇朱紅九路金釘閉合大門)
+    for (const dSide of [-1, 1]) {
+      const doorLeaf = new THREE.Mesh(new THREE.BoxGeometry(1.95, 4.0, 0.14), makeMat('#702219', 0.8))
+      doorLeaf.position.set(dSide * 1.0, 2.15, 5.26)
+      hall.add(doorLeaf)
+      // 9 rows of golden bosses/studs (金銅門釘)
+      for (let row = 0; row < 5; row += 1) {
+        for (let col = 0; col < 3; col += 1) {
+          const stud = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), gold)
+          stud.position.set(dSide * (0.35 + col * 0.6), 0.8 + row * 0.7, 5.34)
+          hall.add(stud)
+        }
+      }
+      // Gilded door pull ring (金銅鋪首銜環)
+      const ringTorus = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.025, 8, 16), gold)
+      ringTorus.position.set(dSide * 0.75, 2.1, 5.35)
+      hall.add(ringTorus)
+    }
+
+    // High Door Threshold (高木門檻)
+    const threshold = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.35, 0.28), darkWood)
+    threshold.position.set(0, 0.45, 5.28)
+    hall.add(threshold)
+
+    // Center Door Lintel & Main Plaque (中門主門額：「中門・神明聖道」)
+    const centerLintel = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.75, 0.38), darkWood)
+    centerLintel.position.set(0, 4.5, 5.24)
+    hall.add(centerLintel)
+    const centerPlaque = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.9, 0.65),
+      this.textMaterial('中 門 ・ 神 明 聖 道', '#f5d688', '#2d180f')
+    )
+    centerPlaque.position.set(0, 4.5, 5.45)
+    hall.add(centerPlaque)
+
+    // Sacred Warning Plaque across the lower center door (「神明聖道・凡人勿行」)
+    const sacredSign = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.4, 0.42),
+      this.textMaterial('神 明 出 入 聖 道 ・ 凡 人 勿 行', '#e5c07b', '#3b2014')
+    )
+    sacredSign.position.set(0, 1.25, 5.38)
+    hall.add(sacredSign)
+
+    // Physics Barrier for Middle Door (中門實體阻隔，守護神聖禮制)
+    this.physics.addStaticBox(new THREE.Vector3(0, 2.4, -1.8), new THREE.Vector3(4.4, 4.8, 0.35))
+
+    // B. 右邊龍門（入口，面向大殿右邊 +X 側，敞開通行進入大殿參拜）
+    // Portal archway framing between column x=5.4 and x=8.1 (centered at x = 6.75)
+    const dragonPortalLintel = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.9, 0.36), redDark)
+    dragonPortalLintel.position.set(6.75, 4.35, 5.2)
+    hall.add(dragonPortalLintel)
+
+    const dragonDoorPlaque = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 0.52),
+      this.textMaterial('龍 門', '#f6d88c', '#2c170f')
+    )
+    dragonDoorPlaque.position.set(6.75, 4.5, 5.4)
+    hall.add(dragonDoorPlaque)
+
+    const dragonDoorSub = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 0.36),
+      this.textMaterial('入 龍 門 ( 參 拜 入 口 )', '#e6c37c', '#331c12')
+    )
+    dragonDoorSub.position.set(6.75, 3.92, 5.4)
+    hall.add(dragonDoorSub)
+
+    // Directional ground marker for entering Dragon Gate
+    const enterMarker = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.2, 0.45),
+      this.textMaterial('➡ 入 龍 門 ( 參 拜 入 口 )', '#f6d88c', '#4b2a1a')
+    )
+    enterMarker.rotation.x = -Math.PI / 2
+    enterMarker.position.set(6.75, 0.29, 6.2)
+    hall.add(enterMarker)
+
+    // C. 左邊虎門（出口，面向大殿左邊 -X 側，敞開通行離開大殿）
+    // Portal archway framing between column x=-8.1 and x=-5.4 (centered at x = -6.75)
+    const tigerPortalLintel = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.9, 0.36), redDark)
+    tigerPortalLintel.position.set(-6.75, 4.35, 5.2)
+    hall.add(tigerPortalLintel)
+
+    const tigerDoorPlaque = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 0.52),
+      this.textMaterial('虎 門', '#f6d88c', '#2c170f')
+    )
+    tigerDoorPlaque.position.set(-6.75, 4.5, 5.4)
+    hall.add(tigerDoorPlaque)
+
+    const tigerDoorSub = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 0.36),
+      this.textMaterial('出 虎 門 ( 離 殿 出 口 )', '#e6c37c', '#331c12')
+    )
+    tigerDoorSub.position.set(-6.75, 3.92, 5.4)
+    hall.add(tigerDoorSub)
+
+    // Directional ground marker for exiting Tiger Gate
+    const exitMarker = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.2, 0.45),
+      this.textMaterial('⬅ 出 虎 門 ( 離 殿 出 口 )', '#f6d88c', '#4b2a1a')
+    )
+    exitMarker.rotation.x = -Math.PI / 2
+    exitMarker.position.set(-6.75, 0.29, 6.2)
+    hall.add(exitMarker)
+
+    // D. 左右壁堵（Screen Wall Panels between the doors）
+    // 右側龍壁堵 (Between 中門 and 龍門, x = 3.8, width 3.2m)
+    const rightScreenWall = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4.8, 0.28), redDark)
+    rightScreenWall.position.set(3.8, 2.4, 5.2)
+    rightScreenWall.castShadow = true
+    rightScreenWall.receiveShadow = true
+    hall.add(rightScreenWall)
+    this.physics.addStaticBox(new THREE.Vector3(3.8, 2.4, -1.8), new THREE.Vector3(3.2, 4.8, 0.28))
+
+    const rightWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.4, 0.12), makeMat('#2b1c14'))
+    rightWindowFrame.position.set(3.8, 2.8, 5.38)
+    hall.add(rightWindowFrame)
+    const rightLattice = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.5, 2.1),
+      this.textMaterial('祥 龍 獻 瑞 ・ 迎 祥 納 福', '#e5c07b', '#362117')
+    )
+    rightLattice.position.set(3.8, 2.8, 5.46)
+    hall.add(rightLattice)
+
+    // 左側虎壁堵 (Between 虎門 and 中門, x = -3.8, width 3.2m)
+    const leftScreenWall = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4.8, 0.28), redDark)
+    leftScreenWall.position.set(-3.8, 2.4, 5.2)
+    leftScreenWall.castShadow = true
+    leftScreenWall.receiveShadow = true
+    hall.add(leftScreenWall)
+    this.physics.addStaticBox(new THREE.Vector3(-3.8, 2.4, -1.8), new THREE.Vector3(3.2, 4.8, 0.28))
+
+    const leftWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.4, 0.12), makeMat('#2b1c14'))
+    leftWindowFrame.position.set(-3.8, 2.8, 5.38)
+    hall.add(leftWindowFrame)
+    const leftLattice = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.5, 2.1),
+      this.textMaterial('猛 虎 辟 邪 ・ 消 災 解 厄', '#e5c07b', '#362117')
+    )
+    leftLattice.position.set(-3.8, 2.8, 5.46)
+    hall.add(leftLattice)
+
+    // 左右外側端牆 (Outer side walls beyond Dragon / Tiger Doors)
+    for (const side of [-1, 1]) {
+      const outerWall = new THREE.Mesh(new THREE.BoxGeometry(1.5, 4.8, 0.28), redDark)
+      outerWall.position.set(side * 8.85, 2.4, 5.2)
+      hall.add(outerWall)
+      this.physics.addStaticBox(new THREE.Vector3(side * 8.85, 2.4, -1.8), new THREE.Vector3(1.5, 4.8, 0.28))
     }
 
     // 5. Main Columns, Carved Dragon Pillars & Crossbeams (大木作柱梁系統：金環立柱、前門雙龍柱與鰲魚雀替)
