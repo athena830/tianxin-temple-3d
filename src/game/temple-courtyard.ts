@@ -380,13 +380,18 @@ export class FrontCourtyard {
     // Signboard near the road so the pavilion is identifiable on entry.
     const sign = new THREE.Group()
     sign.position.set(-4.0, 0, 35.5)
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.9, 0.14), wood)
-    post.position.y = 0.95
+    // Upright post cleanly supports the signboard from underneath up to the base of the plaque
+    const signPostH = 1.58
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, signPostH, 0.14), wood)
+    post.position.set(0, signPostH / 2, 0)
+    // Back brace securing the plaque from behind without obstructing the front text
+    const backBrace = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.58, 0.08), wood)
+    backBrace.position.set(0, 1.85, -0.07)
     const boardMesh = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.6, 0.1), this.c.mat('#36241a'))
     boardMesh.position.y = 1.85
     const signFace = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.5), this.c.text('天心仙姑問事亭', '#e9c97f', '#36241a'))
-    signFace.position.set(0, 1.85, 0.06)
-    sign.add(post, boardMesh, signFace)
+    signFace.position.set(0, 1.85, 0.055)
+    sign.add(post, backBrace, boardMesh, signFace)
     sign.rotation.y = -0.35
     this.add(sign)
     this.c.physics.addStaticBox(new THREE.Vector3(-4.0, 1, 35.5), new THREE.Vector3(0.3, 2, 0.3))
