@@ -1,95 +1,40 @@
-# game-3d starter (three.js + Rapier)
+# 天心宮 / 玉皇宮 3D 線上宮廟參拜系統
 
-A complete, small 3D game — **Sky Cores**: run, jump and dash across floating islands to collect
-every energy core before the clock runs out, avoiding patrol drones. It exists to be *changed*:
-the engine layer is fixed scaffolding, the game layer is the part you rewrite.
+基於 Three.js + Rapier 3D 物理引擎打造的沉浸式線上 3D 宮廟空間。香客可以自由穿過牌樓前庭漫遊參拜，體驗天公爐上香、觀音佛祖主殿禮拜、天心仙姑問事亭象棋卜卦、點光明燈、蓮花許願池投幣祈福等豐富互動。
+
+---
+
+## 快速啟動
 
 ```bash
-pnpm install
-pnpm dev      # http://localhost:5173
-pnpm build    # typecheck + production build + JS/font budgets + total-size report
-pnpm test     # unit tests (rules, save, i18n, level)
-pnpm smoke    # after build: headless browser playthrough + screenshots in shots/
+# 啟動開發預覽伺服器 (預設連接埠: 3000)
+npx vite --host 127.0.0.1 --port 3000
 ```
+瀏覽器開啟：`http://127.0.0.1:3000/`
 
-## Layout
+---
 
-| Path | Role | Change it? |
-| --- | --- | --- |
-| `src/engine/loop.ts` | Fixed 60 Hz simulation + interpolated rendering | Rarely |
-| `src/engine/input.ts` | Keyboard/mouse, gamepad, touch → one action state | Add actions here |
-| `src/engine/physics.ts` | Rapier world, collider helpers, render interpolation | Rarely |
-| `src/engine/renderer.ts` | WebGL renderer, quality presets, bloom | Rarely |
-| `src/engine/audio.ts` | Music/SFX buses, synthesized SFX, `load()` for files | Add sounds |
-| `src/engine/save.ts` | Versioned localStorage save + leaderboard | Add fields + parsing |
-| `src/engine/i18n.ts` | en / zh-CN, browser detection, saved choice wins | Rarely |
-| `src/engine/assets.ts` | Cached GLTF/texture loading with progress | Use it for models |
-| `src/game/config.ts` | Source defaults and active gameplay configuration | Yes |
-| `src/game/tuning.ts` | Tweak catalog, atomic validation and activation boundaries | Yes |
-| `src/game/rules.ts` | Pure score/lives/clock/win rules (unit tested) | Yes |
-| `src/game/world.ts` | Level layout, sky, lights, islands, stones, lifts | Yes |
-| `src/game/player.ts` | Character controller + game feel + procedural model | Yes |
-| `src/game/*.ts` | Camera, cores, drones, particles, scene orchestration | Yes |
-| `src/ui/`, `src/styles/main.css` | HTML/CSS title, HUD, pause, settings, results | Yes |
-| `src/i18n/*.json` | All player-facing text (both files, same keys) | Yes |
+## 版本變更紀錄 (Changelog)
 
-## Rules for changes
+所有關鍵節點均已建立 Git Tag 標記，未來如需切換或還原至指定版本，請執行 `git checkout <版本標籤>`。
 
-- **Simulation in `step()`, visuals in `render()`/`animate()`.** Gameplay state only changes in
-  fixed steps; read presses there with `input.consume(action)`, never `pressed()`.
-- **Rules stay pure.** Scoring, win/lose and progression go in `rules.ts` with tests; scene code
-  reports events and reads state.
-- **Every visible string is an i18n key** in both `en.json` and `zh-CN.json` (a test enforces
-  matching keys and placeholders). English and Chinese use the bundled Manus CC0 fonts in `public/fonts/`;
-  if you add new Chinese text, check it renders (missing glyphs fall back to system fonts).
-- **UI is HTML/CSS**, not canvas. Keep the game look: display font, outlined text, hard offset
-  shadows, skewed buttons, notched panels. Menus must stay keyboard/gamepad navigable
-  (`data-nav` on focusable controls).
-- **Colliders come from the helpers** in `physics.ts` with the same sizes as the meshes.
-- Keep `npm run build` within the JS/font budgets (`scripts/check-size.mjs`) and `npm run smoke` green.
-  Total game asset size is reported without a hard limit.
+| 版本標籤 | 提交節點 | 更新時間 | 主要更新內容與里程碑 |
+| :--- | :--- | :--- | :--- |
+| **`v2.1-fairy-initial`** | `9e56831` | 2026-11-15 | **天心仙姑問事亭置入仙姑立繪最初版**：<br>• 完成天心仙姑去背與精細抗鋸齒處理，生成透明資產。<br>• 於問事亭石桌與棋盤前置入立繪。<br>• 支援雙面材質、涼亭環境光照與自然呼吸仙氣微動態。 |
+| **`v2-stage2a`** | `3682434` | 2026-11-12 | **V2 第二階段 2A（前庭與天心仙姑問事亭空間擴建）**：<br>• 新增牌樓三門、石板主路、庭院圍牆與植栽。<br>• 前庭左側新增「天心仙姑問事亭」（六角涼亭、石桌椅、象棋棋盤）。<br>• 新增「天公爐參拜」儀式動態與「蓮花許願池」。 |
+| **`v2-stage1`** | `0f06e68` | 2026-11-11 | **V2 第一階段（漫遊體驗與視角革新）**：<br>• 解除滑鼠鎖定，改為自由滑鼠與按住拖曳旋轉視角。<br>• 導入第三人稱 Q 版行者角色模型與步行/待機動畫。<br>• 支援點擊設施直接靠近與互動。 |
+| **`v1-before-v2`** | `a3834f5` | 2026-11-10 | **V1 線上宮廟完整版**：<br>• 觀音佛祖主殿、上香、供品桌、平安燈/財神燈/文昌燈。<br>• 每日一籤抽籤系統、祈願牆、本機祈福紀錄保存。 |
 
-## Controls
+---
 
-Keyboard/mouse: WASD move, mouse look (click to capture), Space jump (hold = higher), Shift
-sprint, F or left click dash, Esc pause. Gamepad: left stick, right stick, A jump, X/RB dash,
-LB sprint, Start pause. Touch: left-side stick, right-side drag to look, JUMP / DASH buttons.
+## 操作指引
 
-## Credits
-
-Fonts: ManusCC0 (regular, medium, bold) and ManusCC0 Sans CJK SC — CC0 1.0.
-The bundled Chinese font preserves its 6,547-codepoint repertoire; no font download is required.
-See `public/fonts/ManusCC0-LICENSE.txt`.
-Libraries: three.js (MIT), Rapier (Apache-2.0).
-
-## Preview Tweak
-
-`src/game/tuning.ts` is this game's parameter manager. The Addon panel reads its
-catalog; `config.ts` owns source defaults and the active configuration used by gameplay.
-When adapting the game, keep only controls with actual gameplay consumers, and preserve
-stable IDs for unchanged parameters. Define ranges, units and the correct activation
-boundary. Register through `scripts/manus-tuning/adapter.js` only under `import.meta.env.DEV`.
-Keep the Vite plugin and `scripts/__manus__/` helpers intact; production builds exclude
-the browser adapter and never inject the bridge.
-
-Apply changes preview state only. `LIVE` parameters are read in the next game update;
-`NEXT_ACTION` parameters activate at the relevant jump/dash start; `NEXT_RUN` parameters
-activate in `Game.start`. Model/collider size and gravity are not exposed by this version.
-Do not mutate the source defaults or persist Apply to localStorage. Save with Manus
-checks the snapshot against the current catalog and edits `DEFAULT_CONFIG`, then uses
-the normal Three.js Web build/checkpoint workflow. Keep existing gameplay parameter
-managers when extending an older project; do not create a competing store.
-
-For server-authoritative multiplayer, expose local cosmetic controls only until gameplay
-parameters have explicit server-side development support. The descriptor's GAMEPLAY flag
-is a classification, not server authorization or ranked-score enforcement.
-
-The preview plugin reads the ignored `.manus-webdev/preview-identity.json` v1 projection
-written by the Runtime when initializing, attaching or restoring this project. It contains
-only the resource ID and canonical project directory; private Host bindings and starter
-receipts are not template dependencies. Missing identity disables the bridge.
-The manager latches `tuning.unranked` when non-default GAMEPLAY values become active and
-resets it only at the next run using that run's active values. `Game` snapshots this onto
-`RunState.unranked`; local results cannot save such runs. Preserve this guard when changing
-scoring. When adding online leaderboards, skip submissions for unranked runs and enforce
-eligibility in the authoritative server too; client flags are not proof of a fair score.
+- **探索模式**：
+  - **WASD / 方向鍵**：人物移動
+  - **Shift**：快速移動
+  - **滑鼠右鍵拖曳 / 觸控右側滑動**：旋轉 3D 視角
+  - **滾輪**：縮放鏡頭距離
+  - **E 鍵 / 點擊設施**：進行參拜與儀式互動
+  - **Esc**：關閉目前面板 / 退出探索模式
+- **自由模式 (Browse)**：
+  - 可直接使用滑鼠點擊畫面上方的「參拜指引」、「祈願牆」或「祈福紀錄」。
