@@ -4,6 +4,24 @@
 
 ---
 
+## GitHub 儲存庫與多人協作
+
+本專案主要的官方協作 GitHub 儲存庫為：
+- **Repository URL**：`https://github.com/athena830/tianxin-temple-3d.git`
+- **主要分支**：`main`
+
+### 常用協作指令
+```bash
+# 1. 抓取並合併遠端協作者最新變更（附帶所有版本標籤）
+git pull origin main --tags
+
+# 2. 推送本機開發內容與標籤至共同儲存庫
+git push origin main
+git push origin --tags
+```
+
+---
+
 ## 快速啟動
 
 ```bash
