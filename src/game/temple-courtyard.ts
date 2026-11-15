@@ -44,6 +44,7 @@ export class FrontCourtyard {
     this.addWalls()
     this.addRoad()
     this.addGateArch()
+    this.addScreenWall()
     this.tiangongGlow = this.addTiangongUrn()
     this.addPavilion()
     this.addWishingPool()
@@ -162,7 +163,7 @@ export class FrontCourtyard {
     }
     // Side-bay lanterns: bottom edge at about 4.4 m, never over the central road.
     for (const side of [-1, 1]) for (const dz of [0.7, -0.7]) this.lantern(side * 4.3, 4.85, z + dz, 0.36)
-    // Stone lions guarding the plaza side of the arch.
+    // Stone lions guarding the plaza side of the arch (遵循左雄踩繡球、右雌弄幼獅之傳統禮制).
     for (const side of [-1, 1]) {
       const lion = new THREE.Group()
       lion.position.set(side * 7.7, 0, z + 1.6)
@@ -176,9 +177,89 @@ export class FrontCourtyard {
       const mane = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.12, 8, 16), this.c.mat('#9f9786', 0.9))
       mane.position.set(0, 1.85, 0.18)
       lion.add(base, body, head, mane)
+      if (side === -1) {
+        // Left: 雄獅踏繡球（金銅吉祥球）
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), this.c.mat(PAL.gold, 0.4, 0.3))
+        ball.position.set(0.25, 0.95, 0.38)
+        lion.add(ball)
+      } else {
+        // Right: 雌獅護幼獅（活潑嬉戲小獅雕像）
+        const cub = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), this.c.mat('#b8b09e', 0.9))
+        cub.position.set(-0.25, 0.9, 0.38)
+        lion.add(cub)
+      }
       this.add(lion)
       this.c.physics.addStaticBox(new THREE.Vector3(side * 7.7, 1, z + 1.6), new THREE.Vector3(1.2, 2, 1.2))
     }
+
+    // 抱鼓石／門枕石（牌樓四大金柱柱腳螺紋抱鼓石）
+    for (const [x, , r] of [[-6, 5.6, 0.4], [-2.6, 6.4, 0.46], [2.6, 6.4, 0.46], [6, 5.6, 0.4]] as const) {
+      const drumBase = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.72), this.c.mat('#9c9180', 0.95))
+      drumBase.position.set(x, 0.18, z + r + 0.32)
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.18, 16), this.c.mat('#aba08f', 0.9))
+      drum.rotation.x = Math.PI / 2
+      drum.position.set(x, 0.45, z + r + 0.32)
+      this.add(drumBase)
+      this.add(drum)
+    }
+  }
+
+  /**
+   * Traditional Screen Wall (照牆 / 影壁 / 福祿照壁):
+   * 正對大門（中軸線）外的獨立牆壁，具有避邪止煞、聚氣與視覺屏蔽的作用。
+   * 位於廟前廣場正對牌樓處，雕塑須彌座石基、朱漆壁面、琉璃瓦頂與「紫氣東來・福星高照」金石雕心。
+   */
+  private addScreenWall(): void {
+    const z = 55.6
+    const wallW = 15.2
+    const stone = this.c.mat('#8a7e6f', 0.92)
+    const vermilion = this.c.mat(PAL.red, 0.76)
+    const darkWood = this.c.mat('#302219', 0.88)
+    const gold = this.c.mat(PAL.gold, 0.45, 0.28)
+
+    const screenGroup = new THREE.Group()
+    screenGroup.position.set(0, 0, z)
+
+    // 1. Sumeru Stone Pedestal Base (須彌座雕花石基)
+    const baseLow = new THREE.Mesh(new THREE.BoxGeometry(wallW + 0.8, 0.36, 1.4), stone)
+    baseLow.position.y = 0.18
+    const baseWaist = new THREE.Mesh(new THREE.BoxGeometry(wallW + 0.4, 0.36, 1.1), stone)
+    baseWaist.position.y = 0.54
+    screenGroup.add(baseLow, baseWaist)
+
+    // 2. Vermilion Wall Core (照牆朱漆磚砌主體)
+    const wallBody = new THREE.Mesh(new THREE.BoxGeometry(wallW, 3.2, 0.72), vermilion)
+    wallBody.position.y = 2.32
+    screenGroup.add(wallBody)
+
+    // 3. Central Auspicious Relief Panel (照壁內嵌漢白玉金邊壁心)
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(9.8, 2.35, 0.8), darkWood)
+    frame.position.y = 2.35
+    screenGroup.add(frame)
+
+    const panelFacingTemple = new THREE.Mesh(
+      new THREE.PlaneGeometry(9.4, 2.0),
+      this.c.text('紫 氣 東 來 ・ 福 星 高 照', '#f2d288', '#331d14')
+    )
+    panelFacingTemple.position.set(0, 2.35, -0.41)
+    panelFacingTemple.rotation.y = Math.PI // Faces toward the gate and visitor stand
+    screenGroup.add(panelFacingTemple)
+
+    // Auspicious Medallion Reliefs on left and right wings (左右兩側嵌如意祥雲浮雕)
+    for (const side of [-1, 1]) {
+      const emblem = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.12, 16), gold)
+      emblem.rotation.x = Math.PI / 2
+      emblem.position.set(side * 6.0, 2.35, -0.38)
+      screenGroup.add(emblem)
+    }
+
+    // 4. Glazed Roof Cap with Flying Eaves (歇山廡殿式琉璃飛簷瓦頂)
+    const roof = this.c.roof(wallW + 1.8, 2.4, 4.0, 5.15)
+    roof.position.set(0, 0, 0)
+    screenGroup.add(roof)
+
+    this.add(screenGroup)
+    this.c.physics.addStaticBox(new THREE.Vector3(0, 2.1, z), new THREE.Vector3(wallW + 0.8, 4.6, 1.5))
   }
 
   private lantern(x: number, y: number, z: number, size: number): void {
