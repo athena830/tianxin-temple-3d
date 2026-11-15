@@ -137,16 +137,68 @@ export class TempleWorld {
     hall.position.set(0, 0, -7)
     this.scene.add(hall)
     const red = makeMat(C.vermilion)
+    const redDark = makeMat('#792a20', 0.85)
     const wood = makeMat(C.wood)
+    const darkWood = makeMat(C.darkWood, 0.88)
     const gold = makeMat(C.gold, 0.48, 0.2)
+    const stonePlinth = makeMat('#9e9382', 0.94)
 
-    const back = new THREE.Mesh(new THREE.BoxGeometry(17.2, 4.3, 0.5), makeMat('#60473a'))
-    back.position.set(0, 2.2, -6.1)
+    // 1. Raised Hall Podium & Steps (大殿基座與踏步台階)
+    const podium = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.28, 14.8), stonePlinth)
+    podium.position.set(0, 0.14, -0.3)
+    podium.receiveShadow = true
+    hall.add(podium)
+    this.physics.addStaticBox(new THREE.Vector3(0, 0.14, -7.3), new THREE.Vector3(20.4, 0.28, 14.8))
+
+    // Front approach stone steps (兩級踏步石階)
+    const step1 = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.14, 0.8), stonePlinth)
+    step1.position.set(0, 0.07, 7.5)
+    step1.receiveShadow = true
+    hall.add(step1)
+    const step2 = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.14, 0.5), stonePlinth)
+    step2.position.set(0, 0.21, 6.9)
+    step2.receiveShadow = true
+    hall.add(step2)
+
+    // 2. Solid Back Wall (神龕厚實背牆)
+    const back = new THREE.Mesh(new THREE.BoxGeometry(19.2, 5.1, 0.6), makeMat('#543b2f'))
+    back.position.set(0, 2.55, -6.4)
     back.castShadow = true
     back.receiveShadow = true
     hall.add(back)
-    this.physics.addStaticBox(new THREE.Vector3(0, 2.2, -13.1), new THREE.Vector3(17.2, 4.3, 0.5))
+    this.physics.addStaticBox(new THREE.Vector3(0, 2.55, -13.4), new THREE.Vector3(19.2, 5.1, 0.6))
 
+    // 3. Solid Side Walls with Traditional Pilasters (左右兩側厚實大殿山牆)
+    for (const side of [-1, 1]) {
+      const sx = side * 9.2
+      const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.55, 5.1, 12.6), darkWood)
+      sideWall.position.set(sx, 2.55, -0.4)
+      sideWall.castShadow = true
+      sideWall.receiveShadow = true
+      hall.add(sideWall)
+      this.physics.addStaticBox(new THREE.Vector3(sx, 2.55, -7.4), new THREE.Vector3(0.55, 5.1, 12.6))
+    }
+
+    // 4. Front Facade: Lattice Screens & Entrance Doorway (正面立面：左右雕花隔扇窗欞與中央敞開參拜大門)
+    for (const side of [-1, 1]) {
+      // Screen wall panels between outer columns
+      const screenWall = new THREE.Mesh(new THREE.BoxGeometry(4.8, 4.8, 0.28), redDark)
+      screenWall.position.set(side * 6.5, 2.4, 5.2)
+      screenWall.castShadow = true
+      screenWall.receiveShadow = true
+      hall.add(screenWall)
+      this.physics.addStaticBox(new THREE.Vector3(side * 6.5, 2.4, -1.8), new THREE.Vector3(4.8, 4.8, 0.28))
+
+      // Decorative lattice window overlay (中式雕花窗格)
+      const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.6, 0.12), makeMat('#2b1c14'))
+      windowFrame.position.set(side * 6.5, 3.1, 5.38)
+      hall.add(windowFrame)
+      const lattice = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 2.3), this.textMaterial('吉祥・平安', '#c89d52', '#362117'))
+      lattice.position.set(side * 6.5, 3.1, 5.46)
+      hall.add(lattice)
+    }
+
+    // 5. Main Columns & Crossbeams (主殿立柱與金環樑枋)
     for (const z of [-5.8, -0.2, 5.2]) {
       for (const x of [-8.1, -5.4, 5.4, 8.1]) {
         const column = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 5.05, 12), red)
@@ -158,11 +210,35 @@ export class TempleWorld {
         ring.position.set(x, 4.65, z)
         hall.add(ring)
       }
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(18, 0.42, 0.42), wood)
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(19.2, 0.44, 0.44), wood)
       beam.position.set(0, 5.12, z)
+      beam.castShadow = true
       hall.add(beam)
     }
 
+    // 6. Dou-Gong & Entablature Layer (樑枋與屋頂之間的斗栱額枋實體層，消除浮空黑洞)
+    // Front and Back entablature walls (正脊與後脊額枋填補層)
+    for (const z of [-6.1, 5.2]) {
+      const architrave = new THREE.Mesh(new THREE.BoxGeometry(19.4, 0.65, 0.48), redDark)
+      architrave.position.set(0, 5.42, z)
+      architrave.castShadow = true
+      hall.add(architrave)
+    }
+    // Left & Right triangular gable walls (兩側山牆三角填補，接合斜屋頂)
+    for (const side of [-1, 1]) {
+      const gable = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 14.6), redDark)
+      gable.position.set(side * 9.2, 5.8, -0.4)
+      gable.castShadow = true
+      hall.add(gable)
+    }
+
+    // Interior Coffered Ceiling / Caisson (殿內精緻實體平棋吊頂)
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(18.6, 0.16, 12.8), makeMat('#42281b', 0.85))
+    ceiling.position.set(0, 5.15, -0.5)
+    ceiling.receiveShadow = true
+    hall.add(ceiling)
+
+    // Altar Base & Top (神龕供桌)
     const altarBase = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.48, 1.9), makeMat('#4a3025'))
     altarBase.position.set(0, 0.82, -4.55)
     altarBase.castShadow = true
@@ -181,6 +257,7 @@ export class TempleWorld {
     this.offeringDisplay.position.set(-2.25, 1.75, -4.55)
     hall.add(this.offeringDisplay)
 
+    // Center Statue Plinths (神像底座)
     const centerPlinth = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.6, 2.5), makeMat('#6c5543'))
     centerPlinth.position.set(0, 0.8, -5.7)
     hall.add(centerPlinth)
@@ -188,6 +265,7 @@ export class TempleWorld {
     topPlinth.position.set(0, 1.71, -5.7)
     hall.add(topPlinth)
 
+    // Main Hall Signboard (觀音佛祖匾額)
     const sign = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.4, 0.25), makeMat('#35251c'))
     sign.position.set(0, 5.05, -0.08)
     hall.add(sign)
@@ -195,13 +273,15 @@ export class TempleWorld {
     signText.position.set(0, 5.05, 0.065)
     hall.add(signText)
 
-    const roof = this.createRoof(20, 15.5, 5.1, 8.0)
+    // Grand Hall Roof (大殿重檐歇山式大屋頂)
+    const roof = this.createRoof(20.6, 16.2, 5.35, 8.2)
     roof.position.set(0, 4.9, -7)
     this.roof.add(roof)
     this.roof.position.y = 0
     this.scene.add(this.roof)
     this.addRoofFinial(hall, 0, 0)
 
+    // Red Palace Lanterns (殿前紅色宮燈)
     for (const x of [-6.3, -3.2, 0, 3.2, 6.3]) {
       const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.34, 0.8, 10), makeMat(C.vermilionLight))
       lantern.position.set(x, 3.9, -0.4)
@@ -217,11 +297,23 @@ export class TempleWorld {
 
   private addSideArchitecture(): void {
     const sideMat = makeMat('#6c5140')
+    const darkWood = makeMat(C.darkWood, 0.88)
     for (const x of [-13.4, 13.4]) {
-      const base = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.22, 16), makeMat('#9d8a70'))
+      const isLeft = x < 0
+      const base = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.22, 16.8), makeMat('#9d8a70'))
       base.position.set(x, 0.12, -2.7)
       base.receiveShadow = true
       this.scene.add(base)
+
+      // Solid outer boundary wall for the side corridors (廂房外側厚實封閉牆，不再鏤空漏光)
+      const outerX = isLeft ? x - 2.4 : x + 2.4
+      const outerWall = new THREE.Mesh(new THREE.BoxGeometry(0.42, 3.8, 16.8), darkWood)
+      outerWall.position.set(outerX, 1.9, -2.7)
+      outerWall.castShadow = true
+      outerWall.receiveShadow = true
+      this.scene.add(outerWall)
+      this.physics.addStaticBox(new THREE.Vector3(outerX, 1.9, -2.7), new THREE.Vector3(0.42, 3.8, 16.8))
+
       for (const z of [-9.3, -4, 1.2]) {
         const column = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 3.35, 10), makeMat(C.wood))
         column.position.set(x, 1.72, z)
@@ -232,7 +324,14 @@ export class TempleWorld {
       const lintel = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.38, 0.45), sideMat)
       lintel.position.set(x, 3.48, -4)
       this.scene.add(lintel)
-      const roof = this.createRoof(5.3, 17, 3.15, 4.9)
+
+      // Corridor Ceiling (廂房實體吊頂)
+      const corridorCeiling = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.12, 16.4), makeMat('#3c271d'))
+      corridorCeiling.position.set(x, 3.38, -2.7)
+      corridorCeiling.receiveShadow = true
+      this.scene.add(corridorCeiling)
+
+      const roof = this.createRoof(5.6, 17.2, 3.3, 5.0)
       roof.position.set(x, 2.7, -3.7)
       this.scene.add(roof)
     }
