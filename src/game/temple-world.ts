@@ -3,6 +3,7 @@ import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
 import { FrontCourtyard, GOLD_FURNACE, PAVILION, STAND, TIANGONG, WISH_POOL } from './temple-courtyard'
+import { NpcManager } from './npc-system'
 
 export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0, 31.0)
 
@@ -117,6 +118,7 @@ export class TempleWorld {
   private auraParticleData?: { radius: number; angle: number; speed: number; rotSpeed: number }[]
   private dragonGuanyinUrnPos?: THREE.Vector3
   private dragonPuffTimer = 1.2
+  readonly npcs: NpcManager
 
   constructor(private readonly physics: Physics) {
     // Elegant warm celestial sky & gentle horizon fog (澄澈淡碧與暖金宮闕天空色調)
@@ -153,6 +155,7 @@ export class TempleWorld {
     this.addRitualProps()
     this.addMarkers()
     this.addGiantDragonGuanyin()
+    this.npcs = new NpcManager(this.scene)
     this.avatarStand.add(this.chibi.root)
     this.scene.add(this.avatarStand)
     this.placeAvatarAtStand()
@@ -2293,6 +2296,7 @@ export class TempleWorld {
     this.rearRoof.visible = !insideRear
     this.incenseGlow.intensity = THREE.MathUtils.damp(this.incenseGlow.intensity, 0.22, 1.4, dt)
     this.courtyard.update(time)
+    this.npcs.update(dt, time, playerPosition, camera)
 
     // Y 軸鎖定面向攝影機（Y-axis Billboard）：水平旋轉永遠面向鏡頭，固定俯仰角（Pitch），產生壯闊立體壓迫感
     if (this.dragonGuanyinBillboard && camera) {

@@ -10,6 +10,11 @@ export const CHIBI_PALETTES: Record<string, ChibiPalette> = {
   jade: { robe: '#d9c79a', sash: '#7d9a7a', hair: '#2c211b' },
   vermillion: { robe: '#b0473a', sash: '#e2b864', hair: '#251a16' },
   moon: { robe: '#a9bcb1', sash: '#f1ead8', hair: '#3a2f2a' },
+  scholar: { robe: '#4e7284', sash: '#d9c89e', hair: '#1e1a17' },
+  monk: { robe: '#b58334', sash: '#4a2f18', hair: '#2a1e16' },
+  peach: { robe: '#cf7569', sash: '#f4e0d4', hair: '#221714' },
+  lavender: { robe: '#85739a', sash: '#e6ded3', hair: '#221926' },
+  amber: { robe: '#a67b41', sash: '#59381e', hair: '#271c15' },
 }
 
 const std = (color: string, roughness = 0.75) => new THREE.MeshStandardMaterial({ color, roughness })
