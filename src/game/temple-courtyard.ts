@@ -52,6 +52,7 @@ export class FrontCourtyard {
     this.addLotusPond()
     this.addGoldFurnace()
     this.addPlanting()
+    this.addSacredTrailAndPlatform()
   }
 
   private add(mesh: THREE.Object3D, shadow = true): THREE.Object3D {
@@ -92,11 +93,26 @@ export class FrontCourtyard {
     const wall = this.c.mat(PAL.wall)
     const cap = this.c.mat(PAL.wallCap, 0.8)
     const len = front - back
+
+    // East wall (side = 1): continuous unbroken wall
+    const eastX = halfX - 0.4
+    this.box(0.65, 4.2, len, wall, eastX, 2.1, (front + back) / 2, true)
+    this.box(1.0, 0.3, len + 0.4, cap, eastX, 4.3, (front + back) / 2)
+
+    // West wall (side = -1): broken at z = 31.0 for the sacred moon gate (opening width: 4.4m, z: 28.8 to 33.2)
+    const westX = -(halfX - 0.4)
+    const northLen = 28.8 - back
+    const northCenter = (back + 28.8) / 2
+    this.box(0.65, 4.2, northLen, wall, westX, 2.1, northCenter, true)
+    this.box(1.0, 0.3, northLen + 0.2, cap, westX, 4.3, northCenter)
+
+    const southLen = front - 33.2
+    const southCenter = (33.2 + front) / 2
+    this.box(0.65, 4.2, southLen, wall, westX, 2.1, southCenter, true)
+    this.box(1.0, 0.3, southLen + 0.2, cap, westX, 4.3, southCenter)
+
+    // Front wall segments either side of the arch.
     for (const side of [-1, 1]) {
-      const x = side * (halfX - 0.4)
-      this.box(0.65, 4.2, len, wall, x, 2.1, (front + back) / 2, true)
-      this.box(1.0, 0.3, len + 0.4, cap, x, 4.3, (front + back) / 2)
-      // Front wall segments either side of the arch.
       const inner = 6.45
       const segLen = halfX - 0.4 - inner
       const cx = side * (inner + segLen / 2)
@@ -760,6 +776,213 @@ export class FrontCourtyard {
     }
     this.add(g)
     this.c.physics.addStaticBox(new THREE.Vector3(x, 0.3, z), new THREE.Vector3(1.9, 0.6, 0.55), angle ? rotY(angle) : undefined)
+  }
+
+  /**
+   * 朝聖林蔭小徑與昇龍觀音漢白玉八角大平台：
+   * 1. 西側月亮門／聖境牌坊（【昇龍聖境】石牌坊，帶琉璃飛簷與朱漆門柱、抱鼓石）
+   * 2. 朝聖石板小徑（寬 4.2m、長約 24.4m，以正常移速約步行 5 秒，鋪設青石板與路緣石，配備實體地面碰撞）
+   * 3. 小徑兩側雙排鬱鬱青松（10 株茂密松柏樹）與古樸石燈籠（夜間柔和暖光）
+   * 4. 昇龍觀音漢白玉八角大平台（半徑 14m，雙層須彌台基、漢白玉雕花欄杆、蓮花望柱、四方天燈塔、御路丹陛石踏步）
+   */
+  private addSacredTrailAndPlatform(): void {
+    const gateX = -(SITE.halfX - 0.4) // -29.6
+    const gateZ = 31.0
+    const gold = this.c.mat(PAL.gold, 0.45, 0.28)
+    const vermilion = this.c.mat(PAL.red, 0.76)
+    const marble = this.c.mat('#dfd8cc', 0.9)
+    const paving = this.c.mat(PAL.paving, 0.94)
+    const stone = this.c.mat('#8e8474', 0.92)
+
+    // -------------------------------------------------------------
+    // 1. 西側牌坊拱門（【 昇 龍 聖 境 】 月亮門牌坊）
+    // -------------------------------------------------------------
+    // 左右兩大朱紅金柱（帶碰撞）
+    for (const dz of [-2.2, 2.2]) {
+      const pz = gateZ + dz
+      this.pillar(gateX, pz, 4.8, 0.32, true)
+      // 柱腳抱鼓石
+      const drumBase = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.4, 0.8), this.c.mat('#9c9180', 0.95))
+      drumBase.position.set(gateX, 0.2, pz)
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 16), this.c.mat('#aba08f', 0.9))
+      drum.rotation.z = Math.PI / 2
+      drum.position.set(gateX, 0.48, pz)
+      this.add(drumBase)
+      this.add(drum)
+    }
+    // 牌坊橫楣額樑
+    this.box(0.7, 0.55, 4.8, vermilion, gateX, 4.3, gateZ)
+    this.box(0.85, 0.2, 4.95, gold, gateX, 4.0, gateZ)
+
+    // 歇山式琉璃飛簷頂
+    const archRoof = this.c.roof(2.4, 5.5, 4.55, 5.65)
+    archRoof.position.set(gateX, 0, gateZ)
+    this.add(archRoof)
+
+    // 牌匾：朝向前庭面（東面）題刻【昇龍聖境】，朝向小徑面（西面）題刻【紫氣東來】
+    const plaqueEast = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.8, 0.65),
+      this.c.text('昇 龍 聖 境', '#f4d588', '#2e1910')
+    )
+    plaqueEast.rotation.y = Math.PI / 2
+    plaqueEast.position.set(gateX + 0.38, 4.3, gateZ)
+    this.c.scene.add(plaqueEast)
+
+    const plaqueWest = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.8, 0.65),
+      this.c.text('紫 氣 東 來', '#f4d588', '#2e1910')
+    )
+    plaqueWest.rotation.y = -Math.PI / 2
+    plaqueWest.position.set(gateX - 0.38, 4.3, gateZ)
+    this.c.scene.add(plaqueWest)
+
+    // 牌坊下懸掛一對迎賓吉祥宮燈
+    for (const dz of [-1.5, 1.5]) {
+      this.lantern(gateX, 3.85, gateZ + dz, 0.32)
+    }
+
+    // -------------------------------------------------------------
+    // 2. 朝聖石板小徑（從 x = -29.6 延伸至 x = -54.0，長度 24.4m，約走 5 秒）
+    // -------------------------------------------------------------
+    const trailStartX = gateX // -29.6
+    const trailEndX = -54.0
+    const trailLen = trailStartX - trailEndX // 24.4
+    const trailMidX = (trailStartX + trailEndX) / 2 // -41.8
+    const trailW = 4.2
+
+    // 小徑實體地面物理碰撞（厚度 0.8m，頂面 y = -0.02，確保玩家行走 100% 踏實不穿透）
+    this.box(trailLen, 0.8, trailW, paving, trailMidX, -0.42, gateZ, true)
+
+    // 小徑中央鋪設青石古道面磚
+    const roadSurface = new THREE.Mesh(new THREE.BoxGeometry(trailLen, 0.04, 3.2), this.c.mat(PAL.road, 0.92))
+    roadSurface.position.set(trailMidX, 0.02, gateZ)
+    roadSurface.receiveShadow = true
+    this.c.scene.add(roadSurface)
+
+    // 小徑南北兩側花崗岩路緣石
+    for (const side of [-1, 1]) {
+      const curbZ = gateZ + side * 1.85
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(trailLen, 0.1, 0.26), stone)
+      curb.position.set(trailMidX, 0.05, curbZ)
+      curb.receiveShadow = true
+      this.c.scene.add(curb)
+    }
+
+    // 小徑石條節奏紋理
+    const lineMat = this.c.mat(PAL.roadLine, 0.88)
+    for (let x = trailStartX - 2.0; x > trailEndX + 1.0; x -= 2.6) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.025, 3.1), lineMat)
+      strip.position.set(x, 0.045, gateZ)
+      this.c.scene.add(strip)
+    }
+
+    // -------------------------------------------------------------
+    // 3. 小徑兩側 2 排茂密松柏樹與古樸石燈籠
+    // -------------------------------------------------------------
+    // 北排樹列 (z = 34.6) 與 南排樹列 (z = 27.4)
+    for (const x of [-33.5, -38.5, -43.5, -48.5, -53.0]) {
+      this.tree(x, gateZ + 3.6) // 北側松樹
+      this.tree(x, gateZ - 3.6) // 南側松樹
+    }
+    // 夾道古樸石燈籠（柔和微光）
+    for (const x of [-36.0, -46.0]) {
+      this.stoneLantern(x, gateZ + 2.5)
+      this.stoneLantern(x, gateZ - 2.5)
+    }
+
+    // -------------------------------------------------------------
+    // 4. 昇龍觀音漢白玉八角大平台（中心 x = -68.0, z = 31.0，半徑 14m）
+    // -------------------------------------------------------------
+    const platX = -68.0
+    const platZ = 31.0
+    const platR = 14.0
+
+    // 平台基礎實體物理碰撞（覆蓋直徑 28m 整個大圓台地面）
+    this.c.physics.addStaticBox(new THREE.Vector3(platX, -0.42, platZ), new THREE.Vector3(platR * 2 + 1.0, 0.8, platR * 2 + 1.0))
+    // 步道銜接平台緩坡階梯碰撞
+    this.box(2.0, 0.4, 4.4, stone, -55.0, 0.1, platZ, true)
+
+    // 平台群組
+    const platGroup = new THREE.Group()
+    platGroup.position.set(platX, 0, platZ)
+
+    // (A) 底層漢白玉大圓台基座 (Tier 1)
+    const baseTier1 = new THREE.Mesh(new THREE.CylinderGeometry(platR, platR + 0.4, 0.35, 32), marble)
+    baseTier1.position.y = 0.175
+    baseTier1.receiveShadow = true
+    platGroup.add(baseTier1)
+
+    // (B) 頂層平整八角廣場地坪 (Tier 2)
+    const baseTier2 = new THREE.Mesh(new THREE.CylinderGeometry(platR - 0.4, platR - 0.2, 0.25, 32), this.c.mat('#eee8dc', 0.94))
+    baseTier2.position.y = 0.42
+    baseTier2.receiveShadow = true
+    platGroup.add(baseTier2)
+
+    // (C) 東側朝聖階梯與九龍御路丹陛石（連接小徑與大平台）
+    const stepsGroup = new THREE.Group()
+    stepsGroup.position.set(platR - 0.3, 0, 0)
+    const step1 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.18, 4.6), stone)
+    step1.position.set(0.6, 0.09, 0)
+    const step2 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.18, 4.6), marble)
+    step2.position.set(-0.2, 0.27, 0)
+    // 中央金色祥雲丹陛雕石
+    const danbi = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.04, 1.8), gold)
+    danbi.position.set(0.2, 0.28, 0)
+    danbi.rotation.z = -0.1
+    stepsGroup.add(step1, step2, danbi)
+    platGroup.add(stepsGroup)
+
+    // (D) 外環漢白玉雕花欄杆與蓮花望柱（圍繞半徑 13.5m，東向留出 4.6m 寬敞迎賓階梯）
+    const postCount = 28
+    for (let i = 0; i < postCount; i++) {
+      const a = (i / postCount) * Math.PI * 2
+      // 東側 (a ≈ 0) 留出小徑進場大缺口
+      if (Math.abs(a) < 0.28 || Math.abs(a - Math.PI * 2) < 0.28) continue
+      const px = Math.cos(a) * (platR - 0.6)
+      const pz = Math.sin(a) * (platR - 0.6)
+
+      // 漢白玉方柱
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.75, 0.24), marble)
+      post.position.set(px, 0.85, pz)
+      // 蓮花柱頭
+      const lotusBud = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), this.c.mat('#faf6ee', 0.8))
+      lotusBud.position.set(px, 1.28, pz)
+      // 雕花尋杖欄板
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.42, 0.1), marble)
+      panel.position.set(px, 0.75, pz)
+      panel.rotation.y = a + Math.PI / 2
+      platGroup.add(post, lotusBud, panel)
+    }
+
+    // (E) 四方通天金頂石燈台（分佈於大平台四隅，晝夜長明神光）
+    for (const [dx, dz] of [[-8.8, -8.8], [-8.8, 8.8], [7.5, -8.8], [7.5, 8.8]]) {
+      const lampTower = new THREE.Group()
+      lampTower.position.set(dx, 0.54, dz)
+
+      const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.85, 0.4, 8), stone)
+      lampBase.position.y = 0.2
+      const lampPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.32, 1.8, 8), stone)
+      lampPillar.position.y = 1.3
+      const lampCoreMat = this.c.mat('#ffe088', 0.3)
+      lampCoreMat.emissive.set('#e5a83b')
+      lampCoreMat.emissiveIntensity = 0.8
+      const lampCore = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.65), lampCoreMat)
+      lampCore.position.y = 2.45
+      const lampRoof = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.5, 8), this.c.mat(PAL.wallCap, 0.8))
+      lampRoof.position.y = 3.0
+      const lampGourd = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), gold)
+      lampGourd.position.y = 3.35
+
+      const lampLight = new THREE.PointLight('#ffda7a', 0.8, 12, 2)
+      lampLight.position.set(0, 2.5, 0)
+
+      lampTower.add(lampBase, lampPillar, lampCore, lampRoof, lampGourd, lampLight)
+      platGroup.add(lampTower)
+
+      this.c.physics.addStaticCylinder(new THREE.Vector3(platX + dx, 1.5, platZ + dz), 0.7, 3.2)
+    }
+
+    this.add(platGroup)
   }
 
   update(time: number): void {

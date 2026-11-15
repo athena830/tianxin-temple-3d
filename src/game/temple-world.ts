@@ -4,7 +4,7 @@ import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
 import { FrontCourtyard, GOLD_FURNACE, PAVILION, STAND, TIANGONG, WISH_POOL } from './temple-courtyard'
 
-export const DRAGON_GUANYIN_POS = new THREE.Vector3(0, 0, 16)
+export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0, 31.0)
 
 export type ShrinePointId =
   | 'incense' | 'prayer' | 'offerings' | 'daily-lot' | 'chess'
@@ -50,7 +50,7 @@ const pointPositions: [number, number][] = [
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [WISH_POOL.x + 3.9, WISH_POOL.z], [14.6, 4.3], [15, 0.2],
   [TIANGONG.x - 3.0, TIANGONG.z],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
-  [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z + 5.5],
+  [DRAGON_GUANYIN_POS.x + 5.5, DRAGON_GUANYIN_POS.z],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
@@ -129,10 +129,10 @@ export class TempleWorld {
     this.sun.target.position.set(0, 0, 12)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(2048, 2048)
-    this.sun.shadow.camera.left = -40
+    this.sun.shadow.camera.left = -88
     this.sun.shadow.camera.right = 40
-    this.sun.shadow.camera.top = 52
-    this.sun.shadow.camera.bottom = -36
+    this.sun.shadow.camera.top = 56
+    this.sun.shadow.camera.bottom = -40
     this.sun.shadow.camera.near = 1
     this.sun.shadow.camera.far = 110
     this.sun.shadow.normalBias = 0.035
@@ -1977,10 +1977,10 @@ export class TempleWorld {
     lotusRing2.position.y = 1.95
     root.add(lotusRing2)
 
-    // 朱紅雕花欄杆與漢白玉望柱（圍繞底層台基，南向保留大步道）
+    // 朱紅雕花欄杆與漢白玉望柱（圍繞底層台基，東向朝向小徑來向保留大步道）
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2
-      if (Math.abs(a - Math.PI / 2) < 0.32) continue // 正面留出參拜步道
+      if (Math.abs(a) < 0.35 || Math.abs(a - Math.PI * 2) < 0.35) continue // 東面朝向小徑來向留出參拜步道
       const px = Math.cos(a) * 4.35
       const pz = Math.sin(a) * 4.35
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.55, 0.16), balustradeMat)
@@ -2025,17 +2025,17 @@ export class TempleWorld {
     root.add(billboard)
     this.dragonGuanyinBillboard = billboard
 
-    // 3. 底部青銅九龍香爐與香火煙霧
+    // 3. 底部青銅九龍香爐與香火煙霧（朝向東面迎接從小徑前來的參拜善信）
     const urn = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 0.65, 12), makeMat('#523e2b', 0.6, 0.4))
-    urn.position.set(0, 0.35, 4.6)
+    urn.position.set(4.6, 0.35, 0)
     const urnRim = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.06, 8, 16), goldMat)
     urnRim.rotation.x = Math.PI / 2
-    urnRim.position.set(0, 0.68, 4.6)
+    urnRim.position.set(4.6, 0.68, 0)
     const ember = new THREE.Mesh(new THREE.CircleGeometry(0.48, 12), new THREE.MeshBasicMaterial({ color: '#ff5522' }))
     ember.rotation.x = -Math.PI / 2
-    ember.position.set(0, 0.69, 4.6)
+    ember.position.set(4.6, 0.69, 0)
     root.add(urn, urnRim, ember)
-    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x, 0.75, pos.z + 4.6)
+    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x + 4.6, 0.75, pos.z)
 
     // 4. 金光神聖氛圍燈 (Golden Aura PointLight)
     const auraLight = new THREE.PointLight('#ffdb70', 1.25, 14, 2)
