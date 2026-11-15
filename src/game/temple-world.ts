@@ -1933,66 +1933,70 @@ export class TempleWorld {
     const root = new THREE.Group()
     root.position.copy(pos)
 
-    const stoneMat = makeMat('#8c8072', 0.9, 0.05)
-    const waistMat = makeMat('#3b2b20', 0.85, 0.1)
-    const goldMat = makeMat('#e5b84c', 0.35, 0.5)
+    const stoneMat = makeMat('#887d70', 0.9, 0.05)
+    const waistMat = makeMat('#36281e', 0.85, 0.1)
+    const goldMat = makeMat('#d4af37', 0.35, 0.45)
+    const vermilionMat = makeMat('#962d22', 0.72)
     const balustradeMat = makeMat('#d8d1c5', 0.85)
 
-    // 1. 3D 實體蓮花台基座（Three.js CylinderGeometry 三層八角/圓形立體石造基座，高 2.5 單位、半徑 4 單位）
-    // 底層石造大台基 (Tier 1)
-    const tier1 = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.5, 0.8, 16), stoneMat)
-    tier1.position.y = 0.4
+    // 1. 3D 實體九品蓮台基座（以 Three.js 實體石造須彌座與金雕蓮花座承接，徹底去除重複底座）
+    // 底層石造八角大台基 (Tier 1)
+    const tier1 = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.5, 0.55, 16), stoneMat)
+    tier1.position.y = 0.275
     tier1.castShadow = true
     tier1.receiveShadow = true
     root.add(tier1)
 
-    // 底層台基外緣踏步
-    const tier1Step = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.8, 0.25, 16), stoneMat)
-    tier1Step.position.y = 0.125
+    // 底層外緣踏步
+    const tier1Step = new THREE.Mesh(new THREE.CylinderGeometry(4.55, 4.75, 0.2, 16), stoneMat)
+    tier1Step.position.y = 0.1
     tier1Step.receiveShadow = true
     root.add(tier1Step)
 
     // 中層束腰雕花基座 (Tier 2)
-    const tier2 = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.8, 0.8, 16), waistMat)
-    tier2.position.y = 1.2
+    const tier2 = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.7, 0.65, 16), waistMat)
+    tier2.position.y = 0.85
     tier2.castShadow = true
     tier2.receiveShadow = true
     root.add(tier2)
 
     // 頂層金雕九品蓮花座 (Tier 3)
-    const tier3 = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.4, 0.9, 24), goldMat)
-    tier3.position.y = 2.05
+    const tier3 = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.3, 0.75, 24), goldMat)
+    tier3.position.y = 1.55
     tier3.castShadow = true
     root.add(tier3)
 
-    // 仰蓮金瓣裝飾（環繞蓮花座上緣，生動展開）
-    for (let i = 0; i < 24; i++) {
-      const a = (i / 24) * Math.PI * 2
-      const petal = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.75, 4), goldMat)
-      petal.rotation.x = Math.PI / 2 + 0.35
-      petal.rotation.y = a
-      petal.position.set(Math.cos(a) * 3.15, 2.35, Math.sin(a) * 3.15)
-      root.add(petal)
-    }
+    // 雙層圓潤金蓮飾環 (Smooth Lotus Petal Torus Rings)
+    const lotusRing1 = new THREE.Mesh(new THREE.TorusGeometry(3.15, 0.16, 12, 32), goldMat)
+    lotusRing1.rotation.x = Math.PI / 2
+    lotusRing1.position.y = 1.85
+    root.add(lotusRing1)
 
-    // 漢白玉石欄杆與蓮花望柱（環繞底層台基外緣，保留正面參拜缺口）
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2
-      if (Math.abs(a - Math.PI / 2) < 0.38) continue // 保留南向正面開口迎香客
-      const postX = Math.cos(a) * 4.4
-      const postZ = Math.sin(a) * 4.4
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.65, 0.18), balustradeMat)
-      post.position.set(postX, 0.8, postZ)
-      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), balustradeMat)
-      bud.position.set(postX, 1.16, postZ)
-      bud.scale.set(0.9, 1.3, 0.9)
-      root.add(post, bud)
+    const lotusRing2 = new THREE.Mesh(new THREE.TorusGeometry(2.8, 0.14, 12, 32), goldMat)
+    lotusRing2.rotation.x = Math.PI / 2
+    lotusRing2.position.y = 1.95
+    root.add(lotusRing2)
+
+    // 朱紅雕花欄杆與漢白玉望柱（圍繞底層台基，南向保留大步道）
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2
+      if (Math.abs(a - Math.PI / 2) < 0.32) continue // 正面留出參拜步道
+      const px = Math.cos(a) * 4.35
+      const pz = Math.sin(a) * 4.35
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.55, 0.16), balustradeMat)
+      post.position.set(px, 0.65, pz)
+      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), goldMat)
+      bud.position.set(px, 0.98, pz)
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.32, 0.08), vermilionMat)
+      rail.position.set(px, 0.55, pz)
+      rail.rotation.y = a + Math.PI / 2
+      root.add(post, bud, rail)
     }
 
     // 加上實體碰撞 (Collision) 防止玩家穿透基座
-    this.physics.addStaticCylinder(pos, 4.3, 2.5)
+    this.physics.addStaticCylinder(pos, 4.3, 2.0)
 
-    // 2. 巨型透明材質立牌 (Billboard，高 13 單位、寬 8 單位，置於基座正上方)
+    // 2. 巨型透明材質立牌（已去除圖片底部的重複繪製底座，僅保留觀音菩薩、乘雲金龍與雪白翻騰波濤，自然融入 3D 蓮花座）
     const loader = new THREE.TextureLoader()
     const guanyinTex = loader.load('./guanyin.png', undefined, undefined, () => {
       loader.load('/guanyin.png', t2 => {
@@ -2006,33 +2010,36 @@ export class TempleWorld {
     const planeMat = new THREE.MeshBasicMaterial({
       map: guanyinTex,
       transparent: true,
-      alphaTest: 0.35,
+      alphaTest: 0.25,
       side: THREE.DoubleSide,
       depthWrite: true,
     })
 
-    const billboard = new THREE.Mesh(new THREE.PlaneGeometry(8.0, 13.0), planeMat)
-    // 基座高 2.5 單位，立牌高 13 單位，中心點置於 y = 2.5 + 6.5 = 9.0，頂端高達 15.5 單位（五層樓高）
-    billboard.position.set(0, 9.0, 0)
+    // 比例 571 / 675 = 0.846，高 11.2 單位、寬 9.48 單位
+    const billH = 11.2
+    const billW = billH * (571 / 675)
+    const billboard = new THREE.Mesh(new THREE.PlaneGeometry(billW, billH), planeMat)
+    // 底座頂端位於 y = 1.95，立牌底部精確密接蓮花座，中心點置於 y = 1.95 + billH / 2 = 7.55，通高達 13.2 單位
+    billboard.position.set(0, 1.95 + billH / 2, 0)
     billboard.castShadow = true
     root.add(billboard)
     this.dragonGuanyinBillboard = billboard
 
     // 3. 底部青銅九龍香爐與香火煙霧
     const urn = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 0.65, 12), makeMat('#523e2b', 0.6, 0.4))
-    urn.position.set(0, 0.35, 4.7)
-    const urnRim = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.06, 8, 16), makeMat('#b59248', 0.4, 0.5))
+    urn.position.set(0, 0.35, 4.6)
+    const urnRim = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.06, 8, 16), goldMat)
     urnRim.rotation.x = Math.PI / 2
-    urnRim.position.set(0, 0.68, 4.7)
+    urnRim.position.set(0, 0.68, 4.6)
     const ember = new THREE.Mesh(new THREE.CircleGeometry(0.48, 12), new THREE.MeshBasicMaterial({ color: '#ff5522' }))
     ember.rotation.x = -Math.PI / 2
-    ember.position.set(0, 0.69, 4.7)
+    ember.position.set(0, 0.69, 4.6)
     root.add(urn, urnRim, ember)
-    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x, 0.75, pos.z + 4.7)
+    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x, 0.75, pos.z + 4.6)
 
     // 4. 金光神聖氛圍燈 (Golden Aura PointLight)
     const auraLight = new THREE.PointLight('#ffdb70', 1.25, 14, 2)
-    auraLight.position.set(0, 3.5, 0)
+    auraLight.position.set(0, 3.2, 0)
     root.add(auraLight)
 
     // 5. 動態氣場：基座周圍緩慢上升的金色粒子特效 (Golden Ascending Aura Particles)
@@ -2042,7 +2049,7 @@ export class TempleWorld {
     for (let i = 0; i < particleCount; i++) {
       const radius = 0.6 + Math.random() * 3.4
       const angle = Math.random() * Math.PI * 2
-      const y = 2.5 + Math.random() * 13.5
+      const y = 2.0 + Math.random() * 11.5
       positions[i * 3] = Math.cos(angle) * radius
       positions[i * 3 + 1] = y
       positions[i * 3 + 2] = Math.sin(angle) * radius
@@ -2057,7 +2064,7 @@ export class TempleWorld {
     particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     const particleMat = new THREE.PointsMaterial({
       color: '#ffe066',
-      size: 0.32,
+      size: 0.3,
       transparent: true,
       opacity: 0.85,
       blending: THREE.AdditiveBlending,
@@ -2304,8 +2311,8 @@ export class TempleWorld {
         const p = this.auraParticleData[i]
         p.angle += p.rotSpeed * dt
         let y = arr[i * 3 + 1] + p.speed * dt
-        if (y > 16.0) {
-          y = 2.5
+        if (y > 13.8) {
+          y = 2.0
           p.radius = 0.6 + Math.random() * 3.4
         }
         arr[i * 3] = Math.cos(p.angle) * p.radius
