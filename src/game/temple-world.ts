@@ -84,12 +84,14 @@ export class TempleWorld {
     { id: 'wealth', position: new THREE.Vector3(12.5, 0, -1.6) },
     { id: 'study', position: new THREE.Vector3(15, 0, -1.6) },
   ]
+  private readonly clouds: { mesh: THREE.Group; speed: number; x: number; z: number; y: number }[] = []
 
   constructor(private readonly physics: Physics) {
-    this.scene.background = new THREE.Color('#b9ad98')
-    this.scene.fog = new THREE.Fog('#b9ad98', 70, 150)
-    this.scene.add(new THREE.HemisphereLight('#f2e9d6', '#5c5145', 1.15))
-    const sun = new THREE.DirectionalLight('#ffe5b1', 1.35)
+    // Elegant warm celestial sky & gentle horizon fog (澄澈淡碧與暖金宮闕天空色調)
+    this.scene.background = new THREE.Color('#98b8cb')
+    this.scene.fog = new THREE.Fog('#bfd4df', 65, 175)
+    this.scene.add(new THREE.HemisphereLight('#fbf4e8', '#636b69', 1.1))
+    const sun = new THREE.DirectionalLight('#fff0d0', 1.35)
     sun.position.set(-18, 34, 30)
     sun.target.position.set(0, 0, 12)
     sun.castShadow = true
@@ -102,6 +104,9 @@ export class TempleWorld {
     sun.shadow.camera.far = 110
     sun.shadow.normalBias = 0.035
     this.scene.add(sun, sun.target)
+
+    this.addSkyDome()
+    this.addClouds()
 
     this.courtyard = new FrontCourtyard({
       scene: this.scene, physics: this.physics, mat: makeMat,
@@ -668,6 +673,70 @@ export class TempleWorld {
     return root
   }
 
+  private addSkyDome(): void {
+    // Atmospheric gradient dome canvas texture: zenith pale-azure to horizon warm-cream
+    const cv = document.createElement('canvas')
+    cv.width = 64
+    cv.height = 256
+    const ctx = cv.getContext('2d')!
+    const grad = ctx.createLinearGradient(0, 0, 0, 256)
+    grad.addColorStop(0, '#5a8fa8')    // Sky zenith deep clear azure
+    grad.addColorStop(0.35, '#86adbe') // Soft daytime blue
+    grad.addColorStop(0.72, '#c1d4dc') // Haze layer
+    grad.addColorStop(1, '#ebe4d3')    // Warm temple horizon
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, 64, 256)
+    const tex = new THREE.CanvasTexture(cv)
+    tex.colorSpace = THREE.SRGBColorSpace
+
+    const domeGeo = new THREE.SphereGeometry(180, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.52)
+    const domeMat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false, fog: false })
+    const dome = new THREE.Mesh(domeGeo, domeMat)
+    dome.position.set(0, -6, 10)
+    this.scene.add(dome)
+  }
+
+  private addClouds(): void {
+    const cloudMat = new THREE.MeshBasicMaterial({ color: '#fefcf8', transparent: true, opacity: 0.82, depthWrite: false })
+    // Seed clusters of stylized oriental cumulus clouds drifting across the sky
+    const configs: [number, number, number, number][] = [
+      [-45, 32, -35, 1.2],
+      [-15, 36, -42, 0.9],
+      [35, 30, -30, 1.1],
+      [-50, 28, 12, 1.3],
+      [48, 34, 16, 1.0],
+      [-30, 31, 46, 1.15],
+      [25, 35, 48, 1.25],
+      [0, 38, 2, 0.85],
+      [-65, 33, -10, 1.05],
+      [60, 29, -20, 1.1],
+    ]
+
+    for (const [x, y, z, scale] of configs) {
+      const g = new THREE.Group()
+      // Generate multi-sphere fluffy cloud cluster
+      const puffs: [number, number, number, number][] = [
+        [0, 0, 0, 3.2],
+        [-2.4, -0.4, 0.3, 2.3],
+        [2.3, -0.3, -0.2, 2.4],
+        [-4.2, -0.8, 0, 1.6],
+        [4.0, -0.7, 0.1, 1.7],
+        [0.8, 0.9, -0.3, 2.1],
+        [-1.1, 0.8, 0.2, 1.9],
+      ]
+      for (const [px, py, pz, pr] of puffs) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(pr, 10, 8), cloudMat)
+        puff.position.set(px, py, pz)
+        puff.scale.y = 0.62 // Flatter bottoms for floating cloud look
+        g.add(puff)
+      }
+      g.scale.setScalar(scale)
+      g.position.set(x, y, z)
+      this.scene.add(g)
+      this.clouds.push({ mesh: g, speed: 0.45 + Math.random() * 0.35, x, y, z })
+    }
+  }
+
   /** Show the procedural chibi standing at the select-screen stand. */
   placeAvatarAtStand(): void {
     this.chibi.root.position.set(STAND.x, 0, STAND.z)
@@ -739,6 +808,16 @@ export class TempleWorld {
     this.roof.visible = !insideHall
     this.incenseGlow.intensity = THREE.MathUtils.damp(this.incenseGlow.intensity, 0.22, 1.4, dt)
     this.courtyard.update(time)
+
+    // Gentle cloud drifting animation across celestial dome
+    for (const c of this.clouds) {
+      c.x += c.speed * dt
+      if (c.x > 90) {
+        c.x = -90
+      }
+      c.mesh.position.x = c.x
+      c.mesh.position.y = c.y + Math.sin(time * 0.35 + c.z) * 0.35
+    }
     // A thin, continuous thread of smoke above the Tiangong urn.
     this.puffTimer -= dt
     if (this.puffTimer <= 0 && !this.reducedSmoke) { this.puffTimer = 0.8; this.spawnPuff(this.courtyard.tiangongSmoke) }
