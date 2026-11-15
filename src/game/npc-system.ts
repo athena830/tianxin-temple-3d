@@ -18,6 +18,172 @@ export type NpcConfig = {
   dialogues: NpcDialogueSet
 }
 
+export type LocationZone =
+  | 'pavilion'      // 天心仙姑問事亭（問工作、事業、感情、婚姻、象棋卜卦）
+  | 'guanyin'       // 觀音大殿（大慈大悲、求平安、甘露消災、闔家安康、點光明燈）
+  | 'dragonGuanyin' // 昇龍觀音聖境大平台（五層樓高巨制、金龍騰雲、九龍香爐大願、震撼神蹟）
+  | 'yuhuang'       // 凌霄寶殿（玉皇上帝、天官賜福、國泰民安、天恩浩蕩）
+  | 'lotusPond'     // 盛景大蓮花池（滿池荷花、粉白仙蓮、太湖假山、賞蓮幽香）
+  | 'wishPool'      // 蓮花許願池（投幣許願、心想事成、圓滿祈願）
+  | 'goldFurnace'   // 八角金亭（焚化發財金壽金、添香油錢、生意興隆通四海）
+  | 'courtyard'     // 廟埕中道與山門牌樓（進出宮門、門神威武、晨鐘暮鼓）
+
+export type LocationDialogueSet = {
+  worship: string[]
+  idle: string[]
+  approach: string[]
+}
+
+export const LOCATION_DIALOGUES: Record<LocationZone, LocationDialogueSet> = {
+  pavilion: {
+    worship: [
+      '想請仙姑以象棋神卦指點，弟子這份新工作適不適合我。',
+      '請問仙姑，弟子何時能遇到相知相惜的良緣正緣？',
+      '最近事業經營遇到瓶頸，特來請教仙姑指引明路。',
+      '弟子想轉職換跑道，求仙姑象棋占卜指點吉凶。',
+      '請問仙姑，弟子與伴侶的感情能否修成正果、白頭偕老？',
+      '弟子準備創業開店，特求仙姑指點迷津、趨吉避凶！',
+      '求仙姑神卦開示，指點弟子未來半年的工作與前途運勢。',
+      '弟子為兒女的事業與婚姻祈請仙姑指點解惑。',
+    ],
+    idle: [
+      '聽說仙姑的象棋神卦極為靈驗，待會好好請示工作與前途。',
+      '好多人都特地來問事亭排隊問姻緣，我也來請仙姑指點。',
+      '近來心裡有些迷惘，來問事亭坐坐，聽聽仙姑智慧開示。',
+      '象棋排盤深藏天地玄機，仙姑解卦真是一針見血！',
+      '問世間情為何物，特來求仙姑指引一段好姻緣。',
+    ],
+    approach: [
+      '您好！您也是來請天心仙姑問工作或感情的嗎？仙姑解惑很慈悲喔！',
+      '嗨！天心仙姑的象棋神卦超神準的，推薦您也來抽籤卜卦問事！',
+      '您好！前頭就是問事亭了，想問事業或姻緣都可以請教仙姑喔～',
+    ],
+  },
+  guanyin: {
+    worship: [
+      '大慈大悲觀世音菩薩，祈求保佑一家老幼平安健康、福順吉祥。',
+      '南無觀世音菩薩摩訶薩，祈賜甘露遍灑、消災解厄、諸事順遂。',
+      '弟子誠心向大殿菩薩頂禮，祈願父母延年益壽、子孫孝悌安康。',
+      '信士合掌虔敬禮拜，祈求大士慈悲護持，化解一切災難苦厄。',
+      '在大殿佛前恭敬點上一盞光明燈，願心願成就、前途一片光明！',
+      '祈求菩薩賜我智慧定力，於紛擾世間常行善念、心無掛礙。',
+    ],
+    idle: [
+      '大殿中門完全敞開，一眼就能直視觀世音菩薩金身，太莊嚴慈悲了。',
+      '殿前大門的秦叔寶與尉遲恭門神，手執鐧鞭好威風肅穆！',
+      '主殿沉香繚繞，站在神龕前聞著清香，心裡說不出的踏實安寧。',
+      '八角重疊藻井雕工真是出神入化，不愧是傳統大廟的大木作藝術！',
+    ],
+    approach: [
+      '善信您好！歡迎進大殿參拜觀世音菩薩，心誠則靈，有拜有保庇！',
+      '阿彌陀佛！大殿菩薩金身極為莊嚴慈祥，進去拜拜保平安喔！',
+      '您好呀！大殿有提供平安符與光明燈，記得去拜拜求福喔！',
+    ],
+  },
+  dragonGuanyin: {
+    worship: [
+      '仰望五層樓乘龍觀音聖像，神威赫赫，弟子誠心恭敬朝禮！',
+      '在九龍青銅香爐前敬拜，祈願事業如飛龍在天、騰雲直上！',
+      '乘金龍踏祥雲，大慈大悲觀音大士，保佑合境平安、消災賜福。',
+      '誠心仰望昇龍觀音金身，祈求福氣滿載、鴻運當頭、心願圓滿！',
+      '九龍青銅香爐青煙裊裊，祈求大威德神光護佑弟子轉運開泰。',
+    ],
+    idle: [
+      '哇！這座昇龍觀音真的有五層樓高，金龍騰雲駕霧太震撼了！',
+      '站在漢白玉八角大平台上仰望神像，立體威嚴感撲面而來！',
+      '穿過那座【昇龍聖境】牌坊與松樹小徑走過來，真的像進了仙境！',
+      '大平台四周的通天石燈台晝夜放光，襯托乘龍觀音更加神聖超凡。',
+      '金龍身上的龍鱗刻得栩栩如生，浪花翻騰好有動態氣勢！',
+    ],
+    approach: [
+      '你好！你有走到觀音像正前方仰望嗎？五層樓高的氣勢真的超壯觀！',
+      '哈囉！這座漢白玉大平台的視野超棒，拍照起來仙氣十足！',
+      '嗨！記得在九龍香爐前敬拜觀音大士，乘龍神威特別靈驗喔！',
+    ],
+  },
+  yuhuang: {
+    worship: [
+      '朝拜玄穹高上玉皇大天尊，弟子恭敬叩首，沐浴九天浩蕩天恩！',
+      '天公祖慈悲庇佑，祈求國泰民安、風調雨順、家宅興旺吉慶。',
+      '後殿凌霄寶殿九龍金椅至尊至聖，祈願天官賜福、消災解難。',
+      '至心皈命禮，玉皇大天尊玄穹高上帝，保佑全家老幼四季平順。',
+    ],
+    idle: [
+      '後殿凌霄寶殿面寬進深好宏偉，八根天柱金龍盤繞氣宇軒昂！',
+      '九龍至尊御座高懸八角藻井，整個大殿散發天宮神聖金光。',
+      '從前殿過水廊穿過來就是凌霄寶殿，連通格局開闊大氣。',
+    ],
+    approach: [
+      '善信您好！後殿是宏偉的凌霄寶殿，一定要去朝拜玉皇上帝天公祖喔！',
+      '您好！玉皇大天尊至尊至聖，去大殿合掌叩首，能得九天福澤庇佑！',
+    ],
+  },
+  lotusPond: {
+    worship: [
+      '滿池仙蓮映水開，弟子合掌感念天地造化之美，願心靈如蓮清淨。',
+      '觀世音菩薩坐蓮台，池中仙蓮朵朵開，祈求心想事成、善緣常伴。',
+    ],
+    idle: [
+      '東邊這座大蓮花池開得好繁盛！粉白蓮花隨風輕搖，太美了！',
+      '池畔的太湖石假山與漢白玉欄杆，古色古香，好有皇家園林氣派！',
+      '微風吹拂過水面，帶來陣陣清雅荷香，走在池邊把煩惱全忘光了。',
+      '出淤泥而不染，濯清漣而不妖，這池仙蓮真有出塵靈氣！',
+      '池水碧波如鏡，粉紅白玉荷花盛開，怎麼拍照都好看極了！',
+    ],
+    approach: [
+      '您好呀！東側這座擴建後的大蓮花池超美的，一定要去池畔賞蓮喔！',
+      '嗨！蓮花池邊微風好涼爽，聞聞荷香整個人精神都放鬆了呢！',
+      '您好！池畔的漢白玉雕花欄杆跟太湖石超好拍，很推薦留念喔！',
+    ],
+  },
+  wishPool: {
+    worship: [
+      '投一枚銅錢到許願池，願心中所求皆得圓滿成真！',
+      '清泉泛起漣漪，撲通一聲，願望隨泉水直達天聽！',
+      '誠心許願，祈求家人健康平安、事業順遂、吉星高照。',
+    ],
+    idle: [
+      '許願池水好清澈，剛剛好多人投進硬幣許了好心願呢。',
+      '池邊的金邊圓潤欄杆很漂亮，投個銅錢試試手氣與緣分！',
+    ],
+    approach: [
+      '嗨！許願池很靈驗喔，身上有硬幣的話不妨投一枚許個願吧！',
+      '您好！投幣許願心誠則靈，祝您的心願都能早日實現喔！',
+    ],
+  },
+  goldFurnace: {
+    worship: [
+      '虔誠焚化一份五路發財金與祈安補運金，祈求生意興隆通四海！',
+      '八角金亭爐火熊熊，象徵天心宮香火鼎盛、鴻圖大展！',
+      '添點香油錢助造福田，祈願家宅安泰、四季進財、福星高照。',
+    ],
+    idle: [
+      '八角金亭古色古香，八角重簷歇山頂配上寶頂金葫蘆真精美！',
+      '爐口火光熊熊，香煙騰空，化紙祈福誠意滿滿。',
+    ],
+    approach: [
+      '您好呀！今天金亭香火真旺，祝您萬事順利、大發利市！',
+      '嗨！添香油化金紙祈求財運與平安，心誠則靈喔！',
+    ],
+  },
+  courtyard: {
+    worship: [
+      '站在廟埕前庭仰望正殿，心懷敬仰，合掌祈求天地神明護佑。',
+      '一炷清香敬天地，祈願風調雨順、國泰民安、善信和樂。',
+    ],
+    idle: [
+      '穿過玉皇宮山門牌樓走進廟埕，撲鼻而來的沉香讓人心神寧靜。',
+      '正殿大門秦叔寶與尉遲恭門神，手執金鐧鐵鞭好威風赫赫！',
+      '前庭寬闊平整，晨鐘暮鼓聲聲迴盪，整座宮廟神聖又祥和。',
+      '照壁上的紫氣東來福星高照，好有傳統福文化底蘊。',
+    ],
+    approach: [
+      '善信您好！歡迎蒞臨天心宮，祝您今日平安順遂、法喜充滿！',
+      '您好呀！今天宮廟好熱鬧，各殿都去走走拜拜，很有福氣喔！',
+    ],
+  },
+}
+
 export type TempleWaypoint = {
   name: string
   zone: 'courtyard' | 'sanctuary'
@@ -1006,12 +1172,70 @@ export class NpcInstance {
     this.state = 'walk'
   }
 
+  /**
+   * 智慧判定當前身處之地點分區（問事亭、觀音殿、昇龍聖境、凌霄寶殿、蓮花池、金亭、許願池、前庭廟埕）
+   */
+  getLocationZone(): LocationZone {
+    const pos = this.pos
+    // 1. 西側昇龍聖境大平台（x < -48.0）
+    if (pos.x < -48.0) {
+      return 'dragonGuanyin'
+    }
+    // 2. 後殿凌霄寶殿（z < -10.0）
+    if (pos.z < -10.0) {
+      return 'yuhuang'
+    }
+    // 3. 天心仙姑問事亭（x ~ -12, z ~ 30）
+    const distToPavilion = Math.hypot(pos.x - (-12.0), pos.z - 30.0)
+    if (distToPavilion < 5.8) {
+      return 'pavilion'
+    }
+    // 4. 盛景大蓮花池（x ~ 12.0, z ~ 38.0）
+    const distToLotus = Math.hypot(pos.x - 12.0, pos.z - 38.0)
+    if (distToLotus < 6.8) {
+      return 'lotusPond'
+    }
+    // 5. 蓮花許願池（x ~ -9.5, z ~ 39.5）
+    const distToWish = Math.hypot(pos.x - (-9.5), pos.z - 39.5)
+    if (distToWish < 4.8) {
+      return 'wishPool'
+    }
+    // 6. 八角金亭（x ~ -19.5, z ~ 38.0）
+    const distToFurnace = Math.hypot(pos.x - (-19.5), pos.z - 38.0)
+    if (distToFurnace < 5.2) {
+      return 'goldFurnace'
+    }
+    // 7. 觀音大殿正殿（|x| < 8, z in [-10, 6]）
+    if (Math.abs(pos.x) < 8.0 && pos.z >= -10.0 && pos.z <= 6.0) {
+      return 'guanyin'
+    }
+    // 8. 廟埕中道、前庭廣場、牌樓
+    return 'courtyard'
+  }
+
   say(category: 'idle' | 'worship' | 'approach', force = false): void {
     if (this.lifecycle === 'dormant' || this.lifecycle === 'leaving') return
     if (!force && this.bubble.isSpeaking) return
-    const lines = this.config.dialogues[category]
-    if (!lines || lines.length === 0) return
-    const line = lines[Math.floor(Math.random() * lines.length)]
+
+    const zone = this.getLocationZone()
+    const locSet = LOCATION_DIALOGUES[zone]
+    const locLines = locSet ? locSet[category] : undefined
+    const charLines = this.config.dialogues[category]
+
+    let candidates: string[] = []
+    if (locLines && locLines.length > 0) {
+      // 85% 機率嚴格使用當前地點專屬台詞（問事亭問工作感情、觀音殿求平安甘露等），15% 融入個人身分台詞
+      if (Math.random() < 0.85 || !charLines || charLines.length === 0) {
+        candidates = locLines
+      } else {
+        candidates = charLines
+      }
+    } else if (charLines && charLines.length > 0) {
+      candidates = charLines
+    }
+
+    if (candidates.length === 0) return
+    const line = candidates[Math.floor(Math.random() * candidates.length)]
     this.bubble.show(this.config.name, line, 5.0)
     this.speechCooldown = 12.0 + Math.random() * 10.0
 
