@@ -787,7 +787,6 @@ export class NpcInstance {
   onSpeak?: (speaker: string, text: string) => void
 
   lifecycle: NpcLifecycle = 'dormant'
-  private scaleFactor = 0
   private visitTimeRemaining = 60.0
   private worshipsDone = 0
 
@@ -822,81 +821,131 @@ export class NpcInstance {
   }
 
   /**
-   * 喚醒 NPC 登場（支援立即就位或自宮門優雅進場）
+   * 喚醒 NPC 登場：
+   * 開局時少數香客已在殿前參拜；後續香客一律由山門牌樓外（z = 54.5）步行穿過宮門進場，
+   * 絕不在廟埕地面憑空冒出！
    */
-  spawn(startPos?: THREE.Vector3, heading = 0, initialActive = false): void {
+  spawn(startPos?: THREE.Vector3, heading = Math.PI, initialActive = false): void {
     if (startPos) {
       this.pos.copy(startPos)
     } else {
-      this.pos.copy(this.config.startPos)
+      const enterX = (Math.random() - 0.5) * 3.2
+      this.pos.set(enterX, 0, 54.5)
     }
     this.heading = heading
     this.targetHeading = heading
     this.root.position.copy(this.pos)
     this.root.rotation.y = this.heading
     this.root.visible = true
+    this.root.scale.set(1, 1, 1)
+
+    this.worshipsDone = 0
+    this.speechCooldown = 4.0 + Math.random() * 6.0
+    this.approachCooldown = 6.0
 
     if (initialActive) {
       this.lifecycle = 'active'
-      this.scaleFactor = 1.0
-      this.root.scale.set(1, 1, 1)
       this.visitTimeRemaining = 45.0 + Math.random() * 55.0
+      this.pathWaypoints = []
+      this.currentWaypoint = null
+      this.state = 'idle'
+      this.stateTimer = 1.0 + Math.random() * 3.0
+      this.pickNextDestination()
     } else {
+      // 自山門牌樓外真實步入宮門
       this.lifecycle = 'entering'
-      this.scaleFactor = 0.05
-      this.root.scale.set(0.05, 0.05, 0.05)
-      this.visitTimeRemaining = 55.0 + Math.random() * 65.0
+      this.visitTimeRemaining = 60.0 + Math.random() * 60.0
+      this.state = 'walk'
+      this.walkSpeed = 1.5 + Math.random() * 0.3
+      const enterX = this.pos.x
+      this.pathWaypoints = [
+        new THREE.Vector3(enterX * 0.7, 0, 49.5),
+        new THREE.Vector3(enterX * 0.5, 0, 48.0),
+        new THREE.Vector3(enterX * 0.5, 0, 44.0),
+      ]
+      this.currentWaypoint = null
     }
-
-    this.worshipsDone = 0
-    this.pathWaypoints = []
-    this.currentWaypoint = null
-    this.state = 'idle'
-    this.stateTimer = 1.0 + Math.random() * 2.0
-    this.speechCooldown = 4.0 + Math.random() * 6.0
-    this.approachCooldown = 6.0
-    this.pickNextDestination()
   }
 
   /**
-   * 信眾完成參拜，啟程離開宮廟
+   * 信眾完成參拜，動身步向山門牌樓出口離去
    */
   startLeaving(): void {
     if (this.lifecycle === 'leaving' || this.lifecycle === 'dormant') return
     this.lifecycle = 'leaving'
-    const exitPos = this.pos.x < -35.0 ? new THREE.Vector3(-60.0, 0, 31.0) : new THREE.Vector3(0, 0, 48.0)
+    const exitX = (Math.random() - 0.5) * 3.2
+    const exitPos = new THREE.Vector3(exitX, 0, 54.5)
     this.pathWaypoints = this.planPath(this.pos, exitPos)
     this.state = 'walk'
-    this.walkSpeed = 1.6 + Math.random() * 0.3
+    this.walkSpeed = 1.5 + Math.random() * 0.3
   }
 
   /**
-   * 隱藏並回到休眠後備池
+   * 完全步出山門外後，功德圓滿隱退至後備庫
    */
   despawn(): void {
     this.lifecycle = 'dormant'
     this.root.visible = false
     this.bubble.hide()
     this.bubble.mesh.visible = false
-    this.scaleFactor = 0
-    this.root.scale.set(0, 0, 0)
     this.pathWaypoints = []
     this.currentWaypoint = null
   }
 
-  /** 規劃跨區導航路徑（確保穿越西側月亮門牌坊，沿小徑前行絕不穿牆） */
+  /** 規劃導航路徑（包含自山門進出、跨區穿越西側月亮門牌坊，沿步道前行絕不穿牆） */
   private planPath(start: THREE.Vector3, dest: THREE.Vector3): THREE.Vector3[] {
-    const isStartCourtyard = start.x > -28.0
-    const isDestCourtyard = dest.x > -28.0
+    const isStartCourtyard = start.x > -28.0 && start.z <= 48.0
+    const isDestCourtyard = dest.x > -28.0 && dest.z <= 48.0
     const isStartSanctuary = start.x < -54.0
     const isDestSanctuary = dest.x < -54.0
+    const isDestExit = dest.z > 48.0
 
-    // 1. 同在前庭或同在聖境大平台，直接走直線
+    // 1. 步向山門牌樓出口離開宮廟
+    if (isDestExit) {
+      if (isStartSanctuary) {
+        return [
+          new THREE.Vector3(-55.5, 0, 31.0),
+          new THREE.Vector3(-42.0, 0, 31.0),
+          new THREE.Vector3(-29.6, 0, 31.0),
+          new THREE.Vector3(-24.0, 0, 31.0),
+          new THREE.Vector3(dest.x * 0.5, 0, 44.0),
+          new THREE.Vector3(dest.x * 0.5, 0, 48.0),
+          dest.clone(),
+        ]
+      }
+      return [
+        new THREE.Vector3(dest.x * 0.5, 0, 44.0),
+        new THREE.Vector3(dest.x * 0.5, 0, 48.0),
+        dest.clone(),
+      ]
+    }
+
+    // 2. 自山門外進場
+    if (start.z > 48.0) {
+      const gateWaypoints = [
+        new THREE.Vector3(start.x * 0.7, 0, 49.5),
+        new THREE.Vector3(start.x * 0.5, 0, 48.0),
+        new THREE.Vector3(start.x * 0.5, 0, 44.0),
+      ]
+      if (isDestSanctuary) {
+        return [
+          ...gateWaypoints,
+          new THREE.Vector3(-24.0, 0, 31.0),
+          new THREE.Vector3(-29.6, 0, 31.0),
+          new THREE.Vector3(-42.0, 0, 31.0),
+          new THREE.Vector3(-55.5, 0, 31.0),
+          dest.clone(),
+        ]
+      }
+      return [...gateWaypoints, dest.clone()]
+    }
+
+    // 3. 同在前庭或同在聖境大平台，直接走直線
     if ((isStartCourtyard && isDestCourtyard) || (isStartSanctuary && isDestSanctuary)) {
       return [dest.clone()]
     }
 
-    // 2. 前庭 -> 聖境大平台：循序經由月亮門與松林小徑
+    // 4. 前庭 -> 聖境大平台：循序經由月亮門與松林小徑
     if (isStartCourtyard && isDestSanctuary) {
       return [
         new THREE.Vector3(-24.0, 0, 31.0),
@@ -907,7 +956,7 @@ export class NpcInstance {
       ]
     }
 
-    // 3. 聖境大平台 -> 前庭：循序穿過小徑回到前庭
+    // 5. 聖境大平台 -> 前庭：循序穿過小徑回到前庭
     if (isStartSanctuary && isDestCourtyard) {
       return [
         new THREE.Vector3(-55.5, 0, 31.0),
@@ -958,7 +1007,7 @@ export class NpcInstance {
   }
 
   say(category: 'idle' | 'worship' | 'approach', force = false): void {
-    if (this.lifecycle === 'dormant' || this.scaleFactor < 0.3) return
+    if (this.lifecycle === 'dormant' || this.lifecycle === 'leaving') return
     if (!force && this.bubble.isSpeaking) return
     const lines = this.config.dialogues[category]
     if (!lines || lines.length === 0) return
@@ -977,28 +1026,17 @@ export class NpcInstance {
       return
     }
 
-    // 處理進入淡入與離開淡出動畫
-    if (this.lifecycle === 'entering') {
-      this.scaleFactor = Math.min(1.0, this.scaleFactor + dt * 1.4)
-      this.root.scale.set(this.scaleFactor, this.scaleFactor, this.scaleFactor)
-      if (this.scaleFactor >= 1.0) {
-        this.lifecycle = 'active'
-      }
-    } else if (this.lifecycle === 'leaving') {
-      const distToFrontExit = this.pos.distanceTo(new THREE.Vector3(0, 0, 48.0))
-      const distToWestExit = this.pos.distanceTo(new THREE.Vector3(-60.0, 0, 31.0))
-      if (distToFrontExit < 2.0 || distToWestExit < 2.5 || this.pathWaypoints.length === 0) {
-        this.scaleFactor = Math.max(0, this.scaleFactor - dt * 1.5)
-        this.root.scale.set(this.scaleFactor, this.scaleFactor, this.scaleFactor)
-        if (this.scaleFactor <= 0.05) {
-          this.despawn()
-          return
-        }
-      }
-    } else if (this.lifecycle === 'active') {
+    // 香客在宮廟漫步參拜時效倒數，時間到自然動身步向山門出廟
+    if (this.lifecycle === 'active') {
       this.visitTimeRemaining -= dt
       if (this.visitTimeRemaining <= 0 || this.worshipsDone >= 2) {
         this.startLeaving()
+      }
+    } else if (this.lifecycle === 'leaving') {
+      // 走出山門牌樓外廣場（z >= 53.8），功德圓滿淡出休眠
+      if (this.pos.z >= 53.8) {
+        this.despawn()
+        return
       }
     }
 
@@ -1033,11 +1071,18 @@ export class NpcInstance {
       }
     } else if (this.state === 'walk') {
       if (this.pathWaypoints.length === 0) {
+        if (this.lifecycle === 'entering') {
+          // 已完全穿過山門牌樓步入前庭，正式成為活躍香客
+          this.lifecycle = 'active'
+          this.pickNextDestination()
+          return
+        }
+
         if (this.lifecycle === 'leaving') {
-          this.scaleFactor = Math.max(0, this.scaleFactor - dt * 1.5)
-          this.root.scale.set(this.scaleFactor, this.scaleFactor, this.scaleFactor)
-          if (this.scaleFactor <= 0.05) {
+          if (this.pos.z >= 53.5) {
             this.despawn()
+          } else {
+            this.pathWaypoints = [new THREE.Vector3(this.pos.x, 0, 54.5)]
           }
           return
         }
@@ -1101,7 +1146,7 @@ export class NpcInstance {
 
 /**
  * NPC 總管理器：管理整個宮廟世界的 20 位信眾角色庫，
- * 維持每次同時在場約 5 到 8 人，循環輪替登場與離場。
+ * 維持每次同時在場約 5 到 8 人，全部嚴格由山門牌樓入口步行進出宮廟！
  */
 export class NpcManager {
   readonly npcs: NpcInstance[] = []
@@ -1122,9 +1167,9 @@ export class NpcManager {
       npc.despawn()
     }
 
-    // 2. 開局隨機挑選 6 到 7 位 NPC 活躍就位，均勻散布於宮廟各景點
+    // 2. 開局隨機挑選 6 位 NPC 預先就位在宮廟各神殿前參拜，其餘均由大門進出
     const shuffled = this.npcs.slice().sort(() => Math.random() - 0.5)
-    const initialCount = 6 + Math.floor(Math.random() * 2) // 6 或 7 人
+    const initialCount = 6
     for (let i = 0; i < initialCount; i += 1) {
       const npc = shuffled[i]
       const wp = TEMPLE_WAYPOINTS[i % TEMPLE_WAYPOINTS.length]
@@ -1150,19 +1195,15 @@ export class NpcManager {
 
     this.spawnCooldown -= dt
 
-    // 若在場人數低於下限，或在場人數未滿上限且生成間隔已到，自後備庫輪換新香客登場
+    // 若在場人數未滿上限且生成間隔已到，自後備庫挑選新香客從山門牌樓大門步入！
     if (activeCount < this.TARGET_MIN || (activeCount < this.TARGET_MAX && this.spawnCooldown <= 0)) {
       const dormant = this.npcs.filter(n => n.lifecycle === 'dormant')
       if (dormant.length > 0) {
         const nextNpc = dormant[Math.floor(Math.random() * dormant.length)]
-        // 自牌樓門外或聖境月亮門優雅進場
-        const spawnPoints = [
-          { pos: new THREE.Vector3(0 + (Math.random() - 0.5) * 3.5, 0, 46.5), heading: 0 },
-          { pos: new THREE.Vector3(-25.0, 0, 31.0 + (Math.random() - 0.5) * 1.5), heading: Math.PI / 2 },
-          { pos: new THREE.Vector3(6.5, 0, 24.0 + (Math.random() - 0.5) * 4.0), heading: Math.PI },
-        ]
-        const sp = spawnPoints[Math.floor(Math.random() * spawnPoints.length)]
-        nextNpc.spawn(sp.pos, sp.heading, false)
+        // 自山門牌樓門外廣場步入宮門（絕非平白從地上冒出！）
+        const spawnX = (Math.random() - 0.5) * 3.2
+        const spawnPos = new THREE.Vector3(spawnX, 0, 54.5)
+        nextNpc.spawn(spawnPos, Math.PI, false)
         this.spawnCooldown = 12.0 + Math.random() * 10.0
       }
     }
