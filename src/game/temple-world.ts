@@ -592,26 +592,28 @@ export class TempleWorld {
     const balustradeMat = makeMat('#d6cfc2', 0.88)
     const jade = makeMat(C.jade, 0.4, 0.25)
 
-    // 1. Grand Elevated Podium (凌霄寶殿宏偉巨型石台基: 寬 24.0m x 深 16.5m x 高 0.52m)
-    const podium = new THREE.Mesh(new THREE.BoxGeometry(24.0, 0.52, 16.5), stonePlinth)
-    podium.position.set(0, 0.26, 0)
+    // 1. Grand Elevated Podium (凌霄寶殿宏偉巨型石台基: 寬 24.0m x 深 16.5m x 高 0.28m，與主殿走廊完全等高平整)
+    const podium = new THREE.Mesh(new THREE.BoxGeometry(24.0, 0.28, 16.5), stonePlinth)
+    podium.position.set(0, 0.14, 0)
     podium.receiveShadow = true
     rear.add(podium)
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.26, -25.0), new THREE.Vector3(24.0, 0.52, 16.5))
+    this.physics.addStaticBox(new THREE.Vector3(0, 0.14, -25.0), new THREE.Vector3(24.0, 0.28, 16.5))
 
-    // Courtyard Atrium Stone Paving & Connecting Covered Walkways between Main Hall & Rear Hall (天井與左右連通穿堂迴廊)
+    // Courtyard Atrium Stone Paving & Seamless Connecting Covered Walkways (天井與左右連通穿堂迴廊，無障礙平整銜接)
     for (const side of [-1, 1]) {
-      // Covered walkway floor connecting Main Hall to Rear Hall
-      const corridorFloor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.25, 4.2), stonePlinth)
-      corridorFloor.position.set(side * 5.85, 0.125, 10.35)
+      // Covered walkway floor connecting Main Hall seamlessly to Rear Hall at y = 0.28m
+      const corridorFloor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.28, 4.4), stonePlinth)
+      corridorFloor.position.set(side * 5.85, 0.14, 10.45)
+      corridorFloor.receiveShadow = true
       rear.add(corridorFloor)
+      this.physics.addStaticBox(new THREE.Vector3(side * 5.85, 0.14, -14.55), new THREE.Vector3(3.6, 0.28, 4.4))
 
-      // Walkway Pillars
+      // Walkway Pillars placed on outer edges (側邊立柱，通道中央保留 2.6m 寬敞通暢走道)
       for (const cz of [8.8, 11.8]) {
-        const cPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 4.4, 10), red)
-        cPillar.position.set(side * 4.2, 2.2, cz)
+        const cPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 4.4, 10), red)
+        cPillar.position.set(side * 7.6, 2.2, cz)
         rear.add(cPillar)
-        this.physics.addStaticCylinder(new THREE.Vector3(side * 4.2, 2.2, cz - 25.0), 0.26, 4.4)
+        this.physics.addStaticCylinder(new THREE.Vector3(side * 7.6, 2.2, cz - 25.0), 0.22, 4.4)
       }
 
       // Walkway Roof
@@ -620,50 +622,53 @@ export class TempleWorld {
       this.scene.add(corrRoof)
     }
 
-    // 2. Approach Steps & Imperial Dragon Ramp (登殿大階梯、中央雲龍陛與漢白玉望柱欄杆)
+    // 2. Approach Steps & Imperial Dragon Ramp (登殿大階梯、中央雲龍陛與兩側望柱欄杆)
     // Central Imperial Dragon Ramp (中央丹墀雲龍陛)
-    const dragonRamp = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.1, 1.8), makeMat('#5f7169', 0.88, 0.15))
-    dragonRamp.position.set(0, 0.26, 8.8)
-    dragonRamp.rotation.x = -0.22
+    const dragonRamp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 1.6), makeMat('#5f7169', 0.88, 0.15))
+    dragonRamp.position.set(0, 0.18, 8.8)
+    dragonRamp.rotation.x = -0.18
     dragonRamp.receiveShadow = true
     rear.add(dragonRamp)
     const dragonRelief = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.4, 1.5),
+      new THREE.PlaneGeometry(2.2, 1.3),
       this.textMaterial('丹 墀 雲 龍 陛', '#dfc47b', '#35433d')
     )
-    dragonRelief.position.set(0, 0.33, 8.8)
-    dragonRelief.rotation.x = -Math.PI / 2 + 0.22
+    dragonRelief.position.set(0, 0.24, 8.8)
+    dragonRelief.rotation.x = -Math.PI / 2 + 0.18
     rear.add(dragonRelief)
 
-    // Left & Right Grand Approach Stone Steps (左右登殿三級石階)
-    for (const side of [-1, 1]) {
-      for (let s = 1; s <= 3; s++) {
-        const step = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.13, 0.55), stonePlinth)
-        step.position.set(side * 4.8, s * 0.13 - 0.065, 8.0 + (3 - s) * 0.45)
-        step.receiveShadow = true
-        rear.add(step)
-      }
-    }
+    // Front 2-Tier Grand Stone Steps (前庭登殿雙級石階，步高僅 0.14m，行者輕鬆邁步登殿)
+    const step1 = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.14, 0.8), stonePlinth)
+    step1.position.set(0, 0.07, 8.65)
+    step1.receiveShadow = true
+    rear.add(step1)
+    this.physics.addStaticBox(new THREE.Vector3(0, 0.07, -16.35), new THREE.Vector3(9.2, 0.14, 0.8))
 
-    // White Stone Balustrade (漢白玉雲紋望柱欄杆)
+    const step2 = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.14, 0.6), stonePlinth)
+    step2.position.set(0, 0.21, 8.1)
+    step2.receiveShadow = true
+    rear.add(step2)
+    this.physics.addStaticBox(new THREE.Vector3(0, 0.21, -16.9), new THREE.Vector3(8.6, 0.14, 0.6))
+
+    // White Stone Balustrade (僅配置於外側端緣，通道完全暢通無阻)
     for (const side of [-1, 1]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.56, 0.16), balustradeMat)
-      rail.position.set(side * 7.5, 0.65, 8.1)
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.56, 0.16), balustradeMat)
+      rail.position.set(side * 10.0, 0.55, 8.1)
       rear.add(rail)
-      for (let x = 3.6; x <= 11.4; x += 1.95) {
+      for (let x = 8.5; x <= 11.5; x += 1.5) {
         const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.82, 0.22), balustradeMat)
-        post.position.set(side * x, 0.72, 8.1)
+        post.position.set(side * x, 0.62, 8.1)
         const lotusBud = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), balustradeMat)
-        lotusBud.position.set(side * x, 1.18, 8.1)
+        lotusBud.position.set(side * x, 1.08, 8.1)
         lotusBud.scale.set(0.9, 1.3, 0.9)
         rear.add(post, lotusBud)
       }
     }
 
-    // 3. Grand Front Facade & Majestic Imperial Triple Doors (宏偉三川殿廓、5.6m 寬九龍大金門敞開)
+    // 3. Grand Front Facade & Majestic Imperial Triple Doors (宏偉三川殿廓、6.4m 極度寬敞大御門暢行無阻)
     const frontZ = 6.2
-    // Front eave six grand pillars (前簷六大金柱)
-    for (const x of [-10.5, -6.8, -2.8, 2.8, 6.8, 10.5]) {
+    // Front eave six grand pillars (前簷六大金柱，中門淨寬達 6.4 公尺)
+    for (const x of [-10.5, -6.8, -3.2, 3.2, 6.8, 10.5]) {
       const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 6.4, 14), red)
       col.position.set(x, 3.2, frontZ)
       col.castShadow = true
@@ -679,26 +684,25 @@ export class TempleWorld {
     frontBeam.position.set(0, 6.45, frontZ)
     rear.add(frontBeam)
 
-    // Central Grand Open Palace Portal (中央大敞御門，淨寬 5.6 公尺、通高 5.2 公尺)
-    // Left & Right Front Wall Panels (左右前壁堵與格扇窗，正中央 5.6m 完全通透大門洞直視金身御座)
+    // Central Grand Open Palace Portal (中央大敞御門，中央 6.4m 通透門洞，人物可自由暢行進出)
     for (const side of [-1, 1]) {
-      const wallPanel = new THREE.Mesh(new THREE.BoxGeometry(6.6, 5.2, 0.4), darkWood)
-      wallPanel.position.set(side * 7.5, 2.86, frontZ)
+      const wallPanel = new THREE.Mesh(new THREE.BoxGeometry(6.8, 5.2, 0.4), darkWood)
+      wallPanel.position.set(side * 7.8, 2.86, frontZ)
       wallPanel.castShadow = true
       rear.add(wallPanel)
-      this.physics.addStaticBox(new THREE.Vector3(side * 7.5, 2.86, frontZ - 25.0), new THREE.Vector3(6.6, 5.2, 0.4))
+      this.physics.addStaticBox(new THREE.Vector3(side * 7.8, 2.86, frontZ - 25.0), new THREE.Vector3(6.8, 5.2, 0.4))
 
       // Carved Gilded Window Screen (金雕花鳥連雲格扇窗)
       const windowScreen = new THREE.Mesh(
         new THREE.PlaneGeometry(3.6, 2.4),
         this.textMaterial('五 福 臨 門', '#dfc17c', '#3e2417')
       )
-      windowScreen.position.set(side * 7.2, 3.1, frontZ + 0.22)
+      windowScreen.position.set(side * 7.4, 3.1, frontZ + 0.22)
       rear.add(windowScreen)
 
-      // Grand Double Palace Doors (九路八十一金釘朱漆大內門，向殿內45度大氣敞開)
+      // Grand Double Palace Doors (九路八十一金釘朱漆大內門，向殿內兩側靠牆敞開，完全不阻擋人物走動)
       const doorLeaf = new THREE.Group()
-      doorLeaf.position.set(side * 2.75, 2.66, frontZ)
+      doorLeaf.position.set(side * 3.2, 2.66, frontZ)
       const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(2.3, 4.8, 0.12), makeMat('#8c261b', 0.72))
       doorMesh.position.set(side * -1.15, 0, 0)
       doorMesh.castShadow = true
@@ -717,13 +721,13 @@ export class TempleWorld {
       knocker.position.set(side * -0.5, 0, 0.1)
       doorLeaf.add(knocker)
 
-      // Open angle inward into hall
-      doorLeaf.rotation.y = side * 0.75
+      // Swung open deeply inward along the wall
+      doorLeaf.rotation.y = side * 1.35
       rear.add(doorLeaf)
     }
 
     // Door Portal Top Lintel (中門高聳額枋與斗栱組)
-    const portalLintel = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.9, 0.5), redDark)
+    const portalLintel = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.9, 0.5), redDark)
     portalLintel.position.set(0, 5.5, frontZ)
     rear.add(portalLintel)
 
