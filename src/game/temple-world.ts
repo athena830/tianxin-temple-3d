@@ -637,18 +637,17 @@ export class TempleWorld {
     const loader = new THREE.TextureLoader()
     loader.load('./assets/guanyin-golden.png', tex => {
       tex.colorSpace = THREE.SRGBColorSpace
-      const statueMat = new THREE.MeshStandardMaterial({
+      // Use MeshBasicMaterial to completely eliminate directional light and point light specular shine/glare on the chest
+      const statueMat = new THREE.MeshBasicMaterial({
         map: tex,
         transparent: true,
         alphaTest: 0.05,
-        roughness: 0.35,
-        metalness: 0.25,
         side: THREE.DoubleSide,
       })
       const statueMesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), statueMat)
       statueMesh.position.set(0, 0.32 + statueH / 2, 0)
-      statueMesh.castShadow = true
-      statueMesh.receiveShadow = true
+      statueMesh.castShadow = false
+      statueMesh.receiveShadow = false
       root.add(statueMesh)
     })
 
@@ -661,8 +660,8 @@ export class TempleWorld {
     haloInner.position.set(0, 2.15, -0.14)
     root.add(haloInner)
 
-    // Warm Divine Aura Light (觀世音菩薩慈悲聖光)
-    const statueGlow = new THREE.PointLight('#ffe6a3', 1.5, 10, 2)
+    // Warm Divine Aura Light (微弱聖光，照亮四周神龕但不直接在畫像上反光)
+    const statueGlow = new THREE.PointLight('#ffe6a3', 0.6, 7, 2)
     statueGlow.position.set(0, 2.2, 0.7)
     root.add(statueGlow)
 
