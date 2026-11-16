@@ -164,7 +164,10 @@ export class TempleUi {
     this.toastTimer = window.setTimeout(() => { el.hidden = true }, ms)
   }
 
-  closePanel(): void { this.root.querySelector<HTMLElement>('.panel-wrap')!.hidden = true }
+  closePanel(): void {
+    const wrap = this.root.querySelector<HTMLElement>('.panel-wrap')
+    if (wrap) wrap.hidden = true
+  }
 
   showWishBanner(blessing: WishBlessing, count: number): void {
     const banner = this.root.querySelector<HTMLElement>('.wish-banner')
@@ -339,17 +342,26 @@ export class TempleUi {
 
   private onClick(e: MouseEvent): void {
     const t = (e.target as HTMLElement).closest<HTMLElement>('button')
-    if (!t) { if ((e.target as HTMLElement).classList.contains('panel-wrap')) this.actions.closePanel(); return }
+    if (!t) {
+      if ((e.target as HTMLElement).classList.contains('panel-wrap')) {
+        e.preventDefault()
+        e.stopPropagation()
+        this.closePanel()
+        this.actions.closePanel()
+      }
+      return
+    }
+    e.stopPropagation()
     const act = t.dataset.act
     if (act === 'begin') this.actions.begin()
     else if (act === 'enter') this.actions.enter()
     else if (act === 'resume') this.actions.resume()
-    else if (act === 'close') this.actions.closePanel()
+    else if (act === 'close') { e.preventDefault(); this.closePanel(); this.actions.closePanel() }
     else if (act === 'explore') this.actions.explore()
     else if (act === 'exit') this.actions.exitExplore()
     else if (act === 'guide-cancel') this.actions.cancelGuide()
-    else if (act === 'wish-again') { this.hideWishBanner(); this.actions.ritual('coin') }
-    else if (act === 'wish-close') { this.hideWishBanner() }
+    else if (act === 'wish-again') { e.preventDefault(); this.hideWishBanner(); this.actions.ritual('coin') }
+    else if (act === 'wish-close') { e.preventDefault(); this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
@@ -412,10 +424,12 @@ export class TempleUi {
     if (t.dataset.open) this.open(t.dataset.open as PanelId)
     if (t.dataset.go) { this.root.querySelector<HTMLElement>('.map')!.hidden = true; this.actions.travel(t.dataset.go as ShrinePointId) }
     if (t.dataset.ritual) {
+      e.preventDefault()
       if (t.dataset.ritual === 'coin') {
         const input = this.root.querySelector<HTMLInputElement>('.wish-custom-input')
         if (input) this.customWishInput = input.value.trim()
         this.closePanel()
+        this.actions.closePanel()
       }
       this.actions.ritual(t.dataset.ritual)
     }

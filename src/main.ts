@@ -28,6 +28,7 @@ async function boot(): Promise<void> {
   const startExplore = () => { if (!game) return; audio.unlock(); game.startExplore(); syncMode(); loop.resetAccumulator() }
   const exitExplore = () => { if (!game) return; game.stopExplore(); touch?.releaseStick(); syncMode() }
 
+  let interactBlockedUntil = 0
   const reopen = (id: ShrinePointId, msg: string) => ui.open(id, msg)
   const ui = new TempleUi(store, {
     begin: () => { audio.unlock(); audio.play('ui'); game?.showSelect(); ui.show('select') },
@@ -45,7 +46,13 @@ async function boot(): Promise<void> {
     },
     resume: () => { if (!game) return; ui.show('hud'); syncMode() },
     openPanel: () => { game?.openPanel(); touch?.releaseStick(); syncMode() },
-    closePanel: () => { ui.closePanel(); game?.closePanel(); loop.resetAccumulator(); syncMode() },
+    closePanel: () => {
+      interactBlockedUntil = Math.max(interactBlockedUntil, Date.now() + 500)
+      ui.closePanel()
+      game?.closePanel()
+      loop.resetAccumulator()
+      syncMode()
+    },
     travel: id => { game?.setGuide(id); audio.play('ui'); ui.toast('跟著地上的金色箭頭前往') },
     explore: startExplore,
     exitExplore,
@@ -61,6 +68,7 @@ async function boot(): Promise<void> {
       else if (action === 'gold-furnace') { w.perform('gold-furnace'); audio.play('chime') }
       else if (action === 'yuhuang') {
         if (game.worshipping) return
+        interactBlockedUntil = Date.now() + 3600
         ui.closePanel(); game.closePanel(); syncMode()
         w.perform('yuhuang'); audio.play('chime')
         game.worship({ x: 0, z: -30.2 }, 3.0, () => {
@@ -70,6 +78,7 @@ async function boot(): Promise<void> {
       }
       else if (action === 'guanyin-dragon') {
         if (game.worshipping) return
+        interactBlockedUntil = Date.now() + 5200
         ui.closePanel(); game.closePanel(); syncMode()
         w.perform('guanyin-dragon'); audio.play('chime')
         game.worship(DRAGON_GUANYIN_POS, 4.6, () => {
@@ -94,6 +103,7 @@ async function boot(): Promise<void> {
       else if (action === 'bell') { store.ringBell(); w.perform('bell'); audio.play('bell'); ui.toast('鐘聲悠遠，祝福遠播') }
       else if (action === 'coin') {
         if (game.worshipping) return
+        interactBlockedUntil = Date.now() + 3600
         const cat = ui.selectedWishCategory
         const wishText = ui.customWishInput
         const { count, blessing } = store.tossCoin(cat, wishText)
@@ -160,15 +170,22 @@ async function boot(): Promise<void> {
   g.world.onNpcDialogue = (speaker, text) => ui.showNpcDialogue(speaker, text)
   g.onClickResult = result => {
     if (!result) return
+    if (Date.now() < interactBlockedUntil || g.worshipping) return
     if (result.kind === 'open') ui.open(result.id)
     else { ui.toast(`前往「${result.point.title}」...`); g.setGuide(result.point.id) }
   }
   // Click anywhere on canvas immediately ensures explore mode is active
   canvas.addEventListener('pointerdown', () => {
-    if (game && game.mode === 'browse') startExplore()
+    if (game && game.mode === 'browse' && !game.worshipping && Date.now() >= interactBlockedUntil) startExplore()
   })
-  window.addEventListener('temple:interact', e => ui.open((e as CustomEvent<ShrinePointId>).detail))
-  window.addEventListener('temple:interact-touch', () => { if (g.active && (g.mode === 'explore' || g.mode === 'browse')) ui.open(g.active.id) })
+  window.addEventListener('temple:interact', e => {
+    if (Date.now() < interactBlockedUntil || g.worshipping) return
+    ui.open((e as CustomEvent<ShrinePointId>).detail)
+  })
+  window.addEventListener('temple:interact-touch', () => {
+    if (Date.now() < interactBlockedUntil || g.worshipping) return
+    if (g.active && (g.mode === 'explore' || g.mode === 'browse')) ui.open(g.active.id)
+  })
 
   if (import.meta.env.DEV) {
     const [{ registerGameTuning }, { tuning }] = await Promise.all([import('../scripts/manus-tuning/adapter.js'), import('./game/tuning')])

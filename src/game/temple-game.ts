@@ -143,6 +143,7 @@ export class TempleGame {
   closePanel(): void {
     if (this.mode === 'panel') this.mode = this.resumeMode
     this.input.clearHeld()
+    this.input.takeClicks()
   }
 
   /** Turn the visitor toward a point and play the palms-together bow, then call `done`. */
@@ -276,7 +277,7 @@ export class TempleGame {
     if (free && this.ritualLeft <= 0 && this.input.consume('interact') && this.active) window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.active.id }))
     else this.input.consume('interact')
     const clicks = this.input.takeClicks()
-    if (free && clicks.length) this.onClickResult(this.pick(clicks[clicks.length - 1]))
+    if (free && this.ritualLeft <= 0 && clicks.length) this.onClickResult(this.pick(clicks[clicks.length - 1]))
   }
 
   /** Resolve a canvas click to a station; open it when close enough or walk to clicked point. */

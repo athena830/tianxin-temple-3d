@@ -140,6 +140,7 @@ export class Input {
     this.move.x = 0
     this.move.y = 0
     this.pressed_.clear()
+    this.clicks = []
   }
 
   /** Touch controls feed these from the on-screen joystick and buttons. */
