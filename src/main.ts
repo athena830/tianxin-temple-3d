@@ -92,8 +92,20 @@ async function boot(): Promise<void> {
       else if (action === 'woodfish') { store.tapWoodfish(); w.perform('woodfish'); audio.play('woodfish'); ui.toast('叩——心念安定') }
       else if (action === 'bell') { store.ringBell(); w.perform('bell'); audio.play('bell'); ui.toast('鐘聲悠遠，祝福遠播') }
       else if (action === 'coin') {
-        const n = store.tossCoin(); w.perform('coin'); audio.play('coin')
-        reopen('wishing-pool', `銅錢落入池中，泛起漣漪。這是你投下的第 ${n} 枚。`)
+        const cat = ui.selectedWishCategory
+        const wishText = ui.customWishInput
+        const { count, blessing } = store.tossCoin(cat, wishText)
+        ui.lastWishBlessing = blessing
+        ui.customWishInput = ''
+        audio.play('coin-toss')
+        w.perform('coin', undefined, {
+          playerPos: game.feet,
+          onSplash: () => {
+            audio.play('water-splash')
+            audio.play('wish-chime')
+          },
+        })
+        reopen('wishing-pool', `【${blessing.categoryName}】銅錢化作金芒落入池中！${blessing.title}（池底累計第 ${count} 枚）`)
       }
     },
   })

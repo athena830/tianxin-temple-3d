@@ -1,4 +1,4 @@
-import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId } from '../game/temple-data'
+import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId, type WishCategory, type WishBlessing } from '../game/temple-data'
 import type { ShrinePoint, ShrinePointId, TimeOfDay } from '../game/temple-world'
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
@@ -27,6 +27,9 @@ export class TempleUi {
   private toastTimer = 0
   private currentTime: TimeOfDay = 'day'
   private lastBobei: { title: string; desc: string; cup1: 'yang' | 'yin'; cup2: 'yang' | 'yin' } | null = null
+  selectedWishCategory: WishCategory = 'peace'
+  lastWishBlessing: WishBlessing | null = null
+  customWishInput = ''
 
   constructor(private readonly store: TempleStore, private readonly actions: TempleUiActions) {
     this.root = document.getElementById('ui')!
@@ -244,9 +247,48 @@ export class TempleUi {
         return `<p class="eyebrow">靜心</p><h2>敲木魚</h2><p>隨著節奏，一聲一念，讓心慢慢安定下來。</p>${note}<button class="btn primary big" data-ritual="woodfish">叩・敲一下</button>`
       case 'bell':
         return `<p class="eyebrow">祈福鐘</p><h2>鳴鐘</h2><p>鐘聲悠遠，願祝福隨聲遠播。</p>${note}<button class="btn primary big" data-ritual="bell">鳴鐘祈願</button>`
-      case 'wishing-pool':
-        return `<p class="eyebrow">許願池</p><h2>投一枚祈福銅錢</h2><p>默念心願，將虛擬銅錢投入池中。此處不涉及任何真實付款。</p>${note}
-          <p class="stat">已投入 <b>${d.coins}</b> 枚</p><button class="btn primary big" data-ritual="coin">投下銅錢</button>`
+      case 'wishing-pool': {
+        const catList: { id: WishCategory; name: string; icon: string; desc: string }[] = [
+          { id: 'peace', name: '平安健康', icon: '🌸', desc: '身心康泰・無病無災' },
+          { id: 'career', name: '事業亨通', icon: '💼', desc: '宏圖大展・步步高升' },
+          { id: 'love', name: '廣結良緣', icon: '💖', desc: '良緣天成・貴人相隨' },
+          { id: 'wealth', name: '財運興旺', icon: '💰', desc: '五路納吉・財源廣進' },
+          { id: 'study', name: '金榜題名', icon: '🎓', desc: '魁星高照・才思敏捷' },
+        ]
+        const catButtons = catList.map(c => `
+          <button type="button" class="wish-cat-btn ${this.selectedWishCategory === c.id ? 'active' : ''}" data-wish-cat="${c.id}">
+            <span class="cat-icon">${c.icon}</span>
+            <b class="cat-name">${c.name}</b>
+            <span class="cat-desc">${c.desc}</span>
+          </button>
+        `).join('')
+
+        const blessingCard = this.lastWishBlessing ? `
+          <div class="wish-blessing-card">
+            <span class="blessing-badge">【${this.lastWishBlessing.categoryName}】祈福圓滿</span>
+            <h3 class="blessing-title">${esc(this.lastWishBlessing.title)}</h3>
+            <p class="blessing-prophecy">「${esc(this.lastWishBlessing.prophecy)}」</p>
+            <div class="blessing-foot">✨ 銅錢入水，漣漪四溢・神明垂慈，心誠則靈</div>
+          </div>
+        ` : ''
+
+        return `
+          <p class="eyebrow">前庭東側・蓮花許願池</p>
+          <h2>投一枚祈福銅錢</h2>
+          <p>默念心中所求，選擇祈福主題或輸入心願，將祈福銅錢擲向池心聚寶金蓮台。</p>
+          ${note}
+          ${blessingCard}
+          <div class="wish-section-title">選擇祈願主題：</div>
+          <div class="wish-cat-grid">${catButtons}</div>
+          <div class="wish-custom-row">
+            <input type="text" class="wish-custom-input" placeholder="可填寫具體祈願（選填，例如：家人平安順遂）" maxlength="36" value="${esc(this.customWishInput)}" />
+          </div>
+          <div class="wish-action-bar">
+            <div class="stat">池中已集 <b>${d.coins}</b> 枚願力銅錢</div>
+            <button class="btn primary big wish-toss-btn" data-ritual="coin">🪙 誠心投幣許願</button>
+          </div>
+        `
+      }
       case 'prayer-wall': {
         const mine = d.wishes.map(w => `<li class="mine"><p>${esc(w.text)}</p><small>${formatRecordDate(w.at)}・我的祈願</small></li>`).join('')
         const sample = SAMPLE_WISHES.map(w => `<li><p>${w}</p><small>示例祈願</small></li>`).join('')
@@ -324,6 +366,12 @@ export class TempleUi {
       this.actions.ritual('bobei')
       this.open('bobei', `${this.lastBobei.title}：${this.lastBobei.desc}`)
     }
+    if (t.dataset.wishCat) {
+      this.selectedWishCategory = t.dataset.wishCat as WishCategory
+      for (const btn of this.root.querySelectorAll<HTMLElement>('[data-wish-cat]')) {
+        btn.classList.toggle('active', btn.dataset.wishCat === this.selectedWishCategory)
+      }
+    }
     if (t.dataset.gold) {
       const gold = t.dataset.gold
       this.store.burnGold(gold)
@@ -333,7 +381,13 @@ export class TempleUi {
     if (t.dataset.char) { this.actions.choose(t.dataset.char as CharacterId); this.refreshCharacter() }
     if (t.dataset.open) this.open(t.dataset.open as PanelId)
     if (t.dataset.go) { this.root.querySelector<HTMLElement>('.map')!.hidden = true; this.actions.travel(t.dataset.go as ShrinePointId) }
-    if (t.dataset.ritual) this.actions.ritual(t.dataset.ritual)
+    if (t.dataset.ritual) {
+      if (t.dataset.ritual === 'coin') {
+        const input = this.root.querySelector<HTMLInputElement>('.wish-custom-input')
+        if (input) this.customWishInput = input.value.trim()
+      }
+      this.actions.ritual(t.dataset.ritual)
+    }
     if (t.dataset.piece) {
       this.chessPiece = t.dataset.piece
       for (const p of this.root.querySelectorAll<HTMLElement>('[data-piece]')) p.classList.toggle('on', p === t)

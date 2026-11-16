@@ -4,7 +4,7 @@ import { rmSync, copyFileSync, writeFileSync } from 'node:fs'
 
 const distDir = join(process.cwd(), 'dist')
 console.log('[deploy] Building project with Vite...')
-execSync('npx vite build', { stdio: 'inherit' })
+execSync('node ./node_modules/vite/bin/vite.js build', { stdio: 'inherit' })
 
 console.log('[deploy] Preparing .nojekyll and 404.html...')
 writeFileSync(join(distDir, '.nojekyll'), '')

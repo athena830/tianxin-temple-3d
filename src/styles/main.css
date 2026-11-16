@@ -126,6 +126,42 @@ textarea:focus { outline: 2px solid var(--gold); }
 .piece.black { color: #2b1f18; }
 .piece.on { transform: translateY(-4px); border-color: var(--vermilion); box-shadow: 0 6px 12px rgba(166,60,44,.35); }
 .stat { font-size: 16px; } .stat b { font-size: 26px; color: var(--vermilion); }
+
+/* Wishing Pool Interactive UI */
+.wish-section-title { font-weight: 700; color: #5d4734; margin: 12px 0 8px; font-size: 14px; }
+.wish-cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.wish-cat-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 8px; border-radius: 12px; border: 1.5px solid rgba(160,120,60,.3); background: rgba(255,255,255,.65); text-align: center; cursor: pointer; transition: all .18s ease; gap: 3px; }
+.wish-cat-btn:hover { border-color: var(--vermilion); background: #ffffff; transform: translateY(-2px); }
+.wish-cat-btn.active { border-color: var(--vermilion); background: linear-gradient(180deg, #fff7ea, #ffe8cb); box-shadow: 0 4px 12px rgba(180,60,40,.22); border-width: 2px; }
+.wish-cat-btn .cat-icon { font-size: 22px; }
+.wish-cat-btn .cat-name { font-size: 14px; font-weight: 700; color: var(--vermilion); font-family: var(--serif); }
+.wish-cat-btn .cat-desc { font-size: 11px; color: #7a634e; }
+
+.wish-custom-row { margin: 8px 0 14px; }
+.wish-custom-input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1.5px solid rgba(160,120,60,.35); background: #fffcf5; font-size: 14px; color: #2b1f18; }
+.wish-custom-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(220,170,80,.25); }
+
+.wish-blessing-card {
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fffaf0, #fffaeb 60%, #fff2d8);
+  border: 1.5px solid var(--gold);
+  text-align: center;
+  margin: 12px 0 16px;
+  box-shadow: 0 6px 18px rgba(180,120,40,.15);
+  animation: wishAuraPulse 3s infinite ease-in-out;
+}
+@keyframes wishAuraPulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(210,150,50,.2); }
+  50% { box-shadow: 0 6px 24px rgba(235,175,60,.4); }
+}
+.blessing-badge { display: inline-block; padding: 3px 14px; border-radius: 999px; background: var(--vermilion); color: #fff8ec; font-size: 12px; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
+.blessing-title { font: 700 20px var(--serif); color: var(--vermilion); margin: 6px 0 4px; }
+.blessing-prophecy { font-family: var(--serif); font-size: 15px; color: #433123; line-height: 1.6; margin: 4px 0 8px; }
+.blessing-foot { font-size: 12px; color: var(--jade); font-weight: 700; }
+
+.wish-action-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.wish-toss-btn { margin: 0; min-width: 170px; }
 .wall { list-style: none; padding: 0; margin: 0 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .wall li { padding: 14px; border-radius: 12px; background: #fff6df; border: 1px solid rgba(201,163,90,.5); transform: rotate(-.6deg); }
 .wall li:nth-child(even) { transform: rotate(.7deg); background: #fbe9e1; }

@@ -555,6 +555,17 @@ export class FrontCourtyard {
     rim.rotation.x = Math.PI / 2
     rim.position.set(x, 0.32, z)
     this.c.scene.add(rim)
+
+    // Center Sacred Lotus Pedestal & Treasure Bowl (池心八寶聚寶蓮台)
+    const centerPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 0.38, 16), this.c.mat('#8f8670', 0.8))
+    centerPedestal.position.set(x, 0.15, z)
+    this.c.scene.add(centerPedestal)
+    const centerBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.28, 0.14, 16), this.c.mat(PAL.gold, 0.35, 0.5))
+    centerBowl.position.set(x, 0.35, z)
+    this.c.scene.add(centerBowl)
+    // Sacred golden lotus flower blooming in the center
+    this.c.scene.add(this.lotusFlower(x, 0.42, z, 0.28, '#ffdf78'))
+
     this.addLotusPads(x, z, 1.8, 12, 5)
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.04, z), 2.42, 0.6)
   }

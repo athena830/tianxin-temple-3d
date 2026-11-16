@@ -66,6 +66,52 @@ const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStan
 /** Height of the 3D Guanyin figure above the lotus throne, in metres. */
 const GUANYIN_HEIGHT = 2.6
 
+interface FlyingCoin {
+  mesh: THREE.Group
+  start: THREE.Vector3
+  target: THREE.Vector3
+  progress: number
+  duration: number
+  peak: number
+  rotSpeed: THREE.Vector3
+  onSplash?: () => void
+}
+
+interface SinkingCoin {
+  mesh: THREE.Group
+  y: number
+  targetY: number
+  wobblePhase: number
+  wobbleSpeed: number
+  age: number
+}
+
+interface WaterRipple {
+  mesh: THREE.Mesh
+  baseScale: number
+  maxScale: number
+  age: number
+  life: number
+}
+
+interface SplashDroplet {
+  mesh: THREE.Mesh
+  velocity: THREE.Vector3
+  age: number
+  life: number
+}
+
+interface WishSparkle {
+  mesh: THREE.Mesh
+  baseX: number
+  baseZ: number
+  vy: number
+  swaySpeed: number
+  swayAmp: number
+  age: number
+  life: number
+}
+
 export class TempleWorld {
   private guanyinRoot: THREE.Group | null = null
   private guanyinModelPlaced = false
@@ -86,7 +132,17 @@ export class TempleWorld {
   private readonly lampLights = new Map<LampId, THREE.PointLight>()
   private readonly offeringDisplay = new THREE.Group()
   private readonly smoke: { mesh: THREE.Mesh; age: number; life: number }[] = []
-  private readonly coins: { mesh: THREE.Mesh; age: number; ripple: THREE.Mesh }[] = []
+  private readonly flyingCoins: FlyingCoin[] = []
+  private readonly sinkingCoins: SinkingCoin[] = []
+  private readonly restingCoins: THREE.Group[] = []
+  private readonly ripples: WaterRipple[] = []
+  private readonly droplets: SplashDroplet[] = []
+  private readonly sparkles: WishSparkle[] = []
+
+  private readonly coinGoldMat = makeMat('#f8cb3c', 0.22, 0.92)
+  private readonly coinDarkMat = makeMat('#6b4b1a', 0.5, 0.6)
+  private readonly dropletMat = new THREE.MeshStandardMaterial({ color: '#bcece5', roughness: 0.12, metalness: 0.15, transparent: true, opacity: 0.85 })
+  private readonly sparkleMat = new THREE.MeshBasicMaterial({ color: '#ffe785', transparent: true, opacity: 0.95, depthWrite: false })
   private readonly roof = new THREE.Group()
   private readonly rearRoof = new THREE.Group()
   private readonly bell = new THREE.Group()
@@ -176,6 +232,7 @@ export class TempleWorld {
     this.incenseGlow = new THREE.PointLight('#f1a754', 0.22, 7, 2)
     this.incenseGlow.position.set(0, 1.8, -2.6)
     this.scene.add(this.incenseGlow)
+    this.initRestingCoins()
   }
 
   private addMainHall(): void {
@@ -2224,7 +2281,11 @@ export class TempleWorld {
     return nearest
   }
 
-  perform(action: string, offeringCounts?: Partial<Record<OfferingId, number>>): void {
+  perform(
+    action: string,
+    offeringCounts?: Partial<Record<OfferingId, number>>,
+    options?: { playerPos?: THREE.Vector3; onSplash?: () => void }
+  ): void {
     if (action === 'incense' || action === 'wish' || action === 'prayer') {
       this.spawnSmoke(new THREE.Vector3(0, 1.2, -2.6))
       this.incenseGlow.intensity = 0.9
@@ -2243,7 +2304,7 @@ export class TempleWorld {
     if (action === 'woodfish') this.woodfishImpulse = 0.2
     if (action === 'bell') this.bellImpulse = 0.23
     if (action === 'drum') this.drumImpulse = 0.35
-    if (action === 'coin') this.dropCoin()
+    if (action === 'coin') this.tossWishCoin(options?.playerPos, options?.onSplash)
     if (action === 'lottery') this.spawnSmoke(new THREE.Vector3(-11.8, 1.8, 1.2))
     if (action === 'chess') this.spawnSmoke(new THREE.Vector3(PAVILION.x, 1.2, PAVILION.z))
     if (action === 'yuhuang') { this.spawnSmoke(new THREE.Vector3(0, 2.6, -29.5)) }
@@ -2341,20 +2402,109 @@ export class TempleWorld {
         this.smoke.splice(i, 1)
       }
     }
-    for (let i = this.coins.length - 1; i >= 0; i -= 1) {
-      const c = this.coins[i]
+    // 1. Flying coins in 3D parabolic trajectory
+    for (let i = this.flyingCoins.length - 1; i >= 0; i -= 1) {
+      const c = this.flyingCoins[i]
+      c.progress += dt / c.duration
+      const p = Math.min(1, c.progress)
+      c.mesh.position.x = THREE.MathUtils.lerp(c.start.x, c.target.x, p)
+      c.mesh.position.z = THREE.MathUtils.lerp(c.start.z, c.target.z, p)
+      // Parabolic arc with peak height
+      c.mesh.position.y = THREE.MathUtils.lerp(c.start.y, c.target.y, p) + 4 * c.peak * p * (1 - p)
+      c.mesh.rotation.x += c.rotSpeed.x * dt
+      c.mesh.rotation.y += c.rotSpeed.y * dt
+      c.mesh.rotation.z += c.rotSpeed.z * dt
+
+      if (c.progress >= 1) {
+        c.mesh.position.copy(c.target)
+        c.onSplash?.()
+        this.triggerWaterSplash(c.target)
+        this.flyingCoins.splice(i, 1)
+
+        // Sinks into the water gently
+        this.sinkingCoins.push({
+          mesh: c.mesh,
+          y: c.target.y,
+          targetY: 0.04 + Math.random() * 0.02,
+          wobblePhase: Math.random() * Math.PI * 2,
+          wobbleSpeed: 6 + Math.random() * 4,
+          age: 0,
+        })
+      }
+    }
+
+    // 2. Sinking coins fluttering to the pond floor
+    for (let i = this.sinkingCoins.length - 1; i >= 0; i -= 1) {
+      const c = this.sinkingCoins[i]
       c.age += dt
-      c.mesh.position.y = Math.max(0.33, 1.5 - c.age * 1.8)
-      c.mesh.rotation.z += dt * 4
-      c.ripple.scale.setScalar(0.2 + c.age * 0.7)
-      ;(c.ripple.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.5 - c.age * 0.35)
-      if (c.age > 1.5) {
-        this.scene.remove(c.mesh, c.ripple)
-        c.mesh.geometry.dispose()
-        ;(c.mesh.material as THREE.Material).dispose()
-        c.ripple.geometry.dispose()
-        ;(c.ripple.material as THREE.Material).dispose()
-        this.coins.splice(i, 1)
+      c.y -= dt * 0.28
+      c.mesh.position.y = Math.max(c.targetY, c.y)
+      c.mesh.rotation.x = Math.sin(time * c.wobbleSpeed + c.wobblePhase) * 0.25
+      c.mesh.rotation.z += dt * 1.5
+
+      if (c.y <= c.targetY || c.age >= 1.4) {
+        c.mesh.position.y = c.targetY
+        c.mesh.rotation.set((Math.random() - 0.5) * 0.3, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.3)
+        this.sinkingCoins.push()
+        this.restingCoins.push(c.mesh)
+        this.sinkingCoins.splice(i, 1)
+
+        // Keep resting coins at reasonable count
+        while (this.restingCoins.length > 36) {
+          const old = this.restingCoins.shift()!
+          this.scene.remove(old)
+          old.traverse(obj => {
+            if (obj instanceof THREE.Mesh) obj.geometry?.dispose()
+          })
+        }
+      }
+    }
+
+    // 3. Water surface concentric ripples
+    for (let i = this.ripples.length - 1; i >= 0; i -= 1) {
+      const r = this.ripples[i]
+      r.age += dt
+      if (r.age < 0) continue // delay before expanding
+      const k = Math.min(1, r.age / r.life)
+      const scale = THREE.MathUtils.lerp(r.baseScale, r.maxScale, Math.sqrt(k))
+      r.mesh.scale.set(scale, scale, scale)
+      const mat = r.mesh.material as THREE.MeshBasicMaterial
+      mat.opacity = Math.max(0, 0.75 * (1 - k))
+      if (r.age >= r.life) {
+        this.scene.remove(r.mesh)
+        r.mesh.geometry.dispose()
+        mat.dispose()
+        this.ripples.splice(i, 1)
+      }
+    }
+
+    // 4. Water splash spray droplets
+    for (let i = this.droplets.length - 1; i >= 0; i -= 1) {
+      const d = this.droplets[i]
+      d.age += dt
+      d.velocity.y -= 9.8 * dt
+      d.mesh.position.addScaledVector(d.velocity, dt)
+      if (d.mesh.position.y <= 0.28 || d.age >= d.life) {
+        this.scene.remove(d.mesh)
+        d.mesh.geometry.dispose()
+        this.droplets.splice(i, 1)
+      }
+    }
+
+    // 5. Rising golden wish sparkles
+    for (let i = this.sparkles.length - 1; i >= 0; i -= 1) {
+      const s = this.sparkles[i]
+      s.age += dt
+      const k = Math.min(1, s.age / s.life)
+      s.mesh.position.y += s.vy * dt
+      s.mesh.position.x = s.baseX + Math.sin(time * s.swaySpeed + i) * s.swayAmp
+      s.mesh.position.z = s.baseZ + Math.cos(time * s.swaySpeed + i) * s.swayAmp
+      const scale = Math.max(0.01, 1 - k * 0.7)
+      s.mesh.scale.setScalar(scale)
+      if (s.age >= s.life) {
+        this.scene.remove(s.mesh)
+        s.mesh.geometry.dispose()
+        this.sparkles.splice(i, 1)
       }
     }
   }
@@ -2421,16 +2571,157 @@ export class TempleWorld {
     }
   }
 
-  private dropCoin(): void {
-    const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.045, 20), makeMat(C.gold, 0.28, 0.6))
-    coin.position.set(WISH_POOL.x + (Math.random() - 0.5) * 0.8, 1.5, WISH_POOL.z + (Math.random() - 0.5) * 0.8)
-    coin.castShadow = true
+  private createCoinMesh(): THREE.Group {
+    const coin = new THREE.Group()
+    // Outer disc
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.025, 20), this.coinGoldMat)
+    disc.castShadow = true
+    coin.add(disc)
+    // Raised rim
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.112, 0.012, 6, 20), this.coinGoldMat)
+    rim.rotation.x = Math.PI / 2
+    coin.add(rim)
+    // Dark square inner hole (ancient Chinese copper/gold coin)
+    const hole = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.028, 0.05), this.coinDarkMat)
+    coin.add(hole)
+    return coin
+  }
+
+  private initRestingCoins(): void {
+    // Scatter authentic resting coins across the pond floor
+    for (let i = 0; i < 16; i++) {
+      const coin = this.createCoinMesh()
+      const ang = Math.random() * Math.PI * 2
+      const rad = 0.3 + Math.random() * 1.4
+      const x = WISH_POOL.x + Math.cos(ang) * rad
+      const z = WISH_POOL.z + Math.sin(ang) * rad
+      const y = 0.038 + Math.random() * 0.015
+      coin.position.set(x, y, z)
+      coin.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.25)
+      this.scene.add(coin)
+      this.restingCoins.push(coin)
+    }
+  }
+
+  private tossWishCoin(fromPos?: THREE.Vector3, onSplash?: () => void): void {
+    const coin = this.createCoinMesh()
+
+    // Determine landing point in wishing pool
+    const inCenterBowl = Math.random() < 0.32
+    const target = new THREE.Vector3()
+    if (inCenterBowl) {
+      target.set(
+        WISH_POOL.x + (Math.random() - 0.5) * 0.22,
+        0.35,
+        WISH_POOL.z + (Math.random() - 0.5) * 0.22
+      )
+    } else {
+      const ang = Math.random() * Math.PI * 2
+      const rad = 0.35 + Math.random() * 1.4
+      target.set(
+        WISH_POOL.x + Math.cos(ang) * rad,
+        0.28,
+        WISH_POOL.z + Math.sin(ang) * rad
+      )
+    }
+
+    // Determine launch point: near player or at pool edge
+    let start: THREE.Vector3
+    if (fromPos && Math.hypot(fromPos.x - WISH_POOL.x, fromPos.z - WISH_POOL.z) < 14) {
+      start = new THREE.Vector3(fromPos.x, fromPos.y + 1.15, fromPos.z)
+    } else {
+      const rimAng = Math.atan2(target.z - WISH_POOL.z, target.x - WISH_POOL.x) + Math.PI + (Math.random() - 0.5) * 0.8
+      start = new THREE.Vector3(
+        WISH_POOL.x + Math.cos(rimAng) * 2.35,
+        1.25,
+        WISH_POOL.z + Math.sin(rimAng) * 2.35
+      )
+    }
+
+    coin.position.copy(start)
     this.scene.add(coin)
-    const rippleMat = new THREE.MeshBasicMaterial({ color: '#cae2cf', transparent: true, opacity: 0.5, depthWrite: false })
-    const ripple = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.035, 6, 28), rippleMat)
-    ripple.rotation.x = Math.PI / 2
-    ripple.position.set(coin.position.x, 0.31, coin.position.z)
-    this.scene.add(ripple)
-    this.coins.push({ mesh: coin, age: 0, ripple })
+
+    this.flyingCoins.push({
+      mesh: coin,
+      start,
+      target,
+      progress: 0,
+      duration: 0.72,
+      peak: 1.25 + Math.random() * 0.35,
+      rotSpeed: new THREE.Vector3(12 + Math.random() * 8, 16 + Math.random() * 10, 8 + Math.random() * 6),
+      onSplash,
+    })
+  }
+
+  private triggerWaterSplash(pos: THREE.Vector3): void {
+    // 1. Concentric ripples
+    for (let i = 0; i < 3; i++) {
+      this.spawnRipple(pos.x, 0.285 + i * 0.002, pos.z, -i * 0.12, 1.4 + i * 0.3)
+    }
+    // 2. Splash water droplets
+    for (let i = 0; i < 12; i++) {
+      const ang = Math.random() * Math.PI * 2
+      const spd = 0.6 + Math.random() * 1.5
+      const vy = 2.0 + Math.random() * 1.8
+      this.spawnDroplet(pos, new THREE.Vector3(Math.cos(ang) * spd, vy, Math.sin(ang) * spd))
+    }
+    // 3. Golden wish sparkles
+    for (let i = 0; i < 20; i++) {
+      this.spawnSparkle(pos)
+    }
+  }
+
+  private spawnRipple(x: number, y: number, z: number, startDelay: number, maxScale: number): void {
+    const geo = new THREE.TorusGeometry(0.2, 0.024, 6, 28)
+    const mat = new THREE.MeshBasicMaterial({ color: '#bcece5', transparent: true, opacity: 0.75, depthWrite: false })
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.rotation.x = Math.PI / 2
+    mesh.position.set(x, y, z)
+    mesh.scale.set(0.1, 0.1, 0.1)
+    this.scene.add(mesh)
+    this.ripples.push({
+      mesh,
+      baseScale: 0.2,
+      maxScale,
+      age: startDelay,
+      life: 1.35,
+    })
+  }
+
+  private spawnDroplet(pos: THREE.Vector3, vel: THREE.Vector3): void {
+    const geo = new THREE.SphereGeometry(0.028 + Math.random() * 0.015, 6, 5)
+    const mesh = new THREE.Mesh(geo, this.dropletMat)
+    mesh.position.set(
+      pos.x + (Math.random() - 0.5) * 0.1,
+      pos.y + 0.03,
+      pos.z + (Math.random() - 0.5) * 0.1
+    )
+    this.scene.add(mesh)
+    this.droplets.push({
+      mesh,
+      velocity: vel,
+      age: 0,
+      life: 0.85 + Math.random() * 0.3,
+    })
+  }
+
+  private spawnSparkle(pos: THREE.Vector3): void {
+    const size = 0.03 + Math.random() * 0.03
+    const geo = new THREE.SphereGeometry(size, 6, 5)
+    const mesh = new THREE.Mesh(geo, this.sparkleMat)
+    const ox = pos.x + (Math.random() - 0.5) * 0.35
+    const oz = pos.z + (Math.random() - 0.5) * 0.35
+    mesh.position.set(ox, pos.y + 0.06 + Math.random() * 0.1, oz)
+    this.scene.add(mesh)
+    this.sparkles.push({
+      mesh,
+      baseX: ox,
+      baseZ: oz,
+      vy: 0.8 + Math.random() * 1.2,
+      swaySpeed: 4 + Math.random() * 3,
+      swayAmp: 0.08 + Math.random() * 0.06,
+      age: 0,
+      life: 1.6 + Math.random() * 0.9,
+    })
   }
 }

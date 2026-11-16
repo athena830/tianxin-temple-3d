@@ -5,7 +5,7 @@
  * The starter ships no audio files: SFX are synthesized and the music is a generative ambient
  * pad. To use recorded assets, `load(url)` an AudioBuffer and `playBuffer()` it on either bus.
  */
-export type Sfx = 'pickup' | 'jump' | 'land' | 'hurt' | 'ui' | 'win' | 'lose' | 'dash' | 'bell' | 'woodfish' | 'coin' | 'chime' | 'drum'
+export type Sfx = 'pickup' | 'jump' | 'land' | 'hurt' | 'ui' | 'win' | 'lose' | 'dash' | 'bell' | 'woodfish' | 'coin' | 'chime' | 'drum' | 'coin-toss' | 'water-splash' | 'wish-chime'
 
 export class Audio {
   readonly ctx: AudioContext
@@ -83,6 +83,24 @@ export class Audio {
       case 'drum': tone(95, 38, 0.75, 'sine', 0.55); tone(140, 50, 0.45, 'triangle', 0.35); tone(60, 30, 1.2, 'sine', 0.4, 0.02); break
       case 'woodfish': tone(720, 380, 0.09, 'triangle', 0.45); tone(1450, 900, 0.05, 'sine', 0.15); break
       case 'coin': tone(2100, 2000, 0.25, 'sine', 0.2); tone(2800, 2700, 0.2, 'sine', 0.12, 0.08); tone(300, 120, 0.35, 'sine', 0.12, 0.45); break
+      case 'coin-toss':
+        tone(3200, 2900, 0.12, 'triangle', 0.3)
+        tone(4800, 4200, 0.09, 'sine', 0.22, 0.01)
+        tone(6400, 5800, 0.05, 'sine', 0.15, 0.02)
+        break
+      case 'water-splash':
+        // Liquid splash + bubble pop
+        tone(520, 140, 0.18, 'sine', 0.42)
+        tone(220, 60, 0.28, 'sine', 0.35, 0.02)
+        tone(880, 280, 0.09, 'triangle', 0.22, 0.01)
+        tone(120, 45, 0.35, 'sine', 0.25, 0.05)
+        break
+      case 'wish-chime':
+        // Ethereal sparkling pentatonic blessing chord: C5, E5, G5, B5, D6, G6
+        [523.25, 659.25, 783.99, 987.77, 1174.66, 1567.98].forEach((f, i) => {
+          tone(f, f * 0.998, 1.8 - i * 0.2, 'sine', 0.18 / (1 + i * 0.2), i * 0.08)
+        })
+        break
       case 'chime': [659, 880, 1175].forEach((f, i) => tone(f, f, 1.1, 'sine', 0.16, i * 0.14)); break
       case 'lose': [392, 330, 262].forEach((f, i) => tone(f, f * 0.98, 0.38, 'sine', 0.25, i * 0.16)); break
     }

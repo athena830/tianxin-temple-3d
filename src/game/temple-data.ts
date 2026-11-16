@@ -24,6 +24,58 @@ export const LOTS = [
 export type Wish = { id: string; text: string; at: number }
 export type TempleRecord = { id: string; action: string; detail: string; at: number }
 export type DrawnLot = { day: string; number: number; title: string; text: string; advice: string }
+
+export type WishCategory = 'peace' | 'career' | 'love' | 'wealth' | 'study'
+
+export type WishBlessing = {
+  category: WishCategory
+  categoryName: string
+  title: string
+  prophecy: string
+}
+
+export const WISH_BLESSINGS: Record<WishCategory, { name: string; items: { title: string; prophecy: string }[] }> = {
+  peace: {
+    name: '平安健康',
+    items: [
+      { title: '紫氣迎門・身心自在', prophecy: '觀音慈航，百病不侵，內外清和，福壽康寧。' },
+      { title: '祥雲常罩・家宅康安', prophecy: '隨順安心，長幼安泰，無災無礙，日日清吉。' },
+      { title: '心燈常明・歲月靜好', prophecy: '神明庇佑，諸事順遂，所行皆平坦，所見皆祥和。' },
+    ],
+  },
+  career: {
+    name: '事業亨通',
+    items: [
+      { title: '鵬程萬里・吉星高照', prophecy: '貴人提攜，機緣大開，志存高遠，所向披靡。' },
+      { title: '雲程發軔・時運開泰', prophecy: '積微致著，宏圖大展，得道多助，步步生蓮。' },
+      { title: '龍騰雲海・功業千秋', prophecy: '厚積薄發，勇立潮頭，商通四海，名揚四方。' },
+    ],
+  },
+  love: {
+    name: '廣結良緣',
+    items: [
+      { title: '春風和煦・情誼深長', prophecy: '心懷善念，良友相隨，琴瑟和鳴，良緣天成。' },
+      { title: '花好月圓・相知相惜', prophecy: '彼此溫柔相待，人緣廣開，處處逢貴人，佳偶美滿。' },
+      { title: '靈犀相通・緣定三生', prophecy: '莫急莫憂，佳期在望，真心相映，天賜良配。' },
+    ],
+  },
+  wealth: {
+    name: '財運興旺',
+    items: [
+      { title: '金玉滿堂・源遠流長', prophecy: '善財廣積，生生不息，行善積德，福祿雙全。' },
+      { title: '寶庫豐盈・五路納吉', prophecy: '正偏財旺，事業有成，家道隆昌，富足安康。' },
+      { title: '財星拱照・利祿豐亨', prophecy: '聚寶盆中金錢滿，勤懇篤行納百祥，豐衣足食。' },
+    ],
+  },
+  study: {
+    name: '金榜題名',
+    items: [
+      { title: '魁星點斗・獨占鰲頭', prophecy: '文昌高照，心沉如鏡，才思泉湧，名列前茅。' },
+      { title: '智慧開朗・金榜標名', prophecy: '勤勉篤學，觸類旁通，考運亨通，前程似錦。' },
+      { title: '筆走游龍・蟾宮折桂', prophecy: '十年磨劍今朝試，文曲護持破浪行，大放異彩。' },
+    ],
+  },
+}
 export type TempleData = {
   version: 1
   character: CharacterId
@@ -183,10 +235,24 @@ export class TempleStore {
     return result
   }
 
-  tossCoin(): number {
+  tossCoin(category: WishCategory = 'peace', customWish = ''): { count: number; blessing: WishBlessing } {
     this.data.coins = Math.min(9999, this.data.coins + 1)
-    this.addRecord('許願池投幣', `已投入 ${this.data.coins} 枚祈福銅錢`)
-    return this.data.coins
+    const catData = WISH_BLESSINGS[category] ?? WISH_BLESSINGS.peace
+    const index = Math.floor(Math.random() * catData.items.length)
+    const item = catData.items[index]
+    const blessing: WishBlessing = {
+      category,
+      categoryName: catData.name,
+      title: item.title,
+      prophecy: item.prophecy,
+    }
+    const note = customWish ? `（心願：${safeText(customWish, 40)}）` : ''
+    this.addRecord('許願池投幣', `【${catData.name}】${blessing.title}${note}・累計 ${this.data.coins} 枚`)
+    if (customWish) {
+      this.submitWish(customWish)
+    }
+    this.persist()
+    return { count: this.data.coins, blessing }
   }
 
   ringBell(): void { this.addRecord('鳴鐘', '願心安定，祝福相隨。') }
