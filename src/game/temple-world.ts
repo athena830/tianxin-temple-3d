@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import GUI, { Controller } from 'lil-gui'
 import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
@@ -170,6 +171,15 @@ export class TempleWorld {
   ]
   private readonly clouds: { mesh: THREE.Group; speed: number; x: number; z: number; y: number }[] = []
   private dragonGuanyinBillboard?: THREE.Mesh
+  private dragonGuanyinParams = {
+    posY: 0,
+    posZ: 0,
+    scale: 1.0,
+    lockBillboard: true,
+    rotX: 0,
+  }
+  private guanyinGui?: GUI
+  private dragonGuanyinPosYCtrl?: Controller
   private auraParticles?: THREE.Points
   private auraParticleData?: { radius: number; angle: number; speed: number; rotSpeed: number }[]
   private dragonGuanyinUrnPos?: THREE.Vector3
@@ -2014,11 +2024,49 @@ export class TempleWorld {
     })
 
     const guanyinMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), planeMat)
-    // 底部對齊地面 (Y-axis Alignment)：position.y 設定為最終高度的一半 (H / 2)
-    guanyinMesh.position.set(0, H / 2, 0)
+    // 1. 修正 Y 軸定位（視覺下沉）：下沉約 25% 高度作為基準，讓階梯視覺上能碰到地板
+    const initY = (H / 2) - (H * 0.25)
+    this.dragonGuanyinParams.posY = initY
+    guanyinMesh.position.set(0, initY, 0)
     guanyinMesh.castShadow = true
     root.add(guanyinMesh)
     this.dragonGuanyinBillboard = guanyinMesh
+
+    // 2. 導入 lil-gui「觀音 2D 視角微調」浮動控制面板
+    if (!this.guanyinGui) {
+      const gui = new GUI({ title: '觀音 2D 視角微調' })
+      gui.domElement.style.position = 'fixed'
+      gui.domElement.style.top = '16px'
+      gui.domElement.style.right = '16px'
+      gui.domElement.style.zIndex = '10000'
+      gui.domElement.style.touchAction = 'auto'
+      this.guanyinGui = gui
+
+      const posYCtrl = gui.add(this.dragonGuanyinParams, 'posY', -10, 10, 0.05).name('Position Y').onChange((v: number) => {
+        guanyinMesh.position.y = v
+      })
+
+      gui.add(this.dragonGuanyinParams, 'posZ', -10, 10, 0.05).name('Position Z').onChange((v: number) => {
+        guanyinMesh.position.z = v
+      })
+
+      gui.add(this.dragonGuanyinParams, 'scale', 0.5, 2, 0.01).name('Scale').onChange((v: number) => {
+        guanyinMesh.scale.setScalar(v)
+      })
+
+      const rotXCtrl = gui.add(this.dragonGuanyinParams, 'rotX', -Math.PI / 2, Math.PI / 2, 0.01).name('Rotation X')
+      rotXCtrl.disable()
+
+      gui.add(this.dragonGuanyinParams, 'lockBillboard').name('Billboard 鎖定開關').onChange((v: boolean) => {
+        if (v) {
+          rotXCtrl.disable()
+        } else {
+          rotXCtrl.enable()
+        }
+      })
+
+      this.dragonGuanyinPosYCtrl = posYCtrl
+    }
 
     const applyTexture = (tex: THREE.Texture) => {
       tex.colorSpace = THREE.SRGBColorSpace
@@ -2033,8 +2081,11 @@ export class TempleWorld {
         const dynamicH = W * aspect
         guanyinMesh.geometry.dispose()
         guanyinMesh.geometry = new THREE.PlaneGeometry(W, dynamicH)
-        // 底部對齊地面：重新校準 position.y 為最終高度的一半 (dynamicH / 2)
-        guanyinMesh.position.set(0, dynamicH / 2, 0)
+        // 修正 Y 軸定位（視覺下沉）：下沉約 25% 高度作為基準
+        const updatedY = (dynamicH / 2) - (dynamicH * 0.25)
+        this.dragonGuanyinParams.posY = updatedY
+        guanyinMesh.position.set(0, updatedY, this.dragonGuanyinParams.posZ)
+        this.dragonGuanyinPosYCtrl?.setValue(updatedY)
       }
     }
 
@@ -2333,9 +2384,21 @@ export class TempleWorld {
     this.courtyard.update(time)
     this.npcs.update(dt, time, playerPosition, camera)
 
-    // 強制面朝攝影機 (Billboarding 鎖定)：確保平面永遠完美平行於攝影機，徹底消除向後傾斜與透視壓扁
-    if (this.dragonGuanyinBillboard && camera) {
-      this.dragonGuanyinBillboard.quaternion.copy(camera.quaternion)
+    // 觀音面朝視角與傾斜微調控制
+    if (this.dragonGuanyinBillboard) {
+      if (this.dragonGuanyinParams.lockBillboard) {
+        if (camera) {
+          this.dragonGuanyinBillboard.quaternion.copy(camera.quaternion)
+        }
+      } else {
+        if (camera) {
+          const camPos = camera.position
+          const angle = Math.atan2(camPos.x - DRAGON_GUANYIN_POS.x, camPos.z - DRAGON_GUANYIN_POS.z)
+          this.dragonGuanyinBillboard.rotation.set(this.dragonGuanyinParams.rotX, angle, 0, 'YXZ')
+        } else {
+          this.dragonGuanyinBillboard.rotation.x = this.dragonGuanyinParams.rotX
+        }
+      }
     }
 
     // 動態氣場：金色神光粒子向上螺旋升騰
