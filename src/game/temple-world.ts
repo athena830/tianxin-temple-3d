@@ -1999,21 +1999,8 @@ export class TempleWorld {
     const goldMat = makeMat('#d4af37', 0.35, 0.45)
     const vermilionMat = makeMat('#962d22', 0.72)
 
-    // 1. 3D 漢白玉低階大台基（直徑 9.2m 穩健承托巨型 Q 版白衣乘龍觀音）
-    const tier1 = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.6, 0.25, 32), marbleMat)
-    tier1.position.y = 0.125
-    tier1.castShadow = true
-    tier1.receiveShadow = true
-    root.add(tier1)
-
-    // 台基外緣金雕裝飾環
-    const goldRim = new THREE.Mesh(new THREE.TorusGeometry(4.45, 0.06, 8, 32), goldMat)
-    goldRim.rotation.x = Math.PI / 2
-    goldRim.position.y = 0.25
-    root.add(goldRim)
-
-    // 加上實體碰撞 (Collision) 防止玩家穿透基座
-    this.physics.addStaticCylinder(new THREE.Vector3(pos.x, pos.y + 1.2, pos.z), 4.2, 2.4)
+    // 1. 實體物理碰撞（直徑約 5.0m 圓柱，對齊 Q 版潮玩聖像底座範圍，防止玩家穿透聖像）
+    this.physics.addStaticCylinder(new THREE.Vector3(pos.x, pos.y + 1.2, pos.z), 2.5, 2.4)
 
     // 2. 巨型透明材質立牌（全新 Q 版潮玩手辦風・乘龍白衣觀音聖像）
     const loader = new THREE.TextureLoader()
@@ -2034,33 +2021,35 @@ export class TempleWorld {
       depthWrite: true,
     })
 
-    // 長寬比 629 / 907 ≈ 0.6935，高 11.2 單位、寬 7.77 單位，通高達 11.45 單位
+    // 長寬比 629 / 907 ≈ 0.6935，高 11.2 單位、寬 7.77 單位，通高達 11.2 單位
     const billH = 11.2
     const billW = billH * (629 / 907)
     const billboard = new THREE.Mesh(new THREE.PlaneGeometry(billW, billH), planeMat)
-    // 底座頂端位於 y = 0.25，立牌底部精確密接台基面，中心點置於 y = 0.25 + billH / 2 = 5.85
-    billboard.position.set(0, 0.25 + billH / 2, 0)
+    // 徹底去除多餘第二底座，立牌底部與台基階梯精準平貼於八角平台地面 (y = 0)
+    billboard.position.set(0, billH / 2 - 0.08, 0)
     billboard.castShadow = true
     root.add(billboard)
     this.dragonGuanyinBillboard = billboard
 
-    // 3. 底部青銅九龍香爐、參拜蒲團與香火煙霧（朝向東面迎接從小徑前來的參拜善信）
-    const urn = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 0.65, 12), makeMat('#523e2b', 0.6, 0.4))
-    urn.position.set(4.6, 0.35, 0)
-    const urnRim = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.06, 8, 16), goldMat)
+    // 3. 底部青銅九龍香爐、參拜蒲團與香火煙霧（朝向東面小徑階梯來向，貼合底座前緣）
+    const urn = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.4, 0.62, 12), makeMat('#523e2b', 0.6, 0.4))
+    urn.position.set(3.4, 0.31, 0)
+    const urnRim = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.055, 8, 16), goldMat)
     urnRim.rotation.x = Math.PI / 2
-    urnRim.position.set(4.6, 0.68, 0)
-    const ember = new THREE.Mesh(new THREE.CircleGeometry(0.48, 12), new THREE.MeshBasicMaterial({ color: '#ff5522' }))
+    urnRim.position.y = 0.62
+    urn.add(urnRim)
+    const ember = new THREE.Mesh(new THREE.CircleGeometry(0.46, 12), new THREE.MeshBasicMaterial({ color: '#ff5522' }))
     ember.rotation.x = -Math.PI / 2
-    ember.position.set(4.6, 0.69, 0)
+    ember.position.y = 0.63
+    urn.add(ember)
 
     // 參拜蒲團（金黃織錦拜墊）
     const cushion = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.12, 16), makeMat('#d4a037', 0.8, 0.2))
-    cushion.position.set(5.8, 0.06, 0)
+    cushion.position.set(4.5, 0.06, 0)
     const cushionTop = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.02, 16), vermilionMat)
-    cushionTop.position.set(5.8, 0.125, 0)
-    root.add(urn, urnRim, ember, cushion, cushionTop)
-    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x + 4.6, pos.y + 0.75, pos.z)
+    cushionTop.position.set(4.5, 0.125, 0)
+    root.add(urn, cushion, cushionTop)
+    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x + 3.4, pos.y + 0.68, pos.z)
 
     // 4. 金光神聖氛圍燈 (Golden Aura PointLight)
     const auraLight = new THREE.PointLight('#ffe082', 1.4, 16, 2)
@@ -2074,7 +2063,7 @@ export class TempleWorld {
     for (let i = 0; i < particleCount; i++) {
       const radius = 0.6 + Math.random() * 3.4
       const angle = Math.random() * Math.PI * 2
-      const y = 2.0 + Math.random() * 11.5
+      const y = 0.2 + Math.random() * 11.5
       positions[i * 3] = Math.cos(angle) * radius
       positions[i * 3 + 1] = y
       positions[i * 3 + 2] = Math.sin(angle) * radius
@@ -2340,8 +2329,8 @@ export class TempleWorld {
         const p = this.auraParticleData[i]
         p.angle += p.rotSpeed * dt
         let y = arr[i * 3 + 1] + p.speed * dt
-        if (y > 13.8) {
-          y = 2.0
+        if (y > 11.8) {
+          y = 0.2
           p.radius = 0.6 + Math.random() * 3.4
         }
         arr[i * 3] = Math.cos(p.angle) * p.radius
