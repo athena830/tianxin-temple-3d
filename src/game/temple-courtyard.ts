@@ -1115,11 +1115,18 @@ export class FrontCourtyard {
     const platX = -68.0
     const platZ = 31.0
     const platR = 14.0
+    const platTop = 0.545 // 頂層八角廣場地坪頂面高程 (y = 0.42 + 0.25 / 2 = 0.545)
+    const floorH = 1.0
+    const floorCenterY = platTop - floorH / 2 // 0.045
 
-    // 平台基礎實體物理碰撞（覆蓋直徑 28m 整個大圓台地面）
-    this.c.physics.addStaticBox(new THREE.Vector3(platX, -0.42, platZ), new THREE.Vector3(platR * 2 + 1.0, 0.8, platR * 2 + 1.0))
-    // 步道銜接平台緩坡階梯碰撞
-    this.box(2.0, 0.4, 4.4, stone, -55.0, 0.1, platZ, true)
+    // (1) 漢白玉八角大平台主體實體物理碰撞（覆蓋直徑 28m 大圓台地面，頂面精確對齊 y = 0.545，人物行走踏實不陷地）
+    this.c.physics.addStaticCylinder(new THREE.Vector3(platX, floorCenterY, platZ), platR, floorH)
+
+    // (2) 東側朝聖階梯物理碰撞（自小徑 y = 0.02 逐級平穩登台，每階落差僅 ~0.18m，完美契合角色控制器自動攀爬）
+    // 第一階：踏面高程 y = 0.18 (x = -53.7, 寬 1.6m, 深 4.8m)
+    this.c.physics.addStaticBox(new THREE.Vector3(-53.7, 0.18 - floorH / 2, platZ), new THREE.Vector3(1.6, floorH, 4.8))
+    // 第二階：踏面高程 y = 0.36 (x = -54.7, 寬 1.4m, 深 4.8m)
+    this.c.physics.addStaticBox(new THREE.Vector3(-54.7, 0.36 - floorH / 2, platZ), new THREE.Vector3(1.4, floorH, 4.8))
 
     // 平台群組
     const platGroup = new THREE.Group()
@@ -1171,6 +1178,8 @@ export class FrontCourtyard {
       panel.position.set(px, 0.75, pz)
       panel.rotation.y = a + Math.PI / 2
       platGroup.add(post, lotusBud, panel)
+      // 漢白玉圍欄實體物理防跌落碰撞
+      this.c.physics.addStaticBox(new THREE.Vector3(platX + px, 0.545 + 0.45, platZ + pz), new THREE.Vector3(0.24, 0.9, 2.7), rotY(a + Math.PI / 2))
     }
 
     // (E) 四方通天金頂石燈台（分佈於大平台四隅，晝夜長明神光）

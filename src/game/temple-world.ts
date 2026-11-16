@@ -5,7 +5,7 @@ import type { LampId, OfferingId } from './temple-data'
 import { FrontCourtyard, GOLD_FURNACE, PAVILION, STAND, WISH_POOL } from './temple-courtyard'
 import { NpcManager } from './npc-system'
 
-export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0, 31.0)
+export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
 
 export type ShrinePointId =
   | 'incense' | 'prayer' | 'offerings' | 'daily-lot' | 'chess'
@@ -73,7 +73,11 @@ export class TempleWorld {
   readonly spawn = new THREE.Vector3(STAND.x, 1.2, STAND.z)
   readonly points: ShrinePoint[] = pointSpecs.map((point, i) => ({
     ...point,
-    position: new THREE.Vector3(pointPositions[i][0], 0, pointPositions[i][1]),
+    position: new THREE.Vector3(
+      pointPositions[i][0],
+      point.id === 'guanyin-dragon' ? DRAGON_GUANYIN_POS.y : 0,
+      pointPositions[i][1]
+    ),
   }))
 
   private readonly markers = new Map<ShrinePointId, THREE.Mesh>()
@@ -1276,7 +1280,7 @@ export class TempleWorld {
       const mat = new THREE.MeshBasicMaterial({ color: colors[point.id], transparent: true, opacity: 0.42, depthWrite: false })
       const marker = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.038, 6, 30), mat)
       marker.rotation.x = Math.PI / 2
-      marker.position.set(point.position.x, 0.09, point.position.z)
+      marker.position.set(point.position.x, point.position.y + 0.09, point.position.z)
       marker.renderOrder = 2
       this.scene.add(marker)
       this.markers.set(point.id, marker)
@@ -1994,8 +1998,8 @@ export class TempleWorld {
       root.add(post, bud, rail)
     }
 
-    // 加上實體碰撞 (Collision) 防止玩家穿透基座
-    this.physics.addStaticCylinder(pos, 4.3, 2.0)
+    // 加上實體碰撞 (Collision) 防止玩家穿透基座（涵蓋須彌座與蓮花座）
+    this.physics.addStaticCylinder(new THREE.Vector3(pos.x, pos.y + 1.2, pos.z), 4.3, 2.4)
 
     // 2. 巨型透明材質立牌（已去除圖片底部的重複繪製底座，僅保留觀音菩薩、乘雲金龍與雪白翻騰波濤，自然融入 3D 蓮花座）
     const loader = new THREE.TextureLoader()
@@ -2026,7 +2030,7 @@ export class TempleWorld {
     root.add(billboard)
     this.dragonGuanyinBillboard = billboard
 
-    // 3. 底部青銅九龍香爐與香火煙霧（朝向東面迎接從小徑前來的參拜善信）
+    // 3. 底部青銅九龍香爐、參拜蒲團與香火煙霧（朝向東面迎接從小徑前來的參拜善信）
     const urn = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 0.65, 12), makeMat('#523e2b', 0.6, 0.4))
     urn.position.set(4.6, 0.35, 0)
     const urnRim = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.06, 8, 16), goldMat)
@@ -2035,8 +2039,14 @@ export class TempleWorld {
     const ember = new THREE.Mesh(new THREE.CircleGeometry(0.48, 12), new THREE.MeshBasicMaterial({ color: '#ff5522' }))
     ember.rotation.x = -Math.PI / 2
     ember.position.set(4.6, 0.69, 0)
-    root.add(urn, urnRim, ember)
-    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x + 4.6, 0.75, pos.z)
+
+    // 參拜蒲團（金黃織錦拜墊）
+    const cushion = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.12, 16), makeMat('#d4a037', 0.8, 0.2))
+    cushion.position.set(5.8, 0.06, 0)
+    const cushionTop = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.02, 16), vermilionMat)
+    cushionTop.position.set(5.8, 0.125, 0)
+    root.add(urn, urnRim, ember, cushion, cushionTop)
+    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x + 4.6, pos.y + 0.75, pos.z)
 
     // 4. 金光神聖氛圍燈 (Golden Aura PointLight)
     const auraLight = new THREE.PointLight('#ffdb70', 1.25, 14, 2)
@@ -2241,7 +2251,7 @@ export class TempleWorld {
     dir.divideScalar(len)
     this.guideArrow.position.set(from.x + dir.x * 2.1, from.y + 0.1, from.z + dir.z * 2.1)
     this.guideArrow.rotation.set(0, Math.atan2(dir.x, dir.z), 0)
-    this.guideBeacon.position.set(to.x, 0, to.z)
+    this.guideBeacon.position.set(to.x, to.y, to.z)
     const pulse = 0.55 + Math.sin(time * 4) * 0.15
     ;(this.guideBeacon.material as THREE.MeshBasicMaterial).opacity = pulse * 0.5
   }

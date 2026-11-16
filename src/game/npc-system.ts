@@ -214,13 +214,13 @@ export const TEMPLE_WAYPOINTS: TempleWaypoint[] = [
   // 10. 西側昇龍聖境牌坊門內
   { name: '聖境牌坊東側', zone: 'courtyard', pos: new THREE.Vector3(-24.0, 0, 31.0), isWorship: false },
   // 11. 昇龍觀音青銅香爐（大平台參拜點）
-  { name: '昇龍觀音香爐', zone: 'sanctuary', pos: new THREE.Vector3(-62.5, 0, 31.0), isWorship: true, worshipTarget: new THREE.Vector3(-68.0, 0, 31.0) },
+  { name: '昇龍觀音香爐', zone: 'sanctuary', pos: new THREE.Vector3(-62.5, 0.545, 31.0), isWorship: true, worshipTarget: new THREE.Vector3(-68.0, 0.545, 31.0) },
   // 12. 昇龍觀音大平台北側瞻仰點
-  { name: '觀音大平台北側', zone: 'sanctuary', pos: new THREE.Vector3(-68.0, 0, 37.5), isWorship: true, worshipTarget: new THREE.Vector3(-68.0, 0, 31.0) },
+  { name: '觀音大平台北側', zone: 'sanctuary', pos: new THREE.Vector3(-68.0, 0.545, 37.5), isWorship: true, worshipTarget: new THREE.Vector3(-68.0, 0.545, 31.0) },
   // 13. 昇龍觀音大平台南側瞻仰點
-  { name: '觀音大平台南側', zone: 'sanctuary', pos: new THREE.Vector3(-68.0, 0, 24.5), isWorship: true, worshipTarget: new THREE.Vector3(-68.0, 0, 31.0) },
+  { name: '觀音大平台南側', zone: 'sanctuary', pos: new THREE.Vector3(-68.0, 0.545, 24.5), isWorship: true, worshipTarget: new THREE.Vector3(-68.0, 0.545, 31.0) },
   // 14. 昇龍觀音大平台東門步道階梯
-  { name: '大平台東門階梯', zone: 'sanctuary', pos: new THREE.Vector3(-57.5, 0, 31.0), isWorship: false },
+  { name: '大平台東門階梯', zone: 'sanctuary', pos: new THREE.Vector3(-55.5, 0.36, 31.0), isWorship: false },
   // 15. 後殿凌霄寶殿前
   { name: '凌霄寶殿前', zone: 'courtyard', pos: new THREE.Vector3(0, 0, -18.0), isWorship: true, worshipTarget: new THREE.Vector3(0, 0, -25.0) },
   // 16. 西側鐘鼓樓前
@@ -1070,7 +1070,8 @@ export class NpcInstance {
     if (isDestExit) {
       if (isStartSanctuary) {
         return [
-          new THREE.Vector3(-55.5, 0, 31.0),
+          new THREE.Vector3(-55.5, 0.36, 31.0),
+          new THREE.Vector3(-53.5, 0.18, 31.0),
           new THREE.Vector3(-42.0, 0, 31.0),
           new THREE.Vector3(-29.6, 0, 31.0),
           new THREE.Vector3(-24.0, 0, 31.0),
@@ -1099,7 +1100,8 @@ export class NpcInstance {
           new THREE.Vector3(-24.0, 0, 31.0),
           new THREE.Vector3(-29.6, 0, 31.0),
           new THREE.Vector3(-42.0, 0, 31.0),
-          new THREE.Vector3(-55.5, 0, 31.0),
+          new THREE.Vector3(-53.5, 0.18, 31.0),
+          new THREE.Vector3(-55.5, 0.36, 31.0),
           dest.clone(),
         ]
       }
@@ -1111,21 +1113,23 @@ export class NpcInstance {
       return [dest.clone()]
     }
 
-    // 4. 前庭 -> 聖境大平台：循序經由月亮門與松林小徑
+    // 4. 前庭 -> 聖境大平台：循序經由月亮門與松林小徑登階上台
     if (isStartCourtyard && isDestSanctuary) {
       return [
         new THREE.Vector3(-24.0, 0, 31.0),
         new THREE.Vector3(-29.6, 0, 31.0),
         new THREE.Vector3(-42.0, 0, 31.0),
-        new THREE.Vector3(-55.5, 0, 31.0),
+        new THREE.Vector3(-53.5, 0.18, 31.0),
+        new THREE.Vector3(-55.5, 0.36, 31.0),
         dest.clone(),
       ]
     }
 
-    // 5. 聖境大平台 -> 前庭：循序穿過小徑回到前庭
+    // 5. 聖境大平台 -> 前庭：循序下階穿過小徑回到前庭
     if (isStartSanctuary && isDestCourtyard) {
       return [
-        new THREE.Vector3(-55.5, 0, 31.0),
+        new THREE.Vector3(-55.5, 0.36, 31.0),
+        new THREE.Vector3(-53.5, 0.18, 31.0),
         new THREE.Vector3(-42.0, 0, 31.0),
         new THREE.Vector3(-29.6, 0, 31.0),
         new THREE.Vector3(-24.0, 0, 31.0),
