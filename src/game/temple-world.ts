@@ -1995,7 +1995,6 @@ export class TempleWorld {
     const root = new THREE.Group()
     root.position.copy(pos)
 
-    const marbleMat = makeMat('#ebe5d8', 0.92, 0.04)
     const goldMat = makeMat('#d4af37', 0.35, 0.45)
     const vermilionMat = makeMat('#962d22', 0.72)
 
@@ -2003,33 +2002,46 @@ export class TempleWorld {
     this.physics.addStaticCylinder(new THREE.Vector3(pos.x, pos.y + 1.2, pos.z), 2.5, 2.4)
 
     // 2. 巨型透明材質立牌（全新 Q 版潮玩手辦風・乘龍白衣觀音聖像）
-    const loader = new THREE.TextureLoader()
-    const guanyinTex = loader.load('./guanyin.png', undefined, undefined, () => {
-      loader.load('/guanyin.png', t2 => {
-        t2.colorSpace = THREE.SRGBColorSpace
-        planeMat.map = t2
-        planeMat.needsUpdate = true
-      })
-    })
-    guanyinTex.colorSpace = THREE.SRGBColorSpace
+    const W = 10
+    // 依據原始素材預設計算高度（長寬比 907 / 629 ≈ 1.44197），確保初次建立即維持直式比例
+    let H = W * (907 / 629)
 
     const planeMat = new THREE.MeshBasicMaterial({
-      map: guanyinTex,
       transparent: true,
       alphaTest: 0.18,
       side: THREE.DoubleSide,
       depthWrite: true,
     })
 
-    // 長寬比 629 / 907 ≈ 0.6935，高 11.2 單位、寬 7.77 單位，通高達 11.2 單位
-    const billH = 11.2
-    const billW = billH * (629 / 907)
-    const billboard = new THREE.Mesh(new THREE.PlaneGeometry(billW, billH), planeMat)
-    // 徹底消除浮空感：下移 1.32m 使圖中圓形雕花台基與階梯底座 100% 精準平貼密接於八角平台地面 (y = 0)
-    billboard.position.set(0, billH / 2 - 1.32, 0)
-    billboard.castShadow = true
-    root.add(billboard)
-    this.dragonGuanyinBillboard = billboard
+    const guanyinMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), planeMat)
+    // 底部對齊地面 (Y-axis Alignment)：position.y 設定為最終高度的一半 (H / 2)
+    guanyinMesh.position.set(0, H / 2, 0)
+    guanyinMesh.castShadow = true
+    root.add(guanyinMesh)
+    this.dragonGuanyinBillboard = guanyinMesh
+
+    const applyTexture = (tex: THREE.Texture) => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.needsUpdate = true
+      planeMat.map = tex
+      planeMat.needsUpdate = true
+
+      // 動態鎖定圖片正確長寬比（直式）：取得圖片原始尺寸動態計算高度 H = W * (height / width)
+      const img = tex.image as HTMLImageElement | undefined
+      if (img && img.width && img.height) {
+        const aspect = img.height / img.width
+        const dynamicH = W * aspect
+        guanyinMesh.geometry.dispose()
+        guanyinMesh.geometry = new THREE.PlaneGeometry(W, dynamicH)
+        // 底部對齊地面：重新校準 position.y 為最終高度的一半 (dynamicH / 2)
+        guanyinMesh.position.set(0, dynamicH / 2, 0)
+      }
+    }
+
+    const loader = new THREE.TextureLoader()
+    loader.load('./guanyin.png', applyTexture, undefined, () => {
+      loader.load('/guanyin.png', applyTexture)
+    })
 
     // 地坪柔和陰影接觸面（消除懸空感，產生真實實體立體接地感）
     const groundShadow = new THREE.Mesh(
@@ -2321,13 +2333,9 @@ export class TempleWorld {
     this.courtyard.update(time)
     this.npcs.update(dt, time, playerPosition, camera)
 
-    // Y 軸鎖定面向攝影機（Y-axis Billboard）：水平旋轉永遠面向鏡頭，固定俯仰角（Pitch），產生壯闊立體壓迫感
+    // 強制面朝攝影機 (Billboarding 鎖定)：確保平面永遠完美平行於攝影機，徹底消除向後傾斜與透視壓扁
     if (this.dragonGuanyinBillboard && camera) {
-      const camPos = camera.position
-      const angle = Math.atan2(camPos.x - DRAGON_GUANYIN_POS.x, camPos.z - DRAGON_GUANYIN_POS.z)
-      this.dragonGuanyinBillboard.rotation.y = angle
-      this.dragonGuanyinBillboard.rotation.x = 0
-      this.dragonGuanyinBillboard.rotation.z = 0
+      this.dragonGuanyinBillboard.quaternion.copy(camera.quaternion)
     }
 
     // 動態氣場：金色神光粒子向上螺旋升騰
