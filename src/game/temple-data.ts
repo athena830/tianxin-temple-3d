@@ -5,9 +5,9 @@ export type LampId = 'peace' | 'wealth' | 'study'
 export type OfferingId = 'flower' | 'fruit' | 'tea'
 
 export const CHARACTERS: { id: CharacterId; name: string; title: string; color: string }[] = [
-  { id: 'jade', name: '清蓮', title: '素心行者', color: '#bca77a' },
-  { id: 'vermillion', name: '朱霞', title: '丹心行者', color: '#9d3f31' },
-  { id: 'moon', name: '月白', title: '月照行者', color: '#84998b' },
+  { id: 'jade', name: '清蓮', title: '素心・藍髮白袍', color: '#3a6692' },
+  { id: 'vermillion', name: '朱霞', title: '丹心・朱錦金帶', color: '#b64332' },
+  { id: 'moon', name: '月白', title: '月照・天青白錦', color: '#3678b4' },
 ]
 
 export const LOTS = [
