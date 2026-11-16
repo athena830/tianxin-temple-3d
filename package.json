@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
-    "manus:build-source": "tsc --noEmit && vite build && node scripts/check-size.mjs"
+    "manus:build-source": "tsc --noEmit && vite build && node scripts/check-size.mjs",
+    "deploy:gh-pages": "node scripts/deploy-gh-pages.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
