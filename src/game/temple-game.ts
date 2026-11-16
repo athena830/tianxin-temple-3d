@@ -162,13 +162,20 @@ export class TempleGame {
     const p = this.body.translation()
     const dist = Math.hypot(p.x - poolX, p.z - poolZ)
 
-    // Teleport gently to pool approach point if farther than 4.2m
-    if (dist > 4.2) {
-      const approachX = poolX + 3.0
+    // Ensure character Y is never below ground level (safety floor guard)
+    const safeBodyY = FOOT_OFFSET + 0.05
+
+    // If visitor is farther than 5.2m from the pool, position them at the eastern viewing station
+    if (dist > 5.2) {
+      const approachX = poolX + 3.8
       const approachZ = poolZ
-      this.body.setTranslation({ x: approachX, y: 0.1, z: approachZ }, true)
-      this.body.setNextKinematicTranslation({ x: approachX, y: 0.1, z: approachZ })
-      this.camTarget.set(approachX, 0.1 + LOOK_HEIGHT, approachZ)
+      this.body.setTranslation({ x: approachX, y: safeBodyY, z: approachZ }, true)
+      this.body.setNextKinematicTranslation({ x: approachX, y: safeBodyY, z: approachZ })
+      this.camTarget.set(approachX, LOOK_HEIGHT, approachZ)
+    } else if (p.y < FOOT_OFFSET) {
+      // Fix any sunken position immediately
+      this.body.setTranslation({ x: p.x, y: safeBodyY, z: p.z }, true)
+      this.body.setNextKinematicTranslation({ x: p.x, y: safeBodyY, z: p.z })
     }
 
     // Orient visitor to face the center of the lotus pool
@@ -255,6 +262,7 @@ export class TempleGame {
     this.controller.computeColliderMovement(this.collider, desired)
     const m = this.controller.computedMovement()
     const next = { x: t.x + m.x, y: t.y + m.y, z: t.z + m.z }
+    if (next.y < FOOT_OFFSET - 0.02) { next.y = FOOT_OFFSET; this.vy = 0 }
     if (next.y < -5) { const s = this.world.spawn; next.x = s.x; next.y = s.y; next.z = s.z }
     this.body.setNextKinematicTranslation(next)
     this.physics.step(dt)
