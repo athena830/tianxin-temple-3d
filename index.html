@@ -12,5 +12,23 @@
     <canvas id="game"></canvas>
     <div id="ui"></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      // GitHub Pages 靜態託管備援：若 /src/main.ts 未執行（例如直接以 main 分支作為靜態託管），動態載入已編譯之生產 bundle
+      window.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () {
+          if (!window.__TEMPLE_LOADED__ && location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') {
+            var css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = './assets/index-bFX46WGY.css';
+            document.head.appendChild(css);
+            var s = document.createElement('script');
+            s.type = 'module';
+            s.crossOrigin = '';
+            s.src = './assets/index-Dd3ZzqJ0.js';
+            document.head.appendChild(s);
+          }
+        }, 100);
+      });
+    </script>
   </body>
 </html>

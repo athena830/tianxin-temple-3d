@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1f1814" />
+    <title>玉皇宮｜線上 3D 宮廟祈福</title>
+    <meta name="description" content="走進可自由漫遊的 3D 玉皇宮：上香祈願、每日抽籤、象棋卜卦、點燈、供奉、敲木魚、鳴鐘與許願池。" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <script type="module" crossorigin src="./assets/index-Dd3ZzqJ0.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/three.core-D5c3qx7T.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-bFX46WGY.css">
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="ui"></div>
+    <script>
+      // GitHub Pages 靜態託管備援：若 /src/main.ts 未執行（例如直接以 main 分支作為靜態託管），動態載入已編譯之生產 bundle
+      window.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () {
+          if (!window.__TEMPLE_LOADED__ && location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') {
+            var css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = './assets/index-bFX46WGY.css';
+            document.head.appendChild(css);
+            var s = document.createElement('script');
+            s.type = 'module';
+            s.crossOrigin = '';
+            s.src = './assets/index-CKiP_2l9.js';
+            document.head.appendChild(s);
+          }
+        }, 100);
+      });
+    </script>
+  </body>
+</html>
