@@ -2573,16 +2573,16 @@ export class TempleWorld {
 
   private createCoinMesh(): THREE.Group {
     const coin = new THREE.Group()
-    // Outer disc
-    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.025, 20), this.coinGoldMat)
+    // Outer disc with larger size & brilliant golden luster
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.038, 24), this.coinGoldMat)
     disc.castShadow = true
     coin.add(disc)
-    // Raised rim
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.112, 0.012, 6, 20), this.coinGoldMat)
+    // Raised golden rim
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.018, 6, 24), this.coinGoldMat)
     rim.rotation.x = Math.PI / 2
     coin.add(rim)
-    // Dark square inner hole (ancient Chinese copper/gold coin)
-    const hole = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.028, 0.05), this.coinDarkMat)
+    // Dark square inner hole (ancient Chinese lucky coin)
+    const hole = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.042, 0.075), this.coinDarkMat)
     coin.add(hole)
     return coin
   }
@@ -2646,27 +2646,27 @@ export class TempleWorld {
       start,
       target,
       progress: 0,
-      duration: 0.72,
-      peak: 1.25 + Math.random() * 0.35,
-      rotSpeed: new THREE.Vector3(12 + Math.random() * 8, 16 + Math.random() * 10, 8 + Math.random() * 6),
+      duration: 1.15,
+      peak: 1.55 + Math.random() * 0.25,
+      rotSpeed: new THREE.Vector3(10 + Math.random() * 6, 14 + Math.random() * 8, 7 + Math.random() * 5),
       onSplash,
     })
   }
 
   private triggerWaterSplash(pos: THREE.Vector3): void {
     // 1. Concentric ripples
-    for (let i = 0; i < 3; i++) {
-      this.spawnRipple(pos.x, 0.285 + i * 0.002, pos.z, -i * 0.12, 1.4 + i * 0.3)
+    for (let i = 0; i < 4; i++) {
+      this.spawnRipple(pos.x, 0.285 + i * 0.002, pos.z, -i * 0.14, 1.6 + i * 0.35)
     }
     // 2. Splash water droplets
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 16; i++) {
       const ang = Math.random() * Math.PI * 2
-      const spd = 0.6 + Math.random() * 1.5
-      const vy = 2.0 + Math.random() * 1.8
+      const spd = 0.8 + Math.random() * 1.8
+      const vy = 2.4 + Math.random() * 2.2
       this.spawnDroplet(pos, new THREE.Vector3(Math.cos(ang) * spd, vy, Math.sin(ang) * spd))
     }
     // 3. Golden wish sparkles
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 26; i++) {
       this.spawnSparkle(pos)
     }
   }

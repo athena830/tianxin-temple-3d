@@ -6,6 +6,7 @@ import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
 import type { TempleGame } from './game/temple-game'
+import { WISH_POOL } from './game/temple-courtyard'
 import { DRAGON_GUANYIN_POS, type ShrinePointId } from './game/temple-world'
 import { TempleUi } from './ui/temple-ui'
 import { TouchControls } from './ui/touch'
@@ -92,12 +93,26 @@ async function boot(): Promise<void> {
       else if (action === 'woodfish') { store.tapWoodfish(); w.perform('woodfish'); audio.play('woodfish'); ui.toast('叩——心念安定') }
       else if (action === 'bell') { store.ringBell(); w.perform('bell'); audio.play('bell'); ui.toast('鐘聲悠遠，祝福遠播') }
       else if (action === 'coin') {
+        if (game.worshipping) return
         const cat = ui.selectedWishCategory
         const wishText = ui.customWishInput
         const { count, blessing } = store.tossCoin(cat, wishText)
         ui.lastWishBlessing = blessing
         ui.customWishInput = ''
+        ui.hideWishBanner()
+
+        // 1. Close panel immediately so the 3D world is 100% unobstructed!
+        ui.closePanel()
+        game.closePanel()
+        syncMode()
+
+        // 2. Position visitor and frame camera towards the Lotus Wishing Pool
+        game.frameWishingPool()
+
+        // 3. Play coin toss audio immediately as the coin is launched
         audio.play('coin-toss')
+
+        // 4. Perform 3D parabolic animation; on splash, play water plop & celestial chime
         w.perform('coin', undefined, {
           playerPos: game.feet,
           onSplash: () => {
@@ -105,7 +120,12 @@ async function boot(): Promise<void> {
             audio.play('wish-chime')
           },
         })
-        reopen('wishing-pool', `【${blessing.categoryName}】銅錢化作金芒落入池中！${blessing.title}（池底累計第 ${count} 枚）`)
+
+        // 5. Visitor plays prayer/worship pose facing the pool for 2.4s
+        game.worship({ x: WISH_POOL.x, z: WISH_POOL.z }, 2.4, () => {
+          // 6. After coin has landed and sparkles rise, show the floating wish blessing card at the bottom!
+          ui.showWishBanner(blessing, count)
+        })
       }
     },
   })

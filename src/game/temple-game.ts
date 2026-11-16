@@ -7,6 +7,7 @@ import type { Renderer } from '../engine/renderer'
 import type { Quality } from '../engine/save'
 import { CONFIG } from './config'
 import { TEMPLE_MODEL_URLS } from './temple-assets'
+import { WISH_POOL } from './temple-courtyard'
 import { POINT_TARGETS, TempleWorld, type ShrinePoint, type ShrinePointId } from './temple-world'
 
 /**
@@ -152,6 +153,34 @@ export class TempleGame {
     this.ritualDone = done
     this.input.clearHeld()
   }
+
+  /** Position visitor and frame cinematic camera towards the Lotus Wishing Pool. */
+  frameWishingPool(): void {
+    const poolX = WISH_POOL.x
+    const poolZ = WISH_POOL.z
+    const p = this.body.translation()
+    const dist = Math.hypot(p.x - poolX, p.z - poolZ)
+
+    // Teleport gently to pool approach point if farther than 4.2m
+    if (dist > 4.2) {
+      const approachX = poolX + 3.0
+      const approachZ = poolZ
+      this.body.setTranslation({ x: approachX, y: 0.1, z: approachZ }, true)
+      this.body.setNextKinematicTranslation({ x: approachX, y: 0.1, z: approachZ })
+      this.camTarget.set(approachX, 0.1 + LOOK_HEIGHT, approachZ)
+    }
+
+    // Orient visitor to face the center of the lotus pool
+    const curP = this.body.translation()
+    this.heading = Math.atan2(poolX - curP.x, poolZ - curP.z)
+
+    // Frame camera over visitor's shoulder looking directly at the lotus pool
+    this.yaw = this.heading + Math.PI - 0.22
+    this.pitch = 0.26
+    this.zoom = 4.2
+    this.camDistance = 4.2
+  }
+
   get worshipping(): boolean { return this.ritualLeft > 0 }
   get inTemple(): boolean { return this.mode === 'browse' || this.mode === 'explore' || this.mode === 'panel' }
 

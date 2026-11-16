@@ -82,6 +82,7 @@ export class TempleUi {
       </section>
       <section class="screen pause" data-screen="pause"><div class="title-card"><h2>暫歇片刻</h2><p class="lead">點擊下方按鈕繼續參拜。</p><button class="btn primary" data-act="resume">繼續參拜</button></div></section>
       <div class="panel-wrap" hidden><article class="panel"><button class="close" data-act="close" aria-label="關閉">×</button><div class="panel-body"></div></article></div>
+      <div class="wish-banner" hidden></div>
       <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
       <div class="toast" hidden></div>`
     this.root.addEventListener('click', e => this.onClick(e))
@@ -165,7 +166,34 @@ export class TempleUi {
 
   closePanel(): void { this.root.querySelector<HTMLElement>('.panel-wrap')!.hidden = true }
 
+  showWishBanner(blessing: WishBlessing, count: number): void {
+    const banner = this.root.querySelector<HTMLElement>('.wish-banner')
+    if (!banner) return
+    banner.innerHTML = `
+      <div class="wish-banner-card">
+        <button class="wish-banner-close" data-act="wish-close" aria-label="關閉">×</button>
+        <div class="wish-banner-head">
+          <span class="blessing-badge">【${blessing.categoryName}】祈福圓滿</span>
+          <span class="stat-pill">池底願力：<b>${count}</b> 枚</span>
+        </div>
+        <h3 class="wish-banner-title">${esc(blessing.title)}</h3>
+        <p class="wish-banner-prophecy">「${esc(blessing.prophecy)}」</p>
+        <div class="wish-banner-actions">
+          <button class="btn primary small" data-act="wish-again">🪙 再投一枚</button>
+          <button class="btn small" data-act="wish-close">漫步賞蓮</button>
+        </div>
+      </div>
+    `
+    banner.hidden = false
+  }
+
+  hideWishBanner(): void {
+    const banner = this.root.querySelector<HTMLElement>('.wish-banner')
+    if (banner) banner.hidden = true
+  }
+
   open(id: PanelId, message = ''): void {
+    this.hideWishBanner()
     const wrap = this.root.querySelector<HTMLElement>('.panel-wrap')!
     const body = wrap.querySelector<HTMLElement>('.panel-body')!
     body.innerHTML = this.render(id, message)
@@ -320,6 +348,8 @@ export class TempleUi {
     else if (act === 'explore') this.actions.explore()
     else if (act === 'exit') this.actions.exitExplore()
     else if (act === 'guide-cancel') this.actions.cancelGuide()
+    else if (act === 'wish-again') { this.hideWishBanner(); this.actions.ritual('coin') }
+    else if (act === 'wish-close') { this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
@@ -385,6 +415,7 @@ export class TempleUi {
       if (t.dataset.ritual === 'coin') {
         const input = this.root.querySelector<HTMLInputElement>('.wish-custom-input')
         if (input) this.customWishInput = input.value.trim()
+        this.closePanel()
       }
       this.actions.ritual(t.dataset.ritual)
     }
