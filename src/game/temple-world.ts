@@ -49,7 +49,7 @@ const pointPositions: [number, number][] = [
   [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [WISH_POOL.x + 3.9, WISH_POOL.z], [14.6, 4.3], [15, 0.2],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
-  [DRAGON_GUANYIN_POS.x + 5.5, DRAGON_GUANYIN_POS.z],
+  [DRAGON_GUANYIN_POS.x + 4.8, DRAGON_GUANYIN_POS.z],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
@@ -2025,15 +2025,24 @@ export class TempleWorld {
     const billH = 11.2
     const billW = billH * (629 / 907)
     const billboard = new THREE.Mesh(new THREE.PlaneGeometry(billW, billH), planeMat)
-    // 徹底去除多餘第二底座，立牌底部與台基階梯精準平貼於八角平台地面 (y = 0)
-    billboard.position.set(0, billH / 2 - 0.08, 0)
+    // 徹底消除浮空感：下移 1.32m 使圖中圓形雕花台基與階梯底座 100% 精準平貼密接於八角平台地面 (y = 0)
+    billboard.position.set(0, billH / 2 - 1.32, 0)
     billboard.castShadow = true
     root.add(billboard)
     this.dragonGuanyinBillboard = billboard
 
+    // 地坪柔和陰影接觸面（消除懸空感，產生真實實體立體接地感）
+    const groundShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(2.85, 32),
+      new THREE.MeshBasicMaterial({ color: '#221912', transparent: true, opacity: 0.38, depthWrite: false })
+    )
+    groundShadow.rotation.x = -Math.PI / 2
+    groundShadow.position.set(0, 0.015, 0)
+    root.add(groundShadow)
+
     // 3. 底部青銅九龍香爐、參拜蒲團與香火煙霧（朝向東面小徑階梯來向，貼合底座前緣）
     const urn = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.4, 0.62, 12), makeMat('#523e2b', 0.6, 0.4))
-    urn.position.set(3.4, 0.31, 0)
+    urn.position.set(2.8, 0.31, 0)
     const urnRim = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.055, 8, 16), goldMat)
     urnRim.rotation.x = Math.PI / 2
     urnRim.position.y = 0.62
@@ -2045,11 +2054,11 @@ export class TempleWorld {
 
     // 參拜蒲團（金黃織錦拜墊）
     const cushion = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.12, 16), makeMat('#d4a037', 0.8, 0.2))
-    cushion.position.set(4.5, 0.06, 0)
+    cushion.position.set(3.8, 0.06, 0)
     const cushionTop = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.02, 16), vermilionMat)
-    cushionTop.position.set(4.5, 0.125, 0)
+    cushionTop.position.set(3.8, 0.125, 0)
     root.add(urn, cushion, cushionTop)
-    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x + 3.4, pos.y + 0.68, pos.z)
+    this.dragonGuanyinUrnPos = new THREE.Vector3(pos.x + 2.8, pos.y + 0.68, pos.z)
 
     // 4. 金光神聖氛圍燈 (Golden Aura PointLight)
     const auraLight = new THREE.PointLight('#ffe082', 1.4, 16, 2)
