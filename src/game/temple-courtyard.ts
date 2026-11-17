@@ -1001,6 +1001,131 @@ export class FrontCourtyard {
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 0.95, 3)
   }
 
+  /**
+   * 原神風格唯美仙境神木（Genshin Impact Anime Cel-shaded Stylized Tree）
+   * 專門用於通往昇龍觀音的朝聖神道兩側：
+   * 1. 遒勁自然曲折的動漫風樹幹與自然地景盤根（捨棄生硬幾何花盆與底座）
+   * 2. 多層次雲團簇狀蓬鬆樹冠（雙色階調翡翠碧玉／琉璃金杏動漫配色）
+   * 3. 唯美下垂枝葉飄帶與仙氣微光氛圍
+   */
+  private genshinTree(x: number, z: number, seed: number): void {
+    const tree = new THREE.Group()
+    tree.position.set(x, 0, z)
+
+    // 隨機角度與微幅姿態變異
+    const rotY = (seed * 1.37) % (Math.PI * 2)
+    tree.rotation.y = rotY
+
+    // 1. 自然草苔地景盤根（Natural Mossy Root Base）
+    const mossMat = this.c.mat('#445b3d', 0.9)
+    const rootBase = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 1.1, 0.16, 8), mossMat)
+    rootBase.position.y = 0.08
+    tree.add(rootBase)
+
+    // 伴生自然青石（Stylized accent moss stone）
+    const stoneMat = this.c.mat('#7d7568', 0.88)
+    const stone1 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 0), stoneMat)
+    stone1.position.set(0.65, 0.15, 0.4)
+    stone1.scale.set(1.2, 0.6, 0.9)
+    tree.add(stone1)
+
+    // 2. 遒勁自然多段曲折樹幹（Graceful Curved Anime Trunk）
+    const barkMat = this.c.mat('#553723', 0.85)
+    // 樹幹段 1（根部上揚微傾）
+    const trunk1 = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.38, 1.3, 8), barkMat)
+    trunk1.position.set(0, 0.68, 0)
+    trunk1.rotation.z = 0.08
+    trunk1.castShadow = true
+    tree.add(trunk1)
+
+    // 樹幹段 2（中段曲度延伸）
+    const trunk2 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 1.2, 8), barkMat)
+    trunk2.position.set(0.08, 1.75, 0.04)
+    trunk2.rotation.z = -0.14
+    trunk2.rotation.x = 0.06
+    trunk2.castShadow = true
+    tree.add(trunk2)
+
+    // 主分枝 A（左側伸展枝）
+    const branchA = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.1, 7), barkMat)
+    branchA.position.set(-0.35, 2.45, 0.12)
+    branchA.rotation.z = 0.65
+    branchA.rotation.x = -0.15
+    branchA.castShadow = true
+    tree.add(branchA)
+
+    // 主分枝 B（右側高聳主枝）
+    const branchB = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.17, 1.2, 7), barkMat)
+    branchB.position.set(0.32, 2.55, -0.1)
+    branchB.rotation.z = -0.5
+    branchB.rotation.x = 0.18
+    branchB.castShadow = true
+    tree.add(branchB)
+
+    // 3. 原神風格雲團簇狀蓬鬆樹冠（Anime Cel-shaded Cloud Foliage Clumps）
+    // 配色方案：朝聖神道以「璃月／須彌翡翠碧玉」與部分「秋月金杏」交錯
+    const isGold = seed % 3 === 0
+    const colDeep = isGold ? '#b06500' : '#1e5235'   // 樹冠底層深色
+    const colMid = isGold ? '#e59500' : '#3d8b5a'    // 樹冠中層碧綠/金黃
+    const colHigh = isGold ? '#f7c844' : '#6ec287'   // 頂部高光鮮亮
+    const colBright = isGold ? '#ffe680' : '#a3e8b5' // 頂層陽光微暈
+
+    const matDeep = this.c.mat(colDeep, 0.6)
+    matDeep.emissive.set(isGold ? '#452200' : '#0c2415')
+    matDeep.emissiveIntensity = 0.2
+
+    const matMid = this.c.mat(colMid, 0.55)
+    matMid.emissive.set(isGold ? '#552f00' : '#133520')
+    matMid.emissiveIntensity = 0.22
+
+    const matHigh = this.c.mat(colHigh, 0.5)
+    matHigh.emissive.set(isGold ? '#663c00' : '#1d4d2f')
+    matHigh.emissiveIntensity = 0.25
+
+    const matBright = this.c.mat(colBright, 0.45)
+    matBright.emissive.set(isGold ? '#805500' : '#27683e')
+    matBright.emissiveIntensity = 0.28
+
+    // 定義 6 個雲團蓬鬆簇（立體橢圓球狀、層次錯落）
+    const clusters: { pos: [number, number, number]; scale: [number, number, number]; mat: THREE.Material }[] = [
+      // 底部托球（深色打底）
+      { pos: [-0.6, 2.5, 0.2], scale: [0.95, 0.65, 0.95], mat: matDeep },
+      { pos: [0.55, 2.6, -0.2], scale: [1.0, 0.68, 1.0], mat: matDeep },
+      // 中層大雲團（主要體積）
+      { pos: [-0.75, 3.1, 0.15], scale: [1.3, 0.82, 1.25], mat: matMid },
+      { pos: [0.7, 3.25, -0.1], scale: [1.35, 0.85, 1.3], mat: matMid },
+      { pos: [0.0, 3.2, 0.5], scale: [1.1, 0.75, 1.15], mat: matMid },
+      // 高層主樹冠（明亮光影）
+      { pos: [0.08, 3.8, 0.0], scale: [1.45, 0.95, 1.45], mat: matHigh },
+      // 頂峰高光小雲頂（朝天迎光）
+      { pos: [0.12, 4.35, -0.05], scale: [1.0, 0.72, 1.0], mat: matBright },
+    ]
+
+    for (const c of clusters) {
+      // 原神風格多面體柔化球（Dodecahedron with 1 subdivision）
+      const geo = new THREE.DodecahedronGeometry(1.0, 1)
+      const puff = new THREE.Mesh(geo, c.mat)
+      puff.position.set(...c.pos)
+      puff.scale.set(...c.scale)
+      puff.castShadow = true
+      puff.receiveShadow = true
+      tree.add(puff)
+    }
+
+    // 4. 飄逸下垂柔美枝梢葉團（Drooping anime foliage accents）
+    for (const [dx, dy, dz] of [[-1.2, 2.6, 0.3], [1.1, 2.7, -0.3], [-0.2, 2.8, 0.9], [0.3, 2.7, -0.9]]) {
+      const drop = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.65, 5), matMid)
+      drop.rotation.x = Math.PI
+      drop.position.set(dx, dy, dz)
+      drop.scale.set(1.0, 1.0, 0.6)
+      tree.add(drop)
+    }
+
+    this.add(tree)
+    // 實體樹幹碰撞（半徑 0.45m，絕不阻擋步道）
+    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 0.45, 3.0)
+  }
+
   private bench(x: number, z: number, angle: number): void {
     const stone = this.c.mat('#a9a08e', 0.93)
     const g = new THREE.Group()
@@ -1117,12 +1242,13 @@ export class FrontCourtyard {
     }
 
     // -------------------------------------------------------------
-    // 3. 小徑兩側 2 排茂密松柏樹與古樸石燈籠
+    // 3. 小徑兩側 2 排原神風格唯美仙境神木與古樸石燈籠
     // -------------------------------------------------------------
     // 北排樹列 (z = 34.6) 與 南排樹列 (z = 27.4)
+    let treeSeed = 1
     for (const x of [-33.5, -38.5, -43.5, -48.5, -53.0]) {
-      this.tree(x, gateZ + 3.6) // 北側松樹
-      this.tree(x, gateZ - 3.6) // 南側松樹
+      this.genshinTree(x, gateZ + 3.6, treeSeed++) // 北側原神神木
+      this.genshinTree(x, gateZ - 3.6, treeSeed++) // 南側原神神木
     }
     // 夾道古樸石燈籠（柔和微光）
     for (const x of [-36.0, -46.0]) {
