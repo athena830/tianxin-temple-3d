@@ -250,7 +250,7 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'guanyin-dragon', title: '參拜昇龍觀音', subtitle: '仰望五層樓高乘龍觀音金身', radius: 4.8 },
 ]
 const pointPositions: [number, number][] = [
-  [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
+  [0, 0.4], [3.2, -3.4], [-2.25, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [LOTUS_POND.x - 5.8, LOTUS_POND.z], [14.6, 4.3], [15, 0.2],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x + 4.8, DRAGON_GUANYIN_POS.z],
@@ -258,7 +258,7 @@ const pointPositions: [number, number][] = [
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
 export const POINT_TARGETS: [number, number][] = [
-  [0, -2.55], [0, -12.2], [-4.4, -4.2], [-12, 1.2], [PAVILION.x, PAVILION.z],
+  [0, -2.55], [0, -12.2], [-2.25, -4.55], [-12, 1.2], [PAVILION.x, PAVILION.z],
   [12.5, -1.6], [8.5, -8.5], [15.2, -8], [LOTUS_POND.x, LOTUS_POND.z], [17.5, 4.3], [17.2, 0.2],
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
@@ -1528,19 +1528,6 @@ export class TempleWorld {
     this.scene.add(urn)
     this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, -2.55), 0.86, 1.1)
 
-    // Offerings table outside the altar, plus offerings appear on the altar after use.
-    this.addTable(new THREE.Vector3(-4.4, 0, -4.2), 2.8, 1.45)
-    const flowerVase = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.4, 0.7, 10), makeMat('#987448'))
-    flowerVase.position.set(-4.8, 1.8, -4.15)
-    this.scene.add(flowerVase)
-    for (let i = 0; i < 5; i += 1) {
-      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), makeMat(i % 2 ? '#ead2b5' : '#c55d4e'))
-      const a = i * Math.PI * 2 / 5
-      petal.position.set(-4.8 + Math.cos(a) * 0.29, 2.35, -4.15 + Math.sin(a) * 0.29)
-      petal.scale.set(1, 0.65, 1.45)
-      this.scene.add(petal)
-    }
-
     // Lamp stand: three separate lights; progress is reflected on the 3D objects.
     this.lamps.forEach((lamp, i) => {
       const stand = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.44, 1.3), wood)
@@ -1663,24 +1650,6 @@ export class TempleWorld {
     for (const lamp of this.lamps) this.physics.addStaticBox(new THREE.Vector3(lamp.position.x, 1, lamp.position.z), new THREE.Vector3(1.3, 2, 1.3))
     this.physics.addStaticBox(new THREE.Vector3(0, 0.9, -11.55), new THREE.Vector3(6.8, 1.8, 2.1))
     this.physics.addStaticBox(new THREE.Vector3(0, 1, -12.7), new THREE.Vector3(3.5, 2, 2.7))
-  }
-
-  private addTable(position: THREE.Vector3, width: number, height: number): void {
-    const group = new THREE.Group()
-    group.position.copy(position)
-    const wood = makeMat(C.wood)
-    const top = new THREE.Mesh(new THREE.BoxGeometry(width, 0.22, 1.35), makeMat('#754733'))
-    top.position.y = height
-    top.castShadow = true
-    top.receiveShadow = true
-    group.add(top)
-    for (const x of [-width * 0.42, width * 0.42]) for (const z of [-0.48, 0.48]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, height, 0.18), wood)
-      leg.position.set(x, height / 2, z)
-      group.add(leg)
-    }
-    this.scene.add(group)
-    this.physics.addStaticBox(new THREE.Vector3(position.x, height / 2, position.z), new THREE.Vector3(width * 0.8, height, 1.05))
   }
 
   private addMarkers(): void {
