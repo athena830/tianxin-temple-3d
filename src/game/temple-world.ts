@@ -3,7 +3,7 @@ import GUI from 'lil-gui'
 import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
-import { FrontCourtyard, GOLD_FURNACE, PAVILION, STAND, WISH_POOL } from './temple-courtyard'
+import { FrontCourtyard, GOLD_FURNACE, LOTUS_POND, PAVILION, STAND, WISH_POOL } from './temple-courtyard'
 import { NpcManager } from './npc-system'
 
 export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
@@ -38,7 +38,7 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'lamps', title: '祈福燈區', subtitle: '點平安燈、財神燈、文昌燈', radius: 3.2 },
   { id: 'woodfish', title: '木魚', subtitle: '敲擊木魚，收攝心念', radius: 2.5 },
   { id: 'bell', title: '祈福鐘', subtitle: '鳴鐘祈願，祝福相隨', radius: 2.8 },
-  { id: 'wishing-pool', title: '蓮花許願池', subtitle: '投入一枚祈福銅錢', radius: 2.8 },
+  { id: 'wishing-pool', title: '前庭東側・蓮花許願池', subtitle: '投入一枚祈福銅錢', radius: 4.8 },
   { id: 'prayer-wall', title: '祈願牆', subtitle: '閱讀此裝置上的祝願', radius: 3.0 },
   { id: 'records', title: '祈福紀錄', subtitle: '回看本機保存的參拜足跡', radius: 3.0 },
   { id: 'drum', title: '鼓樓擊鼓', subtitle: '擊鼓鳴志，收攝心念', radius: 2.8 },
@@ -48,7 +48,7 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
 ]
 const pointPositions: [number, number][] = [
   [0, 0.4], [3.2, -3.4], [-4.4, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
-  [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [WISH_POOL.x + 3.9, WISH_POOL.z], [14.6, 4.3], [15, 0.2],
+  [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [LOTUS_POND.x - 5.8, LOTUS_POND.z], [14.6, 4.3], [15, 0.2],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x + 4.8, DRAGON_GUANYIN_POS.z],
 ]
@@ -56,7 +56,7 @@ const pointPositions: [number, number][] = [
 /** Object each station faces, used to orient visitors who use the quick guide. */
 export const POINT_TARGETS: [number, number][] = [
   [0, -2.55], [0, -12.2], [-4.4, -4.2], [-12, 1.2], [PAVILION.x, PAVILION.z],
-  [12.5, -1.6], [8.5, -8.5], [15.2, -8], [WISH_POOL.x, WISH_POOL.z], [17.5, 4.3], [17.2, 0.2],
+  [12.5, -1.6], [8.5, -8.5], [15.2, -8], [LOTUS_POND.x, LOTUS_POND.z], [17.5, 4.3], [17.2, 0.2],
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
 ]
@@ -2338,6 +2338,17 @@ export class TempleWorld {
       const d = Math.hypot(point.position.x - position.x, point.position.z - position.z)
       if (d <= point.radius && d < best) { nearest = point; best = d }
     }
+    // Also support wishing-pool trigger when approaching either the right-side lotus pond (LOTUS_POND) or left-side wish pool (WISH_POOL)
+    const wishPoint = this.points.find(p => p.id === 'wishing-pool')
+    if (wishPoint) {
+      const dLotus = Math.hypot(LOTUS_POND.x - 5.8 - position.x, LOTUS_POND.z - position.z)
+      const dWish = Math.hypot(WISH_POOL.x + 3.9 - position.x, WISH_POOL.z - position.z)
+      const minD = Math.min(dLotus, dWish)
+      if (minD <= 4.8 && minD < best) {
+        nearest = wishPoint
+        best = minD
+      }
+    }
     return nearest
   }
 
@@ -2505,12 +2516,11 @@ export class TempleWorld {
       if (c.y <= c.targetY || c.age >= 1.4) {
         c.mesh.position.y = c.targetY
         c.mesh.rotation.set((Math.random() - 0.5) * 0.3, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.3)
-        this.sinkingCoins.push()
         this.restingCoins.push(c.mesh)
         this.sinkingCoins.splice(i, 1)
 
         // Keep resting coins at reasonable count
-        while (this.restingCoins.length > 36) {
+        while (this.restingCoins.length > 64) {
           const old = this.restingCoins.shift()!
           this.scene.remove(old)
           old.traverse(obj => {
@@ -2648,7 +2658,7 @@ export class TempleWorld {
   }
 
   private initRestingCoins(): void {
-    // Scatter authentic resting coins across the pond floor
+    // 1. Scatter authentic resting coins in the left wish pool (WISH_POOL)
     for (let i = 0; i < 16; i++) {
       const coin = this.createCoinMesh()
       const ang = Math.random() * Math.PI * 2
@@ -2661,41 +2671,65 @@ export class TempleWorld {
       this.scene.add(coin)
       this.restingCoins.push(coin)
     }
+
+    // 2. Scatter authentic resting coins in the grand right-side lotus pond (LOTUS_POND)
+    for (let i = 0; i < 28; i++) {
+      const coin = this.createCoinMesh()
+      const ang = Math.random() * Math.PI * 2
+      const rx = 0.6 + Math.random() * 3.6
+      const rz = 0.4 + Math.random() * 2.4
+      const x = LOTUS_POND.x + Math.cos(ang) * rx
+      const z = LOTUS_POND.z + Math.sin(ang) * rz
+      const y = 0.038 + Math.random() * 0.015
+      coin.position.set(x, y, z)
+      coin.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.25)
+      this.scene.add(coin)
+      this.restingCoins.push(coin)
+    }
   }
 
   private tossWishCoin(fromPos?: THREE.Vector3, onSplash?: () => void): void {
     const coin = this.createCoinMesh()
 
+    // Determine target pool (LOTUS_POND vs WISH_POOL)
+    let isWest = false
+    if (fromPos) {
+      const dEast = Math.hypot(fromPos.x - LOTUS_POND.x, fromPos.z - LOTUS_POND.z)
+      const dWest = Math.hypot(fromPos.x - WISH_POOL.x, fromPos.z - WISH_POOL.z)
+      if (dWest < dEast && dWest < 10) {
+        isWest = true
+      }
+    }
+    const pool = isWest ? WISH_POOL : LOTUS_POND
+
     // Determine landing point in wishing pool
-    const inCenterBowl = Math.random() < 0.32
+    const inCenterBowl = Math.random() < 0.35
     const target = new THREE.Vector3()
     if (inCenterBowl) {
       target.set(
-        WISH_POOL.x + (Math.random() - 0.5) * 0.22,
+        pool.x + (Math.random() - 0.5) * 0.25,
         0.35,
-        WISH_POOL.z + (Math.random() - 0.5) * 0.22
+        pool.z + (Math.random() - 0.5) * 0.25
       )
     } else {
       const ang = Math.random() * Math.PI * 2
-      const rad = 0.35 + Math.random() * 1.4
+      const rx = isWest ? 0.35 + Math.random() * 1.4 : 0.6 + Math.random() * 3.4
+      const rz = isWest ? 0.35 + Math.random() * 1.4 : 0.4 + Math.random() * 2.3
       target.set(
-        WISH_POOL.x + Math.cos(ang) * rad,
+        pool.x + Math.cos(ang) * rx,
         0.28,
-        WISH_POOL.z + Math.sin(ang) * rad
+        pool.z + Math.sin(ang) * rz
       )
     }
 
     // Determine launch point: near player or at pool edge
     let start: THREE.Vector3
-    if (fromPos && Math.hypot(fromPos.x - WISH_POOL.x, fromPos.z - WISH_POOL.z) < 14) {
+    if (fromPos && Math.hypot(fromPos.x - pool.x, fromPos.z - pool.z) < 16) {
       start = new THREE.Vector3(fromPos.x, fromPos.y + 1.15, fromPos.z)
     } else {
-      const rimAng = Math.atan2(target.z - WISH_POOL.z, target.x - WISH_POOL.x) + Math.PI + (Math.random() - 0.5) * 0.8
-      start = new THREE.Vector3(
-        WISH_POOL.x + Math.cos(rimAng) * 2.35,
-        1.25,
-        WISH_POOL.z + Math.sin(rimAng) * 2.35
-      )
+      const edgeX = isWest ? pool.x + 3.8 : pool.x - 5.8
+      const edgeZ = pool.z
+      start = new THREE.Vector3(edgeX, 1.25, edgeZ)
     }
 
     coin.position.copy(start)

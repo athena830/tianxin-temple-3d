@@ -6,7 +6,7 @@ import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
 import type { TempleGame } from './game/temple-game'
-import { WISH_POOL } from './game/temple-courtyard'
+import { LOTUS_POND, WISH_POOL } from './game/temple-courtyard'
 import { DRAGON_GUANYIN_POS, type ShrinePointId } from './game/temple-world'
 import { TempleUi } from './ui/temple-ui'
 import { TouchControls } from './ui/touch'
@@ -131,8 +131,13 @@ async function boot(): Promise<void> {
           },
         })
 
-        // 5. Visitor plays prayer/worship pose facing the pool for 2.4s
-        game.worship({ x: WISH_POOL.x, z: WISH_POOL.z }, 2.4, () => {
+        // 5. Visitor plays prayer/worship pose facing the target lotus pool for 2.4s
+        const feet = game.feet
+        const distEast = Math.hypot(feet.x - LOTUS_POND.x, feet.z - LOTUS_POND.z)
+        const distWest = Math.hypot(feet.x - WISH_POOL.x, feet.z - WISH_POOL.z)
+        const targetPool = distWest < distEast && distWest < 8.0 ? WISH_POOL : LOTUS_POND
+
+        game.worship({ x: targetPool.x, z: targetPool.z }, 2.4, () => {
           // 6. After coin has landed and sparkles rise, show the floating wish blessing card at the bottom!
           ui.showWishBanner(blessing, count)
         })

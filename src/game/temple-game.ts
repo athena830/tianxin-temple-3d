@@ -7,7 +7,7 @@ import type { Renderer } from '../engine/renderer'
 import type { Quality } from '../engine/save'
 import { CONFIG } from './config'
 import { TEMPLE_MODEL_URLS } from './temple-assets'
-import { WISH_POOL } from './temple-courtyard'
+import { LOTUS_POND, WISH_POOL } from './temple-courtyard'
 import { POINT_TARGETS, TempleWorld, type ShrinePoint, type ShrinePointId } from './temple-world'
 
 /**
@@ -155,19 +155,24 @@ export class TempleGame {
     this.input.clearHeld()
   }
 
-  /** Position visitor and frame cinematic camera towards the Lotus Wishing Pool. */
+  /** Position visitor and frame cinematic camera towards the Lotus Wishing Pool (defaults to the magnificent East Lotus Pond). */
   frameWishingPool(): void {
-    const poolX = WISH_POOL.x
-    const poolZ = WISH_POOL.z
     const p = this.body.translation()
+    const distEast = Math.hypot(p.x - LOTUS_POND.x, p.z - LOTUS_POND.z)
+    const distWest = Math.hypot(p.x - WISH_POOL.x, p.z - WISH_POOL.z)
+    const isWest = distWest < distEast && distWest < 8.0
+    const targetPool = isWest ? WISH_POOL : LOTUS_POND
+
+    const poolX = targetPool.x
+    const poolZ = targetPool.z
     const dist = Math.hypot(p.x - poolX, p.z - poolZ)
 
     // Ensure character Y is never below ground level (safety floor guard)
     const safeBodyY = FOOT_OFFSET + 0.05
 
-    // If visitor is farther than 5.2m from the pool, position them at the eastern viewing station
-    if (dist > 5.2) {
-      const approachX = poolX + 3.8
+    // If visitor is farther than viewing station, position them neatly at the stone viewing platform
+    if (dist > (isWest ? 5.2 : 7.2)) {
+      const approachX = isWest ? poolX + 3.8 : poolX - 5.8
       const approachZ = poolZ
       this.body.setTranslation({ x: approachX, y: safeBodyY, z: approachZ }, true)
       this.body.setNextKinematicTranslation({ x: approachX, y: safeBodyY, z: approachZ })

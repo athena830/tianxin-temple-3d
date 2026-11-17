@@ -724,6 +724,16 @@ export class FrontCourtyard {
       new THREE.Vector3(x, 0.45, z),
       new THREE.Vector3((rx + 0.15) * 2, 0.95, (rz + 0.15) * 2)
     )
+
+    // 7. Center Sacred Lotus Pedestal & Treasure Bowl (池心聚寶金蓮台)
+    const centerPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.65, 0.38, 16), this.c.mat('#8f8670', 0.8))
+    centerPedestal.position.set(x, 0.15, z)
+    this.c.scene.add(centerPedestal)
+    const centerBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.32, 0.16, 16), this.c.mat(PAL.gold, 0.35, 0.5))
+    centerBowl.position.set(x, 0.35, z)
+    this.c.scene.add(centerBowl)
+    // Sacred golden lotus flower blooming in the center
+    this.c.scene.add(this.lotusFlower(x, 0.42, z, 0.34, '#ffdf78'))
   }
 
   /**
