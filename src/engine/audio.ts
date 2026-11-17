@@ -9,6 +9,8 @@ export type Sfx = 'pickup' | 'jump' | 'land' | 'hurt' | 'ui' | 'win' | 'lose' | 
 
 export type MusicTrack = 'green_tara' | 'heart_sutra'
 
+export const TARGET_TARA_CHANTS = 12
+
 const TARA_OFFSETS = [24.0, 37.5, 51.0, 64.5, 78.0, 91.5, 105.0, 118.5, 132.0, 145.5, 159.0, 172.5, 186.0, 199.5]
 
 export class Audio {
@@ -144,15 +146,15 @@ export class Audio {
           if (curTime >= off) inLoopCount++
         }
         const totalChants = this.taraLoopCount * TARA_OFFSETS.length + inLoopCount
-        const displayCount = Math.min(36, Math.max(1, totalChants))
+        const displayCount = Math.min(TARGET_TARA_CHANTS, Math.max(1, totalChants))
 
         if (displayCount !== this.taraChantCount) {
           this.taraChantCount = displayCount
-          this.onChantProgress?.(this.taraChantCount, 36)
+          this.onChantProgress?.(this.taraChantCount, TARGET_TARA_CHANTS)
         }
 
-        // When 36 chants complete (in loop 2, offset 7 is at 118.5s; phrase ends at 132.0s)
-        if (totalChants >= 36 && curTime >= 132.0) {
+        // When 12 chants complete (chant 12 starts at 172.5s and finishes at 186.0s before chant 13)
+        if (totalChants >= TARGET_TARA_CHANTS && curTime >= 186.0) {
           this.switchToTrack('heart_sutra')
         }
       })
@@ -210,7 +212,7 @@ export class Audio {
         void ta.play().catch(() => {})
       }
       this.onTrackChange?.('green_tara', '綠度母心咒')
-      this.onChantProgress?.(1, 36)
+      this.onChantProgress?.(1, TARGET_TARA_CHANTS)
     }
   }
 
@@ -221,7 +223,7 @@ export class Audio {
     if (this.currentTrack === 'green_tara') {
       const ta = this.initTaraAudio()
       void ta.play().catch(() => {})
-      this.onChantProgress?.(Math.max(1, this.taraChantCount), 36)
+      this.onChantProgress?.(Math.max(1, this.taraChantCount), TARGET_TARA_CHANTS)
     } else {
       const ha = this.initHeartAudio()
       void ha.play().catch(() => {})
