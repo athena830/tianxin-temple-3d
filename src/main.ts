@@ -57,7 +57,7 @@ async function boot(): Promise<void> {
     explore: startExplore,
     exitExplore,
     cancelGuide: () => game?.setGuide(null),
-    time: mode => game?.world.setTimeOfDay(mode),
+    time: mode => game?.world.setTimeSetting(mode),
     ritual: action => {
       if (!game) return
       const w = game.world

@@ -1,11 +1,18 @@
 import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId, type WishCategory, type WishBlessing } from '../game/temple-data'
-import type { ShrinePoint, ShrinePointId, TimeOfDay } from '../game/temple-world'
+import { getRealWorldTimeOfDay, type ShrinePoint, type ShrinePointId, type TimeOfDay, type TimeSetting } from '../game/temple-world'
 import { APP_VERSION } from '../version'
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
 const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
 const SAMPLE_WISHES = ['願家人身體健康，平安順遂。', '祈求考試順利，心定不慌。', '願世間少些病苦，多些溫柔。', '新的一年，工作踏實、心安自在。']
+
+const TIME_LABELS: Record<TimeOfDay, string> = {
+  day: '☀️ 晴空',
+  dusk: '🌇 夕陽',
+  night: '🌙 夜晚',
+  dawn: '🌅 晨曦',
+}
 
 export type TempleUiActions = {
   begin(): void
@@ -19,20 +26,26 @@ export type TempleUiActions = {
   explore(): void
   exitExplore(): void
   cancelGuide(): void
-  time(mode: TimeOfDay): void
+  time(mode: TimeSetting): void
 }
 
 export class TempleUi {
   screen = 'boot'
   private readonly root: HTMLElement
   private toastTimer = 0
-  private currentTime: TimeOfDay = 'day'
+  private currentTimeSetting: TimeSetting = 'auto'
+  private currentEffectiveTime: TimeOfDay = 'day'
   private lastBobei: { title: string; desc: string; cup1: 'yang' | 'yin'; cup2: 'yang' | 'yin' } | null = null
   selectedWishCategory: WishCategory = 'peace'
   lastWishBlessing: WishBlessing | null = null
   customWishInput = ''
 
   constructor(private readonly store: TempleStore, private readonly actions: TempleUiActions) {
+    const initReal = getRealWorldTimeOfDay().mode
+    this.currentTimeSetting = 'auto'
+    this.currentEffectiveTime = initReal
+    const initialTimeLabel = `⏰ 現實 (${TIME_LABELS[initReal]})`
+
     this.root = document.getElementById('ui')!
     this.root.innerHTML = `
       <div class="app-version-badge" id="app-version">${APP_VERSION}</div>
@@ -59,7 +72,7 @@ export class TempleUi {
         <header class="hud-top">
           <div class="badge"><span class="seal small">玉</span><div><b>玉皇宮</b><small data-who></small></div></div>
           <div class="hud-buttons">
-            <button class="chip" data-act="time">☀️ 晴空</button>
+            <button class="chip" data-act="time">${initialTimeLabel}</button>
             <button class="chip" data-act="map">參拜指引</button>
             <button class="chip" data-open="records">祈福紀錄</button>
             <button class="chip" data-open="prayer-wall">祈願牆</button>
@@ -88,6 +101,16 @@ export class TempleUi {
       <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
       <div class="toast" hidden></div>`
     this.root.addEventListener('click', e => this.onClick(e))
+    window.setInterval(() => {
+      if (this.currentTimeSetting === 'auto') {
+        const cur = getRealWorldTimeOfDay().mode
+        if (cur !== this.currentEffectiveTime) {
+          this.currentEffectiveTime = cur
+          const btn = this.root.querySelector<HTMLElement>('button[data-act="time"]')
+          if (btn) btn.textContent = `⏰ 現實 (${TIME_LABELS[cur]})`
+        }
+      }
+    }, 8000)
     this.root.addEventListener('submit', e => {
       e.preventDefault()
       const form = e.target as HTMLFormElement
@@ -373,19 +396,26 @@ export class TempleUi {
     else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
     else if (act === 'time') {
-      const cycle: TimeOfDay[] = ['day', 'dusk', 'night', 'dawn']
-      const next = cycle[(cycle.indexOf(this.currentTime) + 1) % cycle.length]
-      this.currentTime = next
-      const labels: Record<TimeOfDay, string> = { day: '☀️ 晴空', dusk: '🌇 夕陽', night: '🌙 夜晚', dawn: '🌅 晨曦' }
-      t.textContent = labels[next]
-      this.actions.time(next)
-      const toasts: Record<TimeOfDay, string> = {
-        day: '已切換為「晴空白雲」時段，陽光普照。',
-        dusk: '已切換為「夕陽餘暉」時段，晚霞漫天。',
-        night: '已切換為「夜間點燈」時段，宮燈齊明，金光熠熠。',
-        dawn: '已切換為「晨曦朝陽」時段，紫氣東來。',
+      const cycle: TimeSetting[] = ['auto', 'day', 'dusk', 'night', 'dawn']
+      const next = cycle[(cycle.indexOf(this.currentTimeSetting) + 1) % cycle.length]
+      this.currentTimeSetting = next
+      if (next === 'auto') {
+        this.currentEffectiveTime = getRealWorldTimeOfDay().mode
+        t.textContent = `⏰ 現實 (${TIME_LABELS[this.currentEffectiveTime]})`
+        this.actions.time('auto')
+        this.toast('已切換為「現實時間同步」：場景自動隨現實清晨、白天、黃昏與夜晚即時變換。')
+      } else {
+        this.currentEffectiveTime = next
+        t.textContent = TIME_LABELS[next]
+        this.actions.time(next)
+        const toasts: Record<TimeOfDay, string> = {
+          day: '已切換為「白天（晴空）」時段，陽光普照。',
+          dusk: '已切換為「黃昏（夕陽）」時段，晚霞漫天。',
+          night: '已切換為「夜晚（夜間）」時段，宮燈齊明，金光熠熠。',
+          dawn: '已切換為「清晨（晨曦）」時段，紫氣東來。',
+        }
+        this.toast(toasts[next])
       }
-      this.toast(toasts[next])
     }
     else if (act === 'toss-bobei') {
       const r = Math.random()

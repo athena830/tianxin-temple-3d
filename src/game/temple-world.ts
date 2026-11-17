@@ -14,6 +14,101 @@ export type ShrinePointId =
   | 'drum' | 'yuhuang' | 'gold-furnace' | 'guanyin-dragon'
 
 export type TimeOfDay = 'day' | 'dawn' | 'dusk' | 'night'
+export type TimeSetting = 'auto' | TimeOfDay
+
+export interface TimeConfig {
+  bgColor: string
+  fogColor: string
+  fogNear: number
+  fogFar: number
+  sunColor: string
+  sunIntensity: number
+  sunPosition: [number, number, number]
+  hemiColor: string
+  hemiGroundColor: string
+  hemiIntensity: number
+  cloudColor: string
+  cloudOpacity: number
+  skyStops: [string, string, string, string]
+}
+
+export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
+  dawn: {
+    bgColor: '#ba6a55',
+    fogColor: '#c77a63',
+    fogNear: 55,
+    fogFar: 180,
+    sunColor: '#ffcca0',
+    sunIntensity: 1.15,
+    sunPosition: [-35, 20, 22],
+    hemiColor: '#ffd8b8',
+    hemiGroundColor: '#4a3832',
+    hemiIntensity: 0.95,
+    cloudColor: '#fedbc7',
+    cloudOpacity: 0.85,
+    skyStops: ['#2c3b59', '#8c4840', '#d47752', '#fad794'],
+  },
+  day: {
+    bgColor: '#98b8cb',
+    fogColor: '#bfd4df',
+    fogNear: 55,
+    fogFar: 180,
+    sunColor: '#fff0d0',
+    sunIntensity: 1.35,
+    sunPosition: [-18, 36, 25],
+    hemiColor: '#fbf4e8',
+    hemiGroundColor: '#636b69',
+    hemiIntensity: 1.1,
+    cloudColor: '#fefcf8',
+    cloudOpacity: 0.82,
+    skyStops: ['#5a8fa8', '#86adbe', '#c1d4dc', '#ebe4d3'],
+  },
+  dusk: {
+    bgColor: '#6a2838',
+    fogColor: '#7d3242',
+    fogNear: 55,
+    fogFar: 180,
+    sunColor: '#ff7733',
+    sunIntensity: 0.98,
+    sunPosition: [35, 18, 20],
+    hemiColor: '#ff9966',
+    hemiGroundColor: '#2d1e24',
+    hemiIntensity: 0.85,
+    cloudColor: '#fca57c',
+    cloudOpacity: 0.88,
+    skyStops: ['#1c1c38', '#5e2348', '#a63e3d', '#e67e22'],
+  },
+  night: {
+    bgColor: '#0f1b2d',
+    fogColor: '#142236',
+    fogNear: 70,
+    fogFar: 190,
+    sunColor: '#9cbbe8',
+    sunIntensity: 0.88,
+    sunPosition: [-15, 30, -25],
+    hemiColor: '#3e5c82',
+    hemiGroundColor: '#2a3748',
+    hemiIntensity: 0.95,
+    cloudColor: '#526585',
+    cloudOpacity: 0.55,
+    skyStops: ['#0a1426', '#13223a', '#1e3354', '#2c476e'],
+  },
+}
+
+export function getRealWorldTimeOfDay(date = new Date()): { mode: TimeOfDay; hourFraction: number } {
+  const h = date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600
+  let mode: TimeOfDay = 'night'
+  if (h >= 5.0 && h < 7.0) {
+    mode = 'dawn'
+  } else if (h >= 7.0 && h < 17.0) {
+    mode = 'day'
+  } else if (h >= 17.0 && h < 19.0) {
+    mode = 'dusk'
+  } else {
+    mode = 'night'
+  }
+  return { mode, hourFraction: h }
+}
 
 export type ShrinePoint = {
   id: ShrinePointId
@@ -160,7 +255,34 @@ export class TempleWorld {
   private skyCv!: HTMLCanvasElement
   private skyTex!: THREE.CanvasTexture
   private cloudMat!: THREE.MeshBasicMaterial
+  private timeSetting: TimeSetting = 'auto'
   private timeOfDay: TimeOfDay = 'day'
+  private readonly targetBgColor = new THREE.Color('#98b8cb')
+  private readonly targetFogColor = new THREE.Color('#bfd4df')
+  private targetFogNear = 55
+  private targetFogFar = 180
+  private readonly targetSunColor = new THREE.Color('#fff0d0')
+  private targetSunIntensity = 1.35
+  private readonly targetSunPos = new THREE.Vector3(-18, 36, 25)
+  private readonly targetHemiColor = new THREE.Color('#fbf4e8')
+  private readonly targetHemiGroundColor = new THREE.Color('#636b69')
+  private targetHemiIntensity = 1.1
+  private readonly targetCloudColor = new THREE.Color('#fefcf8')
+  private targetCloudOpacity = 0.82
+  private readonly currentSkyStops: [THREE.Color, THREE.Color, THREE.Color, THREE.Color] = [
+    new THREE.Color('#5a8fa8'),
+    new THREE.Color('#86adbe'),
+    new THREE.Color('#c1d4dc'),
+    new THREE.Color('#ebe4d3'),
+  ]
+  private readonly targetSkyStops: [THREE.Color, THREE.Color, THREE.Color, THREE.Color] = [
+    new THREE.Color('#5a8fa8'),
+    new THREE.Color('#86adbe'),
+    new THREE.Color('#c1d4dc'),
+    new THREE.Color('#ebe4d3'),
+  ]
+  private realTimeCheckTimer = 0
+  private isSkyTransitioning = false
   private bellImpulse = 0
   private drumImpulse = 0
   private woodfishImpulse = 0
@@ -209,6 +331,11 @@ export class TempleWorld {
 
     this.addSkyDome()
     this.addClouds()
+
+    const initialReal = getRealWorldTimeOfDay().mode
+    this.timeSetting = 'auto'
+    this.timeOfDay = initialReal
+    this.applyTimeConfig(TIME_CONFIGS[initialReal], true)
 
     this.courtyard = new FrontCourtyard({
       scene: this.scene, physics: this.physics, mat: makeMat,
@@ -2296,7 +2423,7 @@ export class TempleWorld {
     this.skyCv = document.createElement('canvas')
     this.skyCv.width = 64
     this.skyCv.height = 256
-    this.renderSkyGradient('day')
+    this.renderSkyGradientWithColors(this.currentSkyStops)
     this.skyTex = new THREE.CanvasTexture(this.skyCv)
     this.skyTex.colorSpace = THREE.SRGBColorSpace
 
@@ -2307,81 +2434,95 @@ export class TempleWorld {
     this.scene.add(dome)
   }
 
-  private renderSkyGradient(mode: TimeOfDay): void {
-    const ctx = this.skyCv.getContext('2d')!
+  private renderSkyGradientWithColors(stops: [THREE.Color, THREE.Color, THREE.Color, THREE.Color]): void {
+    if (!this.skyCv) return
+    const ctx = this.skyCv.getContext('2d')
+    if (!ctx) return
     const grad = ctx.createLinearGradient(0, 0, 0, 256)
-    if (mode === 'dawn') {
-      grad.addColorStop(0, '#2c3b59')
-      grad.addColorStop(0.35, '#8c4840')
-      grad.addColorStop(0.72, '#d47752')
-      grad.addColorStop(1, '#fad794')
-    } else if (mode === 'dusk') {
-      grad.addColorStop(0, '#1c1c38')
-      grad.addColorStop(0.35, '#5e2348')
-      grad.addColorStop(0.72, '#a63e3d')
-      grad.addColorStop(1, '#e67e22')
-    } else if (mode === 'night') {
-      grad.addColorStop(0, '#0a1426')
-      grad.addColorStop(0.35, '#13223a')
-      grad.addColorStop(0.72, '#1e3354')
-      grad.addColorStop(1, '#2c476e')
-    } else {
-      // day
-      grad.addColorStop(0, '#5a8fa8')
-      grad.addColorStop(0.35, '#86adbe')
-      grad.addColorStop(0.72, '#c1d4dc')
-      grad.addColorStop(1, '#ebe4d3')
-    }
+    grad.addColorStop(0, '#' + stops[0].getHexString())
+    grad.addColorStop(0.35, '#' + stops[1].getHexString())
+    grad.addColorStop(0.72, '#' + stops[2].getHexString())
+    grad.addColorStop(1, '#' + stops[3].getHexString())
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, 64, 256)
   }
 
-  getTimeOfDay(): TimeOfDay { return this.timeOfDay }
+  renderSkyGradient(mode: TimeOfDay): void {
+    const cfg = TIME_CONFIGS[mode]
+    for (let i = 0; i < 4; i++) {
+      this.currentSkyStops[i].set(cfg.skyStops[i])
+      this.targetSkyStops[i].set(cfg.skyStops[i])
+    }
+    this.renderSkyGradientWithColors(this.currentSkyStops)
+  }
 
-  setTimeOfDay(mode: TimeOfDay): void {
-    this.timeOfDay = mode
-    this.renderSkyGradient(mode)
-    if (this.skyTex) this.skyTex.needsUpdate = true
+  getTimeSetting(): TimeSetting {
+    return this.timeSetting
+  }
 
-    if (mode === 'dawn') {
-      this.scene.background = new THREE.Color('#ba6a55')
-      ;(this.scene.fog as THREE.Fog).color.set('#c77a63')
-      this.sun.color.set('#ffcca0')
-      this.sun.intensity = 1.15
-      this.hemiLight.color.set('#ffd8b8')
-      this.hemiLight.groundColor.set('#4a3832')
-      this.hemiLight.intensity = 0.95
-      if (this.cloudMat) { this.cloudMat.color.set('#fedbc7'); this.cloudMat.opacity = 0.85 }
-    } else if (mode === 'dusk') {
-      this.scene.background = new THREE.Color('#6a2838')
-      ;(this.scene.fog as THREE.Fog).color.set('#7d3242')
-      this.sun.color.set('#ff7733')
-      this.sun.intensity = 0.95
-      this.hemiLight.color.set('#ff9966')
-      this.hemiLight.groundColor.set('#2d1e24')
-      this.hemiLight.intensity = 0.8
-      if (this.cloudMat) { this.cloudMat.color.set('#fca57c'); this.cloudMat.opacity = 0.88 }
-    } else if (mode === 'night') {
-      this.scene.background = new THREE.Color('#0f1b2d')
-      ;(this.scene.fog as THREE.Fog).color.set('#142236')
-      ;(this.scene.fog as THREE.Fog).near = 70
-      ;(this.scene.fog as THREE.Fog).far = 190
-      this.sun.color.set('#9cbbe8')
-      this.sun.intensity = 0.88
-      this.hemiLight.color.set('#3e5c82')
-      this.hemiLight.groundColor.set('#2a3748')
-      this.hemiLight.intensity = 0.95
-      if (this.cloudMat) { this.cloudMat.color.set('#526585'); this.cloudMat.opacity = 0.55 }
+  getTimeOfDay(): TimeOfDay {
+    return this.timeOfDay
+  }
+
+  setTimeSetting(setting: TimeSetting, immediate = false): void {
+    this.timeSetting = setting
+    if (setting === 'auto') {
+      const mode = getRealWorldTimeOfDay().mode
+      this.timeOfDay = mode
+      this.applyTimeConfig(TIME_CONFIGS[mode], immediate)
     } else {
-      // day
-      this.scene.background = new THREE.Color('#98b8cb')
-      ;(this.scene.fog as THREE.Fog).color.set('#bfd4df')
-      this.sun.color.set('#fff0d0')
-      this.sun.intensity = 1.35
-      this.hemiLight.color.set('#fbf4e8')
-      this.hemiLight.groundColor.set('#636b69')
-      this.hemiLight.intensity = 1.1
-      if (this.cloudMat) { this.cloudMat.color.set('#fefcf8'); this.cloudMat.opacity = 0.82 }
+      this.timeOfDay = setting
+      this.applyTimeConfig(TIME_CONFIGS[setting], immediate)
+    }
+  }
+
+  setTimeOfDay(mode: TimeOfDay, immediate = false): void {
+    this.setTimeSetting(mode, immediate)
+  }
+
+  private applyTimeConfig(cfg: TimeConfig, immediate = false): void {
+    this.targetBgColor.set(cfg.bgColor)
+    this.targetFogColor.set(cfg.fogColor)
+    this.targetFogNear = cfg.fogNear
+    this.targetFogFar = cfg.fogFar
+    this.targetSunColor.set(cfg.sunColor)
+    this.targetSunIntensity = cfg.sunIntensity
+    this.targetSunPos.set(...cfg.sunPosition)
+    this.targetHemiColor.set(cfg.hemiColor)
+    this.targetHemiGroundColor.set(cfg.hemiGroundColor)
+    this.targetHemiIntensity = cfg.hemiIntensity
+    this.targetCloudColor.set(cfg.cloudColor)
+    this.targetCloudOpacity = cfg.cloudOpacity
+    this.targetSkyStops[0].set(cfg.skyStops[0])
+    this.targetSkyStops[1].set(cfg.skyStops[1])
+    this.targetSkyStops[2].set(cfg.skyStops[2])
+    this.targetSkyStops[3].set(cfg.skyStops[3])
+    this.isSkyTransitioning = true
+
+    if (immediate) {
+      if (this.scene.background instanceof THREE.Color) this.scene.background.copy(this.targetBgColor)
+      const fog = this.scene.fog as THREE.Fog
+      if (fog) {
+        fog.color.copy(this.targetFogColor)
+        fog.near = this.targetFogNear
+        fog.far = this.targetFogFar
+      }
+      this.sun.color.copy(this.targetSunColor)
+      this.sun.intensity = this.targetSunIntensity
+      this.sun.position.copy(this.targetSunPos)
+      this.hemiLight.color.copy(this.targetHemiColor)
+      this.hemiLight.groundColor.copy(this.targetHemiGroundColor)
+      this.hemiLight.intensity = this.targetHemiIntensity
+      if (this.cloudMat) {
+        this.cloudMat.color.copy(this.targetCloudColor)
+        this.cloudMat.opacity = this.targetCloudOpacity
+      }
+      for (let i = 0; i < 4; i++) {
+        this.currentSkyStops[i].copy(this.targetSkyStops[i])
+      }
+      this.renderSkyGradientWithColors(this.currentSkyStops)
+      if (this.skyTex) this.skyTex.needsUpdate = true
+      this.isSkyTransitioning = false
     }
   }
 
@@ -2525,6 +2666,63 @@ export class TempleWorld {
     this.incenseGlow.intensity = THREE.MathUtils.damp(this.incenseGlow.intensity, 0.22, 1.4, dt)
     this.courtyard.update(time)
     this.npcs.update(dt, time, playerPosition, camera)
+
+    // Real-world time auto synchronization check every 5 seconds
+    if (this.timeSetting === 'auto') {
+      this.realTimeCheckTimer += dt
+      if (this.realTimeCheckTimer >= 5) {
+        this.realTimeCheckTimer = 0
+        const currentReal = getRealWorldTimeOfDay().mode
+        if (currentReal !== this.timeOfDay) {
+          this.timeOfDay = currentReal
+          this.applyTimeConfig(TIME_CONFIGS[currentReal], false)
+        }
+      }
+    }
+
+    // Smooth environment transition lerping (day, dusk, night, dawn)
+    if (this.isSkyTransitioning) {
+      const alpha = Math.min(1.0, dt * 2.2)
+      if (this.scene.background instanceof THREE.Color) {
+        this.scene.background.lerp(this.targetBgColor, alpha)
+      }
+      const fog = this.scene.fog as THREE.Fog
+      if (fog) {
+        fog.color.lerp(this.targetFogColor, alpha)
+        fog.near = THREE.MathUtils.lerp(fog.near, this.targetFogNear, alpha)
+        fog.far = THREE.MathUtils.lerp(fog.far, this.targetFogFar, alpha)
+      }
+      this.sun.color.lerp(this.targetSunColor, alpha)
+      this.sun.intensity = THREE.MathUtils.lerp(this.sun.intensity, this.targetSunIntensity, alpha)
+      this.sun.position.lerp(this.targetSunPos, alpha)
+      this.hemiLight.color.lerp(this.targetHemiColor, alpha)
+      this.hemiLight.groundColor.lerp(this.targetHemiGroundColor, alpha)
+      this.hemiLight.intensity = THREE.MathUtils.lerp(this.hemiLight.intensity, this.targetHemiIntensity, alpha)
+      if (this.cloudMat) {
+        this.cloudMat.color.lerp(this.targetCloudColor, alpha)
+        this.cloudMat.opacity = THREE.MathUtils.lerp(this.cloudMat.opacity, this.targetCloudOpacity, alpha)
+      }
+
+      let maxDiff = 0
+      for (let i = 0; i < 4; i++) {
+        const c = this.currentSkyStops[i]
+        const t = this.targetSkyStops[i]
+        const dr = Math.abs(c.r - t.r)
+        const dg = Math.abs(c.g - t.g)
+        const db = Math.abs(c.b - t.b)
+        if (dr > maxDiff) maxDiff = dr
+        if (dg > maxDiff) maxDiff = dg
+        if (db > maxDiff) maxDiff = db
+        c.lerp(t, alpha)
+      }
+
+      this.renderSkyGradientWithColors(this.currentSkyStops)
+      if (this.skyTex) this.skyTex.needsUpdate = true
+
+      if (maxDiff < 0.003 && Math.abs(this.sun.intensity - this.targetSunIntensity) < 0.005) {
+        this.isSkyTransitioning = false
+      }
+    }
 
     // Face the camera only around the world Y axis. Copying the full camera
     // quaternion also copied its pitch, which tilted the otherwise upright 2D
