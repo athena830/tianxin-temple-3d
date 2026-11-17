@@ -9,27 +9,9 @@
     <link rel="icon" type="image/png" href="./favicon.png" />
   </head>
   <body>
-    <div class="app-version-badge" id="app-version">VER 3.37.0</div>
+    <div class="app-version-badge" id="app-version">VER 3.38.0</div>
     <canvas id="game"></canvas>
     <div id="ui"></div>
     <script type="module" src="/src/main.ts"></script>
-    <script>
-      // GitHub Pages 靜態託管備援：若 /src/main.ts 未執行（例如直接以 main 分支作為靜態託管），動態載入已編譯之生產 bundle
-      window.addEventListener('DOMContentLoaded', function () {
-        setTimeout(function () {
-          if (!window.__TEMPLE_LOADED__ && location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') {
-            var css = document.createElement('link');
-            css.rel = 'stylesheet';
-            css.href = './assets/index-D716XVJ0.css';
-            document.head.appendChild(css);
-            var s = document.createElement('script');
-            s.type = 'module';
-            s.crossOrigin = '';
-            s.src = './assets/index-o3qAOXjV.js';
-            document.head.appendChild(s);
-          }
-        }, 100);
-      });
-    </script>
   </body>
 </html>

@@ -60,6 +60,7 @@ async function boot(): Promise<void> {
     time: mode => game?.world.setTimeSetting(mode),
     toggleMusic: () => audio.toggleMusic(),
     isMusicPlaying: () => audio.isMusicPlaying(),
+    getCurrentMusicState: () => audio.getCurrentMusicState(),
     switchTrack: track => audio.switchToTrack(track),
     ritual: action => {
       if (!game) return
@@ -149,7 +150,7 @@ async function boot(): Promise<void> {
   })
   ui.show('boot')
   audio.onChantProgress = (cur, total) => ui.updateMusicProgress('green_tara', cur, total)
-  audio.onTrackChange = (track, title) => ui.onMusicTrackTransition(track, title)
+  audio.onTrackChange = (track, title, reason) => ui.onMusicTrackTransition(track, title, reason)
   ;(window as any).__templeAudio__ = audio
 
   let loaded = 0
@@ -169,8 +170,17 @@ async function boot(): Promise<void> {
   g.reducedMotion = save.data.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches
   g.world.reducedSmoke = g.reducedMotion
   const assets = new Assets()
-  assets.onProgress(p => ui.setBootProgress(0.7 + p * 0.3))
+  assets.onProgress(p => ui.setBootProgress(0.7 + p * 0.2))
   await g.loadModels(assets)
+  ui.setBootProgress(0.9)
+  // Precompile WebGL shader pipelines while still in boot screen, completely eliminating
+  // the 1-2 second frame freeze when entering the 3D scene!
+  try {
+    renderer.gl.compile(g.world.scene, g.camera)
+  } catch (err) {
+    console.warn('Shader precompile:', err)
+  }
+  ui.setBootProgress(1.0)
   g.world.setCharacter(store.data.character)
   for (const id of Object.keys(store.data.lamps) as LampId[]) if (store.data.lamps[id]) g.world.perform(`lamp-${id}`)
   for (const id of Object.keys(store.data.offerings) as OfferingId[]) {

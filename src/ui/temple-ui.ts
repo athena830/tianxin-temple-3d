@@ -37,6 +37,7 @@ export type TempleUiActions = {
   time(mode: TimeSetting): void
   toggleMusic(): { playing: boolean; track: MusicTrack; chantCount: number }
   isMusicPlaying(): boolean
+  getCurrentMusicState?(): { playing: boolean; track: MusicTrack; chantCount: number }
   switchTrack?(track: MusicTrack): void
 }
 
@@ -56,6 +57,8 @@ export class TempleUi {
     this.currentTimeSetting = 'auto'
     this.currentEffectiveTime = initReal
     const initialTimeLabel = `⏰ 現實 (${getEffectiveTimeLabel(initReal)})`
+    const initMusic = this.actions.getCurrentMusicState?.()
+    const initialMusicLabel = initMusic?.track === 'heart_sutra' ? '🎵 般若心經' : `🎵 綠度母 (${initMusic?.chantCount || 1}/12)`
 
     this.root = document.getElementById('ui')!
     this.root.innerHTML = `
@@ -84,7 +87,7 @@ export class TempleUi {
           <div class="badge"><span class="seal small">玉</span><div><b>玉皇宮</b><small data-who></small></div></div>
           <div class="hud-buttons">
             <button class="chip" data-act="time">${initialTimeLabel}</button>
-            <button class="chip" data-act="music">🎵 綠度母 (1/12)</button>
+            <button class="chip" data-act="music">${initialMusicLabel}</button>
             <button class="chip" data-act="map">參拜指引</button>
             <button class="chip" data-open="records">祈福紀錄</button>
             <button class="chip" data-open="prayer-wall">祈願牆</button>
@@ -532,13 +535,15 @@ export class TempleUi {
     }
   }
 
-  onMusicTrackTransition(track: MusicTrack, _title: string): void {
+  onMusicTrackTransition(track: MusicTrack, title: string, reason?: 'auto_complete' | 'manual' | 'init'): void {
     const btn = this.root.querySelector<HTMLElement>('[data-act="music"]')
     if (btn && this.actions.isMusicPlaying()) {
       btn.textContent = track === 'heart_sutra' ? '🎵 般若心經' : '🎵 綠度母 (1/12)'
     }
-    if (track === 'heart_sutra') {
+    if (reason === 'auto_complete' && track === 'heart_sutra') {
       this.toast('🌸 綠度母心咒已圓滿持誦 12 遍，現轉入《般若波羅蜜多心經》，願智慧圓滿、吉祥安康。', 5200)
+    } else if (reason === 'manual' || reason === 'init') {
+      this.toast(`🌸 正在播放《${title}》，梵音悠揚，心靈安寧。`, 3800)
     }
   }
 }

@@ -19,7 +19,7 @@ export class Audio {
   private music: GainNode
   private sfx: GainNode
   private musicOn = false
-  private currentTrack: MusicTrack = 'green_tara'
+  private currentTrack: MusicTrack = Math.random() < 0.5 ? 'green_tara' : 'heart_sutra'
   private taraChantCount = 0
   private taraLoopCount = 0
   private lastTTime = 0
@@ -28,7 +28,7 @@ export class Audio {
   private buffers = new Map<string, AudioBuffer>()
 
   onChantProgress?: (current: number, total: number) => void
-  onTrackChange?: (track: MusicTrack, title: string) => void
+  onTrackChange?: (track: MusicTrack, title: string, reason?: 'auto_complete' | 'manual' | 'init') => void
 
   constructor() {
     this.ctx = new AudioContext()
@@ -155,7 +155,7 @@ export class Audio {
 
         // When 12 chants complete (chant 12 starts at 172.5s and finishes at 186.0s before chant 13)
         if (totalChants >= TARGET_TARA_CHANTS && curTime >= 186.0) {
-          this.switchToTrack('heart_sutra')
+          this.switchToTrack('heart_sutra', 'auto_complete')
         }
       })
 
@@ -184,7 +184,7 @@ export class Audio {
     return this.heartAudio
   }
 
-  switchToTrack(track: MusicTrack): void {
+  switchToTrack(track: MusicTrack, reason: 'auto_complete' | 'manual' | 'init' = 'manual'): void {
     if (this.currentTrack === track) return
     this.currentTrack = track
 
@@ -198,7 +198,7 @@ export class Audio {
         ha.currentTime = 0
         void ha.play().catch(() => {})
       }
-      this.onTrackChange?.('heart_sutra', '般若波羅蜜多心經')
+      this.onTrackChange?.('heart_sutra', '般若波羅蜜多心經', reason)
     } else {
       this.taraChantCount = 0
       this.taraLoopCount = 0
@@ -211,7 +211,7 @@ export class Audio {
         ta.currentTime = 0
         void ta.play().catch(() => {})
       }
-      this.onTrackChange?.('green_tara', '綠度母心咒')
+      this.onTrackChange?.('green_tara', '綠度母心咒', reason)
       this.onChantProgress?.(1, TARGET_TARA_CHANTS)
     }
   }
@@ -224,10 +224,11 @@ export class Audio {
       const ta = this.initTaraAudio()
       void ta.play().catch(() => {})
       this.onChantProgress?.(Math.max(1, this.taraChantCount), TARGET_TARA_CHANTS)
+      this.onTrackChange?.('green_tara', '綠度母心咒', 'init')
     } else {
       const ha = this.initHeartAudio()
       void ha.play().catch(() => {})
-      this.onTrackChange?.('heart_sutra', '般若波羅蜜多心經')
+      this.onTrackChange?.('heart_sutra', '般若波羅蜜多心經', 'init')
     }
   }
 

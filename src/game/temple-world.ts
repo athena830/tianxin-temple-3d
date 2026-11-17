@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import GUI from 'lil-gui'
 import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
@@ -406,10 +405,6 @@ export class TempleWorld {
    * facing stay in sync without moving the lotus base away from the platform.
    */
   private dragonGuanyinBillboard?: THREE.Group
-  private dragonGuanyinParams = {
-    scale: 1.0,
-  }
-  private guanyinGui?: GUI
   private auraParticles?: THREE.Points
   private auraParticleData?: { radius: number; angle: number; speed: number; rotSpeed: number }[]
   private dragonGuanyinUrnPos?: THREE.Vector3
@@ -2419,22 +2414,6 @@ export class TempleWorld {
     guanyinMesh.castShadow = true
     statueSprite.add(guanyinMesh)
     this.dragonGuanyinBillboard = statueSprite
-
-    // 2. 導入 lil-gui「觀音 2D 視角微調」浮動控制面板
-    if (!this.guanyinGui) {
-      const gui = new GUI({ title: '觀音 2D 視角微調' })
-      gui.domElement.style.position = 'fixed'
-      gui.domElement.style.top = '16px'
-      gui.domElement.style.right = '16px'
-      gui.domElement.style.zIndex = '10000'
-      gui.domElement.style.touchAction = 'auto'
-      this.guanyinGui = gui
-
-      gui.add(this.dragonGuanyinParams, 'scale', 0.5, 2, 0.01).name('Scale').onChange((v: number) => {
-        // Scale the image and its shadow together around the lotus-base anchor.
-        statueSprite.scale.setScalar(v)
-      })
-    }
 
     const applyTexture = (tex: THREE.Texture) => {
       tex.colorSpace = THREE.SRGBColorSpace

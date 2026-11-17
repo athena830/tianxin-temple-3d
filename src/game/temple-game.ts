@@ -6,7 +6,6 @@ import { Physics, RAPIER } from '../engine/physics'
 import type { Renderer } from '../engine/renderer'
 import type { Quality } from '../engine/save'
 import { CONFIG } from './config'
-import { TEMPLE_MODEL_URLS } from './temple-assets'
 import { LOTUS_POND, WISH_POOL } from './temple-courtyard'
 import { POINT_TARGETS, TempleWorld, type ShrinePoint, type ShrinePointId } from './temple-world'
 
@@ -91,10 +90,9 @@ export class TempleGame {
     this.physics.world.step()
   }
 
-  async loadModels(assets: Assets): Promise<void> {
-    // The visitor is the procedural chibi placeholder; only the Guanyin statue is a loaded model.
-    try { this.world.setStatue((await assets.gltf(TEMPLE_MODEL_URLS.guanyin)).scene) }
-    catch (err) { console.warn('statue model failed', err); this.world.showStatueImageFallback() }
+  async loadModels(_assets: Assets): Promise<void> {
+    // Directly use the golden Bodhisattva statue image fallback, avoiding 404 network timeout
+    this.world.showStatueImageFallback()
   }
 
   get position(): THREE.Vector3 {
