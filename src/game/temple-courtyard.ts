@@ -295,6 +295,11 @@ export class FrontCourtyard {
     tassel.position.y = -size * 1.7
     tassel.rotation.x = Math.PI
     g.add(body, capT, capB, cord, tassel)
+    if (size >= 0.3) {
+      const light = new THREE.PointLight('#ff9238', 0.9, 8.5, 2)
+      light.position.y = -size * 0.5
+      g.add(light)
+    }
     this.add(g, false)
   }
 
@@ -976,7 +981,9 @@ export class FrontCourtyard {
     box.position.y = 1.38
     const roof = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.34, 6), stone)
     roof.position.y = 1.73
-    g.add(base, shaft, box, roof)
+    const groundLight = new THREE.PointLight('#ffc366', 1.25, 9.5, 1.8)
+    groundLight.position.y = 1.38
+    g.add(base, shaft, box, roof, groundLight)
     this.add(g)
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.9, z), 0.4, 1.8)
   }

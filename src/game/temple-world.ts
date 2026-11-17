@@ -2321,10 +2321,10 @@ export class TempleWorld {
       grad.addColorStop(0.72, '#a63e3d')
       grad.addColorStop(1, '#e67e22')
     } else if (mode === 'night') {
-      grad.addColorStop(0, '#050811')
-      grad.addColorStop(0.35, '#0b1424')
-      grad.addColorStop(0.72, '#121e33')
-      grad.addColorStop(1, '#1b2a45')
+      grad.addColorStop(0, '#0a1426')
+      grad.addColorStop(0.35, '#13223a')
+      grad.addColorStop(0.72, '#1e3354')
+      grad.addColorStop(1, '#2c476e')
     } else {
       // day
       grad.addColorStop(0, '#5a8fa8')
@@ -2362,14 +2362,16 @@ export class TempleWorld {
       this.hemiLight.intensity = 0.8
       if (this.cloudMat) { this.cloudMat.color.set('#fca57c'); this.cloudMat.opacity = 0.88 }
     } else if (mode === 'night') {
-      this.scene.background = new THREE.Color('#0b101c')
-      ;(this.scene.fog as THREE.Fog).color.set('#0f1626')
-      this.sun.color.set('#486088')
-      this.sun.intensity = 0.32
-      this.hemiLight.color.set('#24334d')
-      this.hemiLight.groundColor.set('#0d1117')
-      this.hemiLight.intensity = 0.45
-      if (this.cloudMat) { this.cloudMat.color.set('#45526c'); this.cloudMat.opacity = 0.4 }
+      this.scene.background = new THREE.Color('#0f1b2d')
+      ;(this.scene.fog as THREE.Fog).color.set('#142236')
+      ;(this.scene.fog as THREE.Fog).near = 70
+      ;(this.scene.fog as THREE.Fog).far = 190
+      this.sun.color.set('#9cbbe8')
+      this.sun.intensity = 0.88
+      this.hemiLight.color.set('#3e5c82')
+      this.hemiLight.groundColor.set('#2a3748')
+      this.hemiLight.intensity = 0.95
+      if (this.cloudMat) { this.cloudMat.color.set('#526585'); this.cloudMat.opacity = 0.55 }
     } else {
       // day
       this.scene.background = new THREE.Color('#98b8cb')
