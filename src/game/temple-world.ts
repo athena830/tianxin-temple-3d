@@ -971,8 +971,8 @@ export class TempleWorld {
     const statueMat = new THREE.MeshStandardMaterial({
       transparent: true,
       alphaTest: 0.05,
-      roughness: 0.35,
-      metalness: 0.3,
+      roughness: 0.65,
+      metalness: 0.0,
       side: THREE.DoubleSide,
     })
 
@@ -992,17 +992,6 @@ export class TempleWorld {
     yuhuangMesh.position.set(0, statueH / 2, 0)
     yuhuangMesh.castShadow = true
     statueGroup.add(yuhuangMesh)
-
-    // Dedicated Celestial Golden Illumination for the Jade Emperor (九天浩瀚金光)
-    const yuhuangSpot = new THREE.SpotLight('#fff0ba', 2.8, 14, Math.PI / 4, 0.45, 1.5)
-    yuhuangSpot.position.set(0, 4.6, throneZ + 2.2)
-    yuhuangSpot.target = yuhuangMesh
-    statueGroup.add(yuhuangSpot)
-    statueGroup.add(yuhuangSpot.target)
-
-    const yuhuangGlow = new THREE.PointLight('#ffda79', 1.6, 6, 2)
-    yuhuangGlow.position.set(0, statueH * 0.65, 0.35)
-    statueGroup.add(yuhuangGlow)
 
     rear.add(statueGroup)
 
