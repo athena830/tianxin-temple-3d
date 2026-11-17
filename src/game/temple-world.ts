@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import GUI, { Controller } from 'lil-gui'
+import GUI from 'lil-gui'
 import { Chibi } from './chibi'
 import type { Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
@@ -170,16 +170,16 @@ export class TempleWorld {
     { id: 'study', position: new THREE.Vector3(15, 0, -1.6) },
   ]
   private readonly clouds: { mesh: THREE.Group; speed: number; x: number; z: number; y: number }[] = []
-  private dragonGuanyinBillboard?: THREE.Mesh
+  /**
+   * The ascending-dragon image and its contact shadow share this ground-anchor
+   * group. Keeping both under one group makes their scale and horizontal
+   * facing stay in sync without moving the lotus base away from the platform.
+   */
+  private dragonGuanyinBillboard?: THREE.Group
   private dragonGuanyinParams = {
-    posY: 0,
-    posZ: 0,
     scale: 1.0,
-    lockBillboard: true,
-    rotX: 0,
   }
   private guanyinGui?: GUI
-  private dragonGuanyinPosYCtrl?: Controller
   private auraParticles?: THREE.Points
   private auraParticleData?: { radius: number; angle: number; speed: number; rotSpeed: number }[]
   private dragonGuanyinUrnPos?: THREE.Vector3
@@ -2023,14 +2023,16 @@ export class TempleWorld {
       depthWrite: true,
     })
 
+    // The source image is transparent RGBA and its lotus base reaches the bottom
+    // pixel.  Anchor that bottom edge at local y = 0, which is the top surface of
+    // the ascending-dragon platform (DRAGON_GUANYIN_POS.y), rather than applying
+    // the old visual 25% downward offset.
+    const statueSprite = new THREE.Group()
     const guanyinMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), planeMat)
-    // 1. 修正 Y 軸定位（視覺下沉）：下沉約 25% 高度作為基準，讓階梯視覺上能碰到地板
-    const initY = (H / 2) - (H * 0.25)
-    this.dragonGuanyinParams.posY = initY
-    guanyinMesh.position.set(0, initY, 0)
+    guanyinMesh.position.set(0, H / 2, 0)
     guanyinMesh.castShadow = true
-    root.add(guanyinMesh)
-    this.dragonGuanyinBillboard = guanyinMesh
+    statueSprite.add(guanyinMesh)
+    this.dragonGuanyinBillboard = statueSprite
 
     // 2. 導入 lil-gui「觀音 2D 視角微調」浮動控制面板
     if (!this.guanyinGui) {
@@ -2042,30 +2044,10 @@ export class TempleWorld {
       gui.domElement.style.touchAction = 'auto'
       this.guanyinGui = gui
 
-      const posYCtrl = gui.add(this.dragonGuanyinParams, 'posY', -10, 10, 0.05).name('Position Y').onChange((v: number) => {
-        guanyinMesh.position.y = v
-      })
-
-      gui.add(this.dragonGuanyinParams, 'posZ', -10, 10, 0.05).name('Position Z').onChange((v: number) => {
-        guanyinMesh.position.z = v
-      })
-
       gui.add(this.dragonGuanyinParams, 'scale', 0.5, 2, 0.01).name('Scale').onChange((v: number) => {
-        guanyinMesh.scale.setScalar(v)
+        // Scale the image and its shadow together around the lotus-base anchor.
+        statueSprite.scale.setScalar(v)
       })
-
-      const rotXCtrl = gui.add(this.dragonGuanyinParams, 'rotX', -Math.PI / 2, Math.PI / 2, 0.01).name('Rotation X')
-      rotXCtrl.disable()
-
-      gui.add(this.dragonGuanyinParams, 'lockBillboard').name('Billboard 鎖定開關').onChange((v: boolean) => {
-        if (v) {
-          rotXCtrl.disable()
-        } else {
-          rotXCtrl.enable()
-        }
-      })
-
-      this.dragonGuanyinPosYCtrl = posYCtrl
     }
 
     const applyTexture = (tex: THREE.Texture) => {
@@ -2081,11 +2063,8 @@ export class TempleWorld {
         const dynamicH = W * aspect
         guanyinMesh.geometry.dispose()
         guanyinMesh.geometry = new THREE.PlaneGeometry(W, dynamicH)
-        // 修正 Y 軸定位（視覺下沉）：下沉約 25% 高度作為基準
-        const updatedY = (dynamicH / 2) - (dynamicH * 0.25)
-        this.dragonGuanyinParams.posY = updatedY
-        guanyinMesh.position.set(0, updatedY, this.dragonGuanyinParams.posZ)
-        this.dragonGuanyinPosYCtrl?.setValue(updatedY)
+        // Preserve the bottom-edge anchor when the actual texture ratio arrives.
+        guanyinMesh.position.set(0, dynamicH / 2, 0)
       }
     }
 
@@ -2094,14 +2073,34 @@ export class TempleWorld {
       loader.load('/guanyin.png', applyTexture)
     })
 
-    // 地坪柔和陰影接觸面（消除懸空感，產生真實實體立體接地感）
+    // Soft oval contact shadow, horizontally aligned to the platform. It lives in
+    // the same anchored group as the sprite, so the contact stays correct when
+    // the display scale changes.
+    const shadowCanvas = document.createElement('canvas')
+    shadowCanvas.width = shadowCanvas.height = 128
+    const shadowCtx = shadowCanvas.getContext('2d')
+    if (shadowCtx) {
+      const gradient = shadowCtx.createRadialGradient(64, 64, 0, 64, 64, 64)
+      gradient.addColorStop(0, 'rgba(34, 25, 18, 0.48)')
+      gradient.addColorStop(0.55, 'rgba(34, 25, 18, 0.36)')
+      gradient.addColorStop(0.82, 'rgba(34, 25, 18, 0.20)')
+      gradient.addColorStop(1, 'rgba(34, 25, 18, 0)')
+      shadowCtx.fillStyle = gradient
+      shadowCtx.fillRect(0, 0, 128, 128)
+    }
+    const shadowTexture = new THREE.CanvasTexture(shadowCanvas)
+    shadowTexture.colorSpace = THREE.SRGBColorSpace
     const groundShadow = new THREE.Mesh(
-      new THREE.CircleGeometry(2.85, 32),
-      new THREE.MeshBasicMaterial({ color: '#221912', transparent: true, opacity: 0.38, depthWrite: false })
+      // Slightly wider than the visible lotus base so a soft contact edge remains
+      // visible around it from elevated as well as eye-level camera angles.
+      new THREE.PlaneGeometry(8.4, 3.5),
+      new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false })
     )
     groundShadow.rotation.x = -Math.PI / 2
-    groundShadow.position.set(0, 0.015, 0)
-    root.add(groundShadow)
+    groundShadow.position.set(0, 0.012, 0)
+    groundShadow.renderOrder = 1
+    statueSprite.add(groundShadow)
+    root.add(statueSprite)
 
     // 3. 底部青銅九龍香爐、參拜蒲團與香火煙霧（朝向東面小徑階梯來向，貼合底座前緣）
     const urn = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.4, 0.62, 12), makeMat('#523e2b', 0.6, 0.4))
@@ -2384,21 +2383,13 @@ export class TempleWorld {
     this.courtyard.update(time)
     this.npcs.update(dt, time, playerPosition, camera)
 
-    // 觀音面朝視角與傾斜微調控制
-    if (this.dragonGuanyinBillboard) {
-      if (this.dragonGuanyinParams.lockBillboard) {
-        if (camera) {
-          this.dragonGuanyinBillboard.quaternion.copy(camera.quaternion)
-        }
-      } else {
-        if (camera) {
-          const camPos = camera.position
-          const angle = Math.atan2(camPos.x - DRAGON_GUANYIN_POS.x, camPos.z - DRAGON_GUANYIN_POS.z)
-          this.dragonGuanyinBillboard.rotation.set(this.dragonGuanyinParams.rotX, angle, 0, 'YXZ')
-        } else {
-          this.dragonGuanyinBillboard.rotation.x = this.dragonGuanyinParams.rotX
-        }
-      }
+    // Face the camera only around the world Y axis. Copying the full camera
+    // quaternion also copied its pitch, which tilted the otherwise upright 2D
+    // image and separated the visible lotus base from its ground anchor.
+    if (this.dragonGuanyinBillboard && camera) {
+      const camPos = camera.position
+      const angle = Math.atan2(camPos.x - DRAGON_GUANYIN_POS.x, camPos.z - DRAGON_GUANYIN_POS.z)
+      this.dragonGuanyinBillboard.rotation.set(0, angle, 0)
     }
 
     // 動態氣場：金色神光粒子向上螺旋升騰

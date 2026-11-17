@@ -1,5 +1,6 @@
 import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId, type WishCategory, type WishBlessing } from '../game/temple-data'
 import type { ShrinePoint, ShrinePointId, TimeOfDay } from '../game/temple-world'
+import { APP_VERSION } from '../version'
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
 const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
@@ -34,6 +35,7 @@ export class TempleUi {
   constructor(private readonly store: TempleStore, private readonly actions: TempleUiActions) {
     this.root = document.getElementById('ui')!
     this.root.innerHTML = `
+      <div class="app-version-badge" id="app-version">${APP_VERSION}</div>
       <section class="screen boot" data-screen="boot"><img class="boot-icon" src="./favicon.png" alt="" width="72" height="72" /><p>宮門將啟，正在備香⋯</p><div class="bar"><i></i></div></section>
       <section class="screen title" data-screen="title">
         <div class="title-card">
