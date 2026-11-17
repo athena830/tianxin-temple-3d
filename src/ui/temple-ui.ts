@@ -149,6 +149,11 @@ export class TempleUi {
   showNpcDialogue(speaker: string, text: string, ms = 4800): void {
     const bar = this.root.querySelector<HTMLElement>('.npc-dialogue-bar')
     if (!bar) return
+    // 手機觸控或窄螢幕版：徹底關閉 2D 螢幕遮擋條，僅保留世界空間 3D 頭頂對話泡泡
+    if (window.innerWidth <= 640 || document.body.classList.contains('has-touch')) {
+      bar.hidden = true
+      return
+    }
     const nameEl = bar.querySelector<HTMLElement>('.npc-name')
     const textEl = bar.querySelector<HTMLElement>('.npc-text')
     if (nameEl) nameEl.textContent = `【${speaker}】`
