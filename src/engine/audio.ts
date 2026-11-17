@@ -115,7 +115,7 @@ export class Audio {
   private initBgm(): HTMLAudioElement {
     if (!this.bgmAudio) {
       const el = new window.Audio()
-      el.src = './audio/green_tara.mp3'
+      el.src = './audio/green_tara.mp3?v=3.33.0'
       el.loop = true
       el.preload = 'auto'
       el.volume = 0.45
