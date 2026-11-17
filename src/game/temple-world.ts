@@ -2013,8 +2013,8 @@ export class TempleWorld {
 
     // 2. 巨型透明材質立牌（全新 Q 版潮玩手辦風・乘龍白衣觀音聖像）
     const W = 10
-    // 依據原始素材預設計算高度（長寬比 907 / 629 ≈ 1.44197），確保初次建立即維持直式比例
-    let H = W * (907 / 629)
+    // 依據全新乘龍觀音素材預設計算高度（長寬比 877 / 550 ≈ 1.5945），確保初次建立即維持直式比例
+    let H = W * (877 / 550)
 
     const planeMat = new THREE.MeshBasicMaterial({
       transparent: true,
