@@ -27,6 +27,7 @@ export type TempleUiActions = {
   exitExplore(): void
   cancelGuide(): void
   time(mode: TimeSetting): void
+  toggleMusic(): boolean
 }
 
 export class TempleUi {
@@ -73,6 +74,7 @@ export class TempleUi {
           <div class="badge"><span class="seal small">玉</span><div><b>玉皇宮</b><small data-who></small></div></div>
           <div class="hud-buttons">
             <button class="chip" data-act="time">${initialTimeLabel}</button>
+            <button class="chip" data-act="music">🎵 音樂：開</button>
             <button class="chip" data-act="map">參拜指引</button>
             <button class="chip" data-open="records">祈福紀錄</button>
             <button class="chip" data-open="prayer-wall">祈願牆</button>
@@ -395,6 +397,11 @@ export class TempleUi {
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
+    else if (act === 'music') {
+      const playing = this.actions.toggleMusic()
+      t.textContent = playing ? '🎵 音樂：開' : '🔇 音樂：關'
+      this.toast(playing ? '已開啟綠度母梵唱背景音樂，願吉祥平安。' : '已將背景音樂靜音。')
+    }
     else if (act === 'time') {
       const cycle: TimeSetting[] = ['auto', 'day', 'dusk', 'night', 'dawn']
       const next = cycle[(cycle.indexOf(this.currentTimeSetting) + 1) % cycle.length]

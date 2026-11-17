@@ -31,7 +31,7 @@ async function boot(): Promise<void> {
   let interactBlockedUntil = 0
   const reopen = (id: ShrinePointId, msg: string) => ui.open(id, msg)
   const ui = new TempleUi(store, {
-    begin: () => { audio.unlock(); audio.play('ui'); game?.showSelect(); ui.show('select') },
+    begin: () => { audio.unlock(); audio.startMusic(); audio.play('ui'); game?.showSelect(); ui.show('select') },
     choose: id => { store.setCharacter(id); game?.world.setCharacter(id); audio.play('ui') },
     enter: () => {
       audio.unlock(); audio.startMusic()
@@ -58,6 +58,7 @@ async function boot(): Promise<void> {
     exitExplore,
     cancelGuide: () => game?.setGuide(null),
     time: mode => game?.world.setTimeSetting(mode),
+    toggleMusic: () => audio.toggleMusic(),
     ritual: action => {
       if (!game) return
       const w = game.world
