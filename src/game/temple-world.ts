@@ -1422,6 +1422,34 @@ export class TempleWorld {
   }
 
   private doorGodMaterial(god: 'qin' | 'yuchi' | 'wang' | 'ma'): THREE.MeshStandardMaterial {
+    // 1. 正殿大門門神（秦叔寶、尉遲恭）：採用正統台灣宮廟彩繪大師名作高解析門神圖繪
+    if (god === 'qin' || god === 'yuchi') {
+      const mat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        roughness: 0.42,
+        metalness: 0.12,
+      })
+      const primaryUrl = god === 'qin' ? './assets/menshen-qin.png' : './assets/menshen-yuchi.png'
+      const fallbackUrl1 = god === 'qin' ? '/assets/menshen-qin.png' : '/assets/menshen-yuchi.png'
+      const fallbackUrl2 = god === 'qin' ? './menshen-qin.png' : './menshen-yuchi.png'
+      const loader = new THREE.TextureLoader()
+      const applyTex = (tex: THREE.Texture) => {
+        tex.colorSpace = THREE.SRGBColorSpace
+        mat.map = tex
+        mat.needsUpdate = true
+      }
+      loader.load(primaryUrl, applyTex, undefined, () => {
+        loader.load(fallbackUrl1, applyTex, undefined, () => {
+          loader.load(fallbackUrl2, applyTex)
+        })
+      })
+      return mat
+    }
+
+    return this.createProceduralDoorGodMaterial(god)
+  }
+
+  private createProceduralDoorGodMaterial(god: 'wang' | 'ma' | 'qin' | 'yuchi'): THREE.MeshStandardMaterial {
     const canvas = document.createElement('canvas')
     canvas.width = 512
     canvas.height = 1024
@@ -2009,7 +2037,11 @@ export class TempleWorld {
     const vermilionMat = makeMat('#962d22', 0.72)
 
     // 1. 實體物理碰撞（直徑約 5.0m 圓柱，對齊 Q 版潮玩聖像底座範圍，防止玩家穿透聖像）
-    this.physics.addStaticCylinder(new THREE.Vector3(pos.x, pos.y + 1.2, pos.z), 2.5, 2.4)
+    const lotusThroneHeight = 2.86
+    // The procedural lotus throne is the object's physical footprint. Its top
+    // aligns with the 2D figure's feet, so visitors cannot walk through the
+    // visible base or make the sprite appear unsupported.
+    this.physics.addStaticCylinder(new THREE.Vector3(pos.x, pos.y + lotusThroneHeight / 2, pos.z), 3.1, lotusThroneHeight)
 
     // 2. 巨型透明材質立牌（全新 Q 版潮玩手辦風・乘龍白衣觀音聖像）
     const W = 10
@@ -2028,8 +2060,46 @@ export class TempleWorld {
     // the ascending-dragon platform (DRAGON_GUANYIN_POS.y), rather than applying
     // the old visual 25% downward offset.
     const statueSprite = new THREE.Group()
+    // Replace the image's rounded painted base with a real 3D lotus throne.
+    const lotusBase = new THREE.Group()
+    const lotusStone = makeMat('#c69a58', 0.52, 0.16)
+    const lotusGold = makeMat('#d9ae61', 0.38, 0.26)
+    const lotusPink = makeMat('#e9a994', 0.62, 0.05)
+    const addLotusTier = (topRadius: number, bottomRadius: number, height: number, y: number, material: THREE.Material) => {
+      const tier = new THREE.Mesh(new THREE.CylinderGeometry(topRadius, bottomRadius, height, 48), material)
+      tier.position.y = y
+      tier.castShadow = true
+      tier.receiveShadow = true
+      lotusBase.add(tier)
+    }
+    addLotusTier(3.18, 3.42, 0.38, 0.19, lotusStone)
+    addLotusTier(2.92, 3.18, 0.22, 0.49, lotusGold)
+    addLotusTier(2.42, 2.72, 0.52, 0.86, lotusStone)
+    // Bridge the petal ring to the top support so the throne is one continuous solid.
+    addLotusTier(2.1, 2.32, 0.42, 2.39, lotusGold)
+    // Top support surface: 2.73 + 0.13 = the 2.86 m physical/contact height.
+    addLotusTier(1.72, 1.96, 0.26, 2.73, lotusStone)
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), lotusPink)
+      petal.scale.set(0.46, 0.72, 0.22)
+      petal.position.set(Math.cos(angle) * 2.2, 1.45, Math.sin(angle) * 2.2)
+      petal.rotation.set(0.15 * Math.sin(angle), -angle, 0.26 * Math.cos(angle))
+      petal.castShadow = true
+      petal.receiveShadow = true
+      lotusBase.add(petal)
+    }
+    statueSprite.add(lotusBase)
     const guanyinMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), planeMat)
-    guanyinMesh.position.set(0, H / 2, 0)
+    // The source body's visible lower contour ends about 2.4 m above its
+    // cropped rectangle edge; the remaining pixels belong to the original
+    // painted pedestal. Sink only that remainder into the 3D top support.
+    // Pixel row 650 is directly below the rendered feet and above the
+    // original painted lotus pedestal. Keeping any lower rows reintroduces a
+    // second (floating) 2D base above the real throne.
+    const bodyCropHeight = 650
+    const feetInset = 2.4
+    guanyinMesh.position.set(0, lotusThroneHeight - feetInset + H / 2, 0)
     guanyinMesh.castShadow = true
     statueSprite.add(guanyinMesh)
     this.dragonGuanyinBillboard = statueSprite
@@ -2053,18 +2123,44 @@ export class TempleWorld {
     const applyTexture = (tex: THREE.Texture) => {
       tex.colorSpace = THREE.SRGBColorSpace
       tex.needsUpdate = true
-      planeMat.map = tex
-      planeMat.needsUpdate = true
-
       // 動態鎖定圖片正確長寬比（直式）：取得圖片原始尺寸動態計算高度 H = W * (height / width)
       const img = tex.image as HTMLImageElement | undefined
       if (img && img.width && img.height) {
-        const aspect = img.height / img.width
+        const cropHeight = Math.min(bodyCropHeight, img.height)
+        const bodyCanvas = document.createElement('canvas')
+        bodyCanvas.width = img.width
+        bodyCanvas.height = cropHeight
+        const bodyCtx = bodyCanvas.getContext('2d')
+        if (bodyCtx) {
+          // Preserve the complete figure above the waist, then taper to the
+          // robe and feet. This removes only the painted side petals/base that
+          // would otherwise overlap the real 3D lotus throne.
+          bodyCtx.beginPath()
+          bodyCtx.moveTo(0, 0)
+          bodyCtx.lineTo(img.width, 0)
+          bodyCtx.lineTo(img.width, 560)
+          // Follow the robe into the feet while excluding every outer lotus
+          // petal from the source image. The procedural throne owns that
+          // silhouette now, so the two bases cannot visually separate.
+          bodyCtx.bezierCurveTo(455, 575, 400, 585, 365, 595)
+          bodyCtx.bezierCurveTo(350, 615, 340, 635, 335, cropHeight)
+          bodyCtx.lineTo(215, cropHeight)
+          bodyCtx.bezierCurveTo(210, 635, 200, 615, 185, 595)
+          bodyCtx.bezierCurveTo(150, 585, 95, 575, 0, 560)
+          bodyCtx.closePath()
+          bodyCtx.clip()
+          bodyCtx.drawImage(img, 0, 0, img.width, cropHeight, 0, 0, img.width, cropHeight)
+        }
+        const bodyTexture = new THREE.CanvasTexture(bodyCanvas)
+        bodyTexture.colorSpace = THREE.SRGBColorSpace
+        planeMat.map = bodyTexture
+        planeMat.needsUpdate = true
+        const aspect = cropHeight / img.width
         const dynamicH = W * aspect
         guanyinMesh.geometry.dispose()
         guanyinMesh.geometry = new THREE.PlaneGeometry(W, dynamicH)
         // Preserve the bottom-edge anchor when the actual texture ratio arrives.
-        guanyinMesh.position.set(0, dynamicH / 2, 0)
+        guanyinMesh.position.set(0, lotusThroneHeight - feetInset + dynamicH / 2, 0)
       }
     }
 
