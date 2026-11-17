@@ -961,6 +961,51 @@ export class TempleWorld {
     }
     rear.add(throneSeat, throneBack)
 
+    // 7.1. Sacred Golden Body of 玉皇上帝 (玄穹高上玉皇大天尊金身聖相)
+    const statueGroup = new THREE.Group()
+    statueGroup.position.set(0, 1.66, throneZ - 0.52)
+
+    const statueH = 2.68
+    const statueW = statueH * (670 / 1079) // 1.664m
+    const statueGeo = new THREE.PlaneGeometry(statueW, statueH)
+    const statueMat = new THREE.MeshStandardMaterial({
+      transparent: true,
+      alphaTest: 0.05,
+      roughness: 0.35,
+      metalness: 0.3,
+      side: THREE.DoubleSide,
+    })
+
+    const yuhuangLoader = new THREE.TextureLoader()
+    const applyYuhuangTex = (tex: THREE.Texture) => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      statueMat.map = tex
+      statueMat.needsUpdate = true
+    }
+    yuhuangLoader.load('./assets/yuhuang.png', applyYuhuangTex, undefined, () => {
+      yuhuangLoader.load('/assets/yuhuang.png', applyYuhuangTex, undefined, () => {
+        yuhuangLoader.load('./yuhuang.png', applyYuhuangTex)
+      })
+    })
+
+    const yuhuangMesh = new THREE.Mesh(statueGeo, statueMat)
+    yuhuangMesh.position.set(0, statueH / 2, 0)
+    yuhuangMesh.castShadow = true
+    statueGroup.add(yuhuangMesh)
+
+    // Dedicated Celestial Golden Illumination for the Jade Emperor (九天浩瀚金光)
+    const yuhuangSpot = new THREE.SpotLight('#fff0ba', 2.8, 14, Math.PI / 4, 0.45, 1.5)
+    yuhuangSpot.position.set(0, 4.6, throneZ + 2.2)
+    yuhuangSpot.target = yuhuangMesh
+    statueGroup.add(yuhuangSpot)
+    statueGroup.add(yuhuangSpot.target)
+
+    const yuhuangGlow = new THREE.PointLight('#ffda79', 1.6, 6, 2)
+    yuhuangGlow.position.set(0, statueH * 0.65, 0.35)
+    statueGroup.add(yuhuangGlow)
+
+    rear.add(statueGroup)
+
     // Sacred Golden Mandorla & Divine Halo (金光萬道神聖光輪)
     const haloOuter = new THREE.Mesh(new THREE.TorusGeometry(2.3, 0.14, 12, 36), gold)
     haloOuter.position.set(0, 3.8, throneZ - 1.45)
