@@ -427,7 +427,7 @@ export class TempleUi {
         const toasts: Record<TimeOfDay, string> = {
           day: '已切換為「白天（晴空）」時段，旭日當空，光耀萬山。',
           dusk: '已切換為「黃昏（夕陽）」時段，落日熔金，晚霞漫天。',
-          night: `已切換為「夜晚（夜間）」時段：深山無光害星空璀璨、銀河高懸，今夜天象為「${lunar.name}」(${lunar.description})，宮燈齊明。`,
+          night: `已切換為「夜晚（夜間）」時段：深山夜空寧靜澄澈、星月相映，今夜天象為「${lunar.name}」(${lunar.description})，宮燈齊明。`,
           dawn: '已切換為「清晨（晨曦）」時段，紫氣東來，初陽晨曦與曉星相映。',
         }
         this.toast(toasts[next])

@@ -135,7 +135,7 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     sunVisualOpacity: 0.92,
     moonPos: [95, 35, -80],
     moonOpacity: 0.15,
-    starsOpacity: 0.12,
+    starsOpacity: 0.08,
     milkyWayOpacity: 0.0,
   },
   day: {
@@ -177,8 +177,8 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     sunVisualOpacity: 0.95,
     moonPos: [75, 60, -90],
     moonOpacity: 0.45,
-    starsOpacity: 0.28,
-    milkyWayOpacity: 0.18,
+    starsOpacity: 0.15,
+    milkyWayOpacity: 0.0,
   },
   night: {
     bgColor: '#0f1b2d',
@@ -198,8 +198,8 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     sunVisualOpacity: 0.0,
     moonPos: [62, 92, -95],
     moonOpacity: 1.0,
-    starsOpacity: 1.0,
-    milkyWayOpacity: 0.88,
+    starsOpacity: 0.85,
+    milkyWayOpacity: 0.0,
   },
 }
 
@@ -425,10 +425,6 @@ export class TempleWorld {
   private moonTexture?: THREE.CanvasTexture
   private starsPoints?: THREE.Points
   private starsMat?: THREE.PointsMaterial
-  private starsBrightPoints?: THREE.Points
-  private starsBrightMat?: THREE.PointsMaterial
-  private milkyWayPoints?: THREE.Points
-  private milkyWayMat?: THREE.PointsMaterial
   private celestialGroup?: THREE.Group
 
   private currentSunVisualOpacity = 1.0
@@ -2707,31 +2703,49 @@ export class TempleWorld {
     this.moonSprite.visible = this.currentMoonOpacity > 0.005
     this.celestialGroup.add(this.moonSprite)
 
-    // 3. High-Mountain Zero-Light-Pollution Starfield (1,800 stars)
-    const starCount = 1800
+    // 3. High-Mountain Starfield (clean, gentle ~120 circular stars high in the sky dome)
+    const starCanvas = document.createElement('canvas')
+    starCanvas.width = 64
+    starCanvas.height = 64
+    const starCtx = starCanvas.getContext('2d')
+    if (starCtx) {
+      const g = starCtx.createRadialGradient(32, 32, 0, 32, 32, 30)
+      g.addColorStop(0, 'rgba(255, 255, 255, 1.0)')
+      g.addColorStop(0.25, 'rgba(255, 255, 255, 0.85)')
+      g.addColorStop(0.65, 'rgba(220, 240, 255, 0.35)')
+      g.addColorStop(1.0, 'rgba(180, 220, 255, 0)')
+      starCtx.fillStyle = g
+      starCtx.beginPath()
+      starCtx.arc(32, 32, 30, 0, Math.PI * 2)
+      starCtx.fill()
+    }
+    const starTex = new THREE.CanvasTexture(starCanvas)
+    starTex.colorSpace = THREE.SRGBColorSpace
+
+    const starCount = 120
     const starPositions = new Float32Array(starCount * 3)
     const starColors = new Float32Array(starCount * 3)
     const colorPalette: [number, number, number][] = [
       [1.0, 1.0, 1.0],       // Diamond white
       [0.92, 0.96, 1.0],     // Ice blue
-      [0.78, 0.88, 1.0],     // Sapphire white
-      [1.0, 0.94, 0.82],     // Warm starlight
-      [1.0, 0.85, 0.65],     // Golden star
+      [1.0, 0.95, 0.85],     // Warm starlight
+      [0.85, 0.92, 1.0],     // Sapphire white
     ]
 
     for (let i = 0; i < starCount; i++) {
       const u = Math.random()
       const v = Math.random()
-      const theta = 0.06 + u * (Math.PI * 0.46)
+      // Keep strictly to upper sky (theta from 0.06 to 0.38 * PI, elevation > 35 degrees)
+      const theta = 0.06 + u * (Math.PI * 0.34)
       const phi = v * Math.PI * 2
       const r = 172 + (Math.random() - 0.5) * 4
 
       starPositions[i * 3] = r * Math.sin(theta) * Math.cos(phi)
-      starPositions[i * 3 + 1] = r * Math.cos(theta) + 4
+      starPositions[i * 3 + 1] = r * Math.cos(theta) + 12 // High above temple roofs
       starPositions[i * 3 + 2] = r * Math.sin(theta) * Math.sin(phi)
 
       const col = colorPalette[Math.floor(Math.random() * colorPalette.length)]
-      const brightness = 0.65 + Math.random() * 0.35
+      const brightness = 0.6 + Math.random() * 0.4
       starColors[i * 3] = col[0] * brightness
       starColors[i * 3 + 1] = col[1] * brightness
       starColors[i * 3 + 2] = col[2] * brightness
@@ -2741,9 +2755,11 @@ export class TempleWorld {
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
     starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
     this.starsMat = new THREE.PointsMaterial({
-      size: 1.35,
+      map: starTex,
+      size: 2.2,
       vertexColors: true,
       transparent: true,
+      blending: THREE.AdditiveBlending,
       opacity: this.currentStarsOpacity,
       depthWrite: false,
       fog: false,
@@ -2751,96 +2767,6 @@ export class TempleWorld {
     this.starsPoints = new THREE.Points(starGeo, this.starsMat)
     this.starsPoints.visible = this.currentStarsOpacity > 0.005
     this.celestialGroup.add(this.starsPoints)
-
-    // 4. Brilliant Major Constellation Stars (350 larger twinkling stars)
-    const brightCount = 350
-    const brightPositions = new Float32Array(brightCount * 3)
-    const brightColors = new Float32Array(brightCount * 3)
-    for (let i = 0; i < brightCount; i++) {
-      const u = Math.random()
-      const v = Math.random()
-      const theta = 0.08 + u * (Math.PI * 0.44)
-      const phi = v * Math.PI * 2
-      const r = 170 + (Math.random() - 0.5) * 4
-
-      brightPositions[i * 3] = r * Math.sin(theta) * Math.cos(phi)
-      brightPositions[i * 3 + 1] = r * Math.cos(theta) + 4
-      brightPositions[i * 3 + 2] = r * Math.sin(theta) * Math.sin(phi)
-
-      const col = colorPalette[Math.floor(Math.random() * colorPalette.length)]
-      brightColors[i * 3] = col[0]
-      brightColors[i * 3 + 1] = col[1]
-      brightColors[i * 3 + 2] = col[2]
-    }
-    const brightGeo = new THREE.BufferGeometry()
-    brightGeo.setAttribute('position', new THREE.BufferAttribute(brightPositions, 3))
-    brightGeo.setAttribute('color', new THREE.BufferAttribute(brightColors, 3))
-    this.starsBrightMat = new THREE.PointsMaterial({
-      size: 2.8,
-      vertexColors: true,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      opacity: this.currentStarsOpacity,
-      depthWrite: false,
-      fog: false,
-    })
-    this.starsBrightPoints = new THREE.Points(brightGeo, this.starsBrightMat)
-    this.starsBrightPoints.visible = this.currentStarsOpacity > 0.005
-    this.celestialGroup.add(this.starsBrightPoints)
-
-    // 5. Deep-Mountain Milky Way Galaxy Ribbon (900 stardust particles)
-    const mwCount = 900
-    const mwPositions = new Float32Array(mwCount * 3)
-    const mwColors = new Float32Array(mwCount * 3)
-    const mwPalette: [number, number, number][] = [
-      [0.35, 0.72, 0.98], // Cosmic cyan
-      [0.65, 0.45, 0.95], // Nebula violet
-      [0.95, 0.88, 0.75], // Stardust gold
-      [0.25, 0.52, 0.88], // Deep azure
-      [0.85, 0.92, 1.0],  // Brilliant white
-    ]
-
-    for (let i = 0; i < mwCount; i++) {
-      const t = (Math.random() - 0.5) * Math.PI * 0.95
-      const bandWidth = (Math.random() - 0.5) * 26
-      const bandHeight = (Math.random() - 0.5) * 16
-
-      const rad = 168 + (Math.random() - 0.5) * 6
-      const baseTheta = Math.PI * 0.5 - t * 0.85
-      const basePhi = 0.75 + t * 0.45
-
-      let x = rad * Math.sin(baseTheta) * Math.cos(basePhi) + bandWidth * Math.sin(basePhi)
-      let y = rad * Math.cos(baseTheta) + bandHeight + 10
-      let z = rad * Math.sin(baseTheta) * Math.sin(basePhi) - bandWidth * Math.cos(basePhi)
-
-      if (y < 8) y = 8 + Math.random() * 8
-
-      mwPositions[i * 3] = x
-      mwPositions[i * 3 + 1] = y
-      mwPositions[i * 3 + 2] = z
-
-      const col = mwPalette[Math.floor(Math.random() * mwPalette.length)]
-      const b = 0.55 + Math.random() * 0.45
-      mwColors[i * 3] = col[0] * b
-      mwColors[i * 3 + 1] = col[1] * b
-      mwColors[i * 3 + 2] = col[2] * b
-    }
-
-    const mwGeo = new THREE.BufferGeometry()
-    mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPositions, 3))
-    mwGeo.setAttribute('color', new THREE.BufferAttribute(mwColors, 3))
-    this.milkyWayMat = new THREE.PointsMaterial({
-      size: 4.2,
-      vertexColors: true,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      opacity: this.currentMilkyWayOpacity,
-      depthWrite: false,
-      fog: false,
-    })
-    this.milkyWayPoints = new THREE.Points(mwGeo, this.milkyWayMat)
-    this.milkyWayPoints.visible = this.currentMilkyWayOpacity > 0.005
-    this.celestialGroup.add(this.milkyWayPoints)
 
     this.scene.add(this.celestialGroup)
   }
@@ -3063,14 +2989,6 @@ export class TempleWorld {
       if (this.starsMat) {
         this.starsMat.opacity = this.currentStarsOpacity
         this.starsPoints && (this.starsPoints.visible = this.currentStarsOpacity > 0.005)
-      }
-      if (this.starsBrightMat) {
-        this.starsBrightMat.opacity = this.currentStarsOpacity
-        this.starsBrightPoints && (this.starsBrightPoints.visible = this.currentStarsOpacity > 0.005)
-      }
-      if (this.milkyWayMat) {
-        this.milkyWayMat.opacity = this.currentMilkyWayOpacity
-        this.milkyWayPoints && (this.milkyWayPoints.visible = this.currentMilkyWayOpacity > 0.005)
       }
 
       this.isSkyTransitioning = false
@@ -3296,17 +3214,9 @@ export class TempleWorld {
       this.moonSprite.visible = this.currentMoonOpacity > 0.005
     }
     if (this.starsMat) {
-      this.starsMat.opacity = this.currentStarsOpacity
+      const twinkle = 0.85 + 0.15 * Math.sin(time * 2.2)
+      this.starsMat.opacity = this.currentStarsOpacity * twinkle
       this.starsPoints && (this.starsPoints.visible = this.currentStarsOpacity > 0.005)
-    }
-    if (this.starsBrightMat) {
-      const twinkle = 0.82 + 0.18 * Math.sin(time * 2.8)
-      this.starsBrightMat.opacity = this.currentStarsOpacity * twinkle
-      this.starsBrightPoints && (this.starsBrightPoints.visible = this.currentStarsOpacity > 0.005)
-    }
-    if (this.milkyWayMat) {
-      this.milkyWayMat.opacity = this.currentMilkyWayOpacity
-      this.milkyWayPoints && (this.milkyWayPoints.visible = this.currentMilkyWayOpacity > 0.005)
     }
 
     // Periodic check for lunar phase date updates (every 60 seconds)
