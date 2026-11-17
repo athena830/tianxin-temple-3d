@@ -2703,26 +2703,28 @@ export class TempleWorld {
     this.moonSprite.visible = this.currentMoonOpacity > 0.005
     this.celestialGroup.add(this.moonSprite)
 
-    // 3. High-Mountain Starfield (clean, gentle ~120 circular stars high in the sky dome)
+    // 3. High-Mountain Starfield (sparse, gentle natural ~75 circular starlight points high in the sky dome)
     const starCanvas = document.createElement('canvas')
     starCanvas.width = 64
     starCanvas.height = 64
     const starCtx = starCanvas.getContext('2d')
     if (starCtx) {
-      const g = starCtx.createRadialGradient(32, 32, 0, 32, 32, 30)
+      const g = starCtx.createRadialGradient(32, 32, 0, 32, 32, 28)
       g.addColorStop(0, 'rgba(255, 255, 255, 1.0)')
-      g.addColorStop(0.25, 'rgba(255, 255, 255, 0.85)')
-      g.addColorStop(0.65, 'rgba(220, 240, 255, 0.35)')
+      g.addColorStop(0.2, 'rgba(255, 255, 255, 0.85)')
+      g.addColorStop(0.5, 'rgba(215, 235, 255, 0.3)')
       g.addColorStop(1.0, 'rgba(180, 220, 255, 0)')
       starCtx.fillStyle = g
       starCtx.beginPath()
-      starCtx.arc(32, 32, 30, 0, Math.PI * 2)
+      starCtx.arc(32, 32, 28, 0, Math.PI * 2)
       starCtx.fill()
     }
     const starTex = new THREE.CanvasTexture(starCanvas)
     starTex.colorSpace = THREE.SRGBColorSpace
+    starTex.minFilter = THREE.LinearFilter
+    starTex.magFilter = THREE.LinearFilter
 
-    const starCount = 120
+    const starCount = 75
     const starPositions = new Float32Array(starCount * 3)
     const starColors = new Float32Array(starCount * 3)
     const colorPalette: [number, number, number][] = [
@@ -2735,13 +2737,13 @@ export class TempleWorld {
     for (let i = 0; i < starCount; i++) {
       const u = Math.random()
       const v = Math.random()
-      // Keep strictly to upper sky (theta from 0.06 to 0.38 * PI, elevation > 35 degrees)
-      const theta = 0.06 + u * (Math.PI * 0.34)
+      // Keep strictly to high upper sky dome (elevation > 40 degrees, completely clear of rooftops and horizon)
+      const theta = 0.08 + u * (Math.PI * 0.28)
       const phi = v * Math.PI * 2
-      const r = 172 + (Math.random() - 0.5) * 4
+      const r = 175 + (Math.random() - 0.5) * 4
 
       starPositions[i * 3] = r * Math.sin(theta) * Math.cos(phi)
-      starPositions[i * 3 + 1] = r * Math.cos(theta) + 12 // High above temple roofs
+      starPositions[i * 3 + 1] = r * Math.cos(theta) + 15 // Well above temple roofs
       starPositions[i * 3 + 2] = r * Math.sin(theta) * Math.sin(phi)
 
       const col = colorPalette[Math.floor(Math.random() * colorPalette.length)]
@@ -2756,7 +2758,7 @@ export class TempleWorld {
     starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
     this.starsMat = new THREE.PointsMaterial({
       map: starTex,
-      size: 2.2,
+      size: 1.6,
       vertexColors: true,
       transparent: true,
       blending: THREE.AdditiveBlending,

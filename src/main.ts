@@ -59,6 +59,8 @@ async function boot(): Promise<void> {
     cancelGuide: () => game?.setGuide(null),
     time: mode => game?.world.setTimeSetting(mode),
     toggleMusic: () => audio.toggleMusic(),
+    isMusicPlaying: () => audio.isMusicPlaying(),
+    switchTrack: track => audio.switchToTrack(track),
     ritual: action => {
       if (!game) return
       const w = game.world
@@ -146,6 +148,9 @@ async function boot(): Promise<void> {
     },
   })
   ui.show('boot')
+  audio.onChantProgress = (cur, total) => ui.updateMusicProgress('green_tara', cur, total)
+  audio.onTrackChange = (track, title) => ui.onMusicTrackTransition(track, title)
+  ;(window as any).__templeAudio__ = audio
 
   let loaded = 0
   const track = <T>(p: Promise<T>): Promise<T> => p.then(v => (ui.setBootProgress(0.1 + (++loaded / 4) * 0.6), v))
