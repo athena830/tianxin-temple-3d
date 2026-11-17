@@ -30,6 +30,90 @@ export interface TimeConfig {
   cloudColor: string
   cloudOpacity: number
   skyStops: [string, string, string, string]
+  // Celestial objects visual properties
+  sunVisualPos: [number, number, number]
+  sunVisualOpacity: number
+  moonPos: [number, number, number]
+  moonOpacity: number
+  starsOpacity: number
+  milkyWayOpacity: number
+}
+
+export interface LunarPhaseInfo {
+  phase: number // 0..1 (0: New Moon, 0.25: First Quarter, 0.5: Full Moon, 0.75: Last Quarter)
+  cycleDay: number // 0..29.53
+  illumination: number // 0..1
+  name: string // 朔月, 娥眉月, 上弦月, 滿月, etc.
+  description: string
+  isMidAutumnFullMoon: boolean
+  lunarMonth: number
+  lunarDay: number
+}
+
+export function getLunarPhaseInfo(date = new Date()): LunarPhaseInfo {
+  // Astronomical synodic month calculation (~29.530588 days)
+  // Reference known new moon: 2000-01-06 18:14 UTC (timestamp: 947182440000)
+  const diffDays = (date.getTime() - 947182440000) / 86400000
+  const cycleDay = ((diffDays % 29.530588) + 29.530588) % 29.530588
+  const phase = cycleDay / 29.530588
+  const illumination = (1 - Math.cos(phase * 2 * Math.PI)) / 2
+
+  let lunarMonth = 0
+  let lunarDay = 0
+  try {
+    const parts = new Intl.DateTimeFormat('zh-u-ca-chinese', { month: 'numeric', day: 'numeric' }).formatToParts(date)
+    for (const p of parts) {
+      if (p.type === 'month') lunarMonth = parseInt(p.value, 10) || 0
+      if (p.type === 'day') lunarDay = parseInt(p.value, 10) || 0
+    }
+  } catch {
+    // Graceful fallback if Intl unsupported
+  }
+
+  const isMidAutumn = (lunarMonth === 8 && (lunarDay === 15 || lunarDay === 16))
+
+  let name = ''
+  let description = ''
+
+  if (isMidAutumn) {
+    name = '中秋滿月'
+    description = '農曆八月十五中秋佳節・皎潔金桂皓月，銀輝遍照深山'
+  } else if (cycleDay < 1.0 || cycleDay >= 28.5) {
+    name = '新月（朔月）'
+    description = '月華初隱，深山萬籟俱寂，繁星銀河極致璀璨'
+  } else if (cycleDay < 6.8) {
+    name = '娥眉月'
+    description = '新月如鉤，清冷澄澈，如古琴初泛'
+  } else if (cycleDay < 8.5) {
+    name = '上弦月'
+    description = '半輪明月，清輝照夜，山林含霜'
+  } else if (cycleDay < 13.8) {
+    name = '盈凸月'
+    description = '月漸盈滿，清光大盛，古剎清幽'
+  } else if (cycleDay < 16.0) {
+    name = '滿月（望月）'
+    description = '明月高懸，皎潔銀輝灑落古寺古山'
+  } else if (cycleDay < 21.8) {
+    name = '虧凸月'
+    description = '月華漸斂，夜色清寧，山嵐如霧'
+  } else if (cycleDay < 23.5) {
+    name = '下弦月'
+    description = '下弦半月，清輝照古殿，晨星微芒'
+  } else {
+    name = '殘月'
+    description = '殘月伴曉星，群山靜謐，天將明矣'
+  }
+
+  return {
+    phase,
+    cycleDay,
+    illumination,
+    name,
+    description,
+    isMidAutumnFullMoon: isMidAutumn,
+    lunarMonth,
+    lunarDay,
+  }
 }
 
 export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
@@ -47,6 +131,12 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     cloudColor: '#fedbc7',
     cloudOpacity: 0.85,
     skyStops: ['#2c3b59', '#8c4840', '#d47752', '#fad794'],
+    sunVisualPos: [-125, 42, 60],
+    sunVisualOpacity: 0.92,
+    moonPos: [95, 35, -80],
+    moonOpacity: 0.15,
+    starsOpacity: 0.12,
+    milkyWayOpacity: 0.0,
   },
   day: {
     bgColor: '#98b8cb',
@@ -62,6 +152,12 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     cloudColor: '#fefcf8',
     cloudOpacity: 0.82,
     skyStops: ['#5a8fa8', '#86adbe', '#c1d4dc', '#ebe4d3'],
+    sunVisualPos: [-65, 115, 75],
+    sunVisualOpacity: 1.0,
+    moonPos: [95, 20, -80],
+    moonOpacity: 0.0,
+    starsOpacity: 0.0,
+    milkyWayOpacity: 0.0,
   },
   dusk: {
     bgColor: '#6a2838',
@@ -77,6 +173,12 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     cloudColor: '#fca57c',
     cloudOpacity: 0.88,
     skyStops: ['#1c1c38', '#5e2348', '#a63e3d', '#e67e22'],
+    sunVisualPos: [125, 38, 55],
+    sunVisualOpacity: 0.95,
+    moonPos: [75, 60, -90],
+    moonOpacity: 0.45,
+    starsOpacity: 0.28,
+    milkyWayOpacity: 0.18,
   },
   night: {
     bgColor: '#0f1b2d',
@@ -92,6 +194,12 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     cloudColor: '#526585',
     cloudOpacity: 0.55,
     skyStops: ['#0a1426', '#13223a', '#1e3354', '#2c476e'],
+    sunVisualPos: [0, -70, 0],
+    sunVisualOpacity: 0.0,
+    moonPos: [62, 92, -95],
+    moonOpacity: 1.0,
+    starsOpacity: 1.0,
+    milkyWayOpacity: 0.88,
   },
 }
 
@@ -308,6 +416,38 @@ export class TempleWorld {
   private dragonPuffTimer = 1.2
   readonly npcs: NpcManager
   onNpcDialogue?: (speaker: string, text: string) => void
+  onTimeOfDayChange?: (mode: TimeOfDay) => void
+
+  // Celestial objects (Sun, Moon, Starfield, Milky Way)
+  private sunSprite?: THREE.Sprite
+  private moonSprite?: THREE.Sprite
+  private moonCanvas?: HTMLCanvasElement
+  private moonTexture?: THREE.CanvasTexture
+  private starsPoints?: THREE.Points
+  private starsMat?: THREE.PointsMaterial
+  private starsBrightPoints?: THREE.Points
+  private starsBrightMat?: THREE.PointsMaterial
+  private milkyWayPoints?: THREE.Points
+  private milkyWayMat?: THREE.PointsMaterial
+  private celestialGroup?: THREE.Group
+
+  private currentSunVisualOpacity = 1.0
+  private targetSunVisualOpacity = 1.0
+  private readonly currentSunVisualPos = new THREE.Vector3(-65, 115, 75)
+  private readonly targetSunVisualPos = new THREE.Vector3(-65, 115, 75)
+
+  private currentMoonOpacity = 0.0
+  private targetMoonOpacity = 0.0
+  private readonly currentMoonPos = new THREE.Vector3(62, 92, -95)
+  private readonly targetMoonPos = new THREE.Vector3(62, 92, -95)
+
+  private currentStarsOpacity = 0.0
+  private targetStarsOpacity = 0.0
+  private currentMilkyWayOpacity = 0.0
+  private targetMilkyWayOpacity = 0.0
+
+  private lunarPhaseInfo: LunarPhaseInfo = getLunarPhaseInfo()
+  private lunarCheckTimer = 0
 
   constructor(private readonly physics: Physics) {
     // Elegant warm celestial sky & gentle horizon fog (澄澈淡碧與暖金宮闕天空色調)
@@ -330,6 +470,7 @@ export class TempleWorld {
     this.scene.add(this.sun, this.sun.target)
 
     this.addSkyDome()
+    this.addCelestialObjects()
     this.addClouds()
 
     const initialReal = getRealWorldTimeOfDay().mode
@@ -2483,6 +2624,330 @@ export class TempleWorld {
     this.scene.add(dome)
   }
 
+  private addCelestialObjects(): void {
+    this.celestialGroup = new THREE.Group()
+
+    // 1. Sun visual sprite (radiant corona + flare rays + white-hot core)
+    const sunCanvas = document.createElement('canvas')
+    sunCanvas.width = 256
+    sunCanvas.height = 256
+    const sCtx = sunCanvas.getContext('2d')
+    if (sCtx) {
+      const cx = 128, cy = 128
+      // Outer solar corona
+      const gradCorona = sCtx.createRadialGradient(cx, cy, 30, cx, cy, 126)
+      gradCorona.addColorStop(0, 'rgba(255, 255, 255, 1.0)')
+      gradCorona.addColorStop(0.2, 'rgba(255, 240, 180, 0.95)')
+      gradCorona.addColorStop(0.45, 'rgba(255, 180, 70, 0.60)')
+      gradCorona.addColorStop(0.75, 'rgba(255, 110, 30, 0.22)')
+      gradCorona.addColorStop(1.0, 'rgba(255, 80, 20, 0)')
+      sCtx.fillStyle = gradCorona
+      sCtx.beginPath()
+      sCtx.arc(cx, cy, 126, 0, Math.PI * 2)
+      sCtx.fill()
+
+      // Solar flare rays (12-point delicate flare)
+      sCtx.save()
+      sCtx.translate(cx, cy)
+      sCtx.fillStyle = 'rgba(255, 235, 160, 0.16)'
+      for (let i = 0; i < 12; i++) {
+        sCtx.rotate(Math.PI / 6)
+        sCtx.beginPath()
+        sCtx.moveTo(-3, 0)
+        sCtx.lineTo(0, 124)
+        sCtx.lineTo(3, 0)
+        sCtx.closePath()
+        sCtx.fill()
+      }
+      sCtx.restore()
+
+      // Core brilliant disc
+      const gradCore = sCtx.createRadialGradient(cx, cy, 0, cx, cy, 40)
+      gradCore.addColorStop(0, '#ffffff')
+      gradCore.addColorStop(0.75, '#fffef2')
+      gradCore.addColorStop(1.0, 'rgba(255, 245, 205, 0.9)')
+      sCtx.fillStyle = gradCore
+      sCtx.beginPath()
+      sCtx.arc(cx, cy, 40, 0, Math.PI * 2)
+      sCtx.fill()
+    }
+    const sunTex = new THREE.CanvasTexture(sunCanvas)
+    sunTex.colorSpace = THREE.SRGBColorSpace
+    const sunMat = new THREE.SpriteMaterial({
+      map: sunTex,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+    })
+    this.sunSprite = new THREE.Sprite(sunMat)
+    this.sunSprite.scale.set(42, 42, 1)
+    this.sunSprite.position.copy(this.currentSunVisualPos)
+    ;(this.sunSprite.material as THREE.SpriteMaterial).opacity = this.currentSunVisualOpacity
+    this.sunSprite.visible = this.currentSunVisualOpacity > 0.005
+    this.celestialGroup.add(this.sunSprite)
+
+    // 2. Real-World Moon sprite (with dynamic lunar phase & craters)
+    this.moonCanvas = document.createElement('canvas')
+    this.moonCanvas.width = 256
+    this.moonCanvas.height = 256
+    this.renderMoonCanvas(this.moonCanvas, this.lunarPhaseInfo)
+    this.moonTexture = new THREE.CanvasTexture(this.moonCanvas)
+    this.moonTexture.colorSpace = THREE.SRGBColorSpace
+    const moonMat = new THREE.SpriteMaterial({
+      map: this.moonTexture,
+      transparent: true,
+      depthWrite: false,
+      fog: false,
+    })
+    this.moonSprite = new THREE.Sprite(moonMat)
+    this.moonSprite.scale.set(28, 28, 1)
+    this.moonSprite.position.copy(this.currentMoonPos)
+    ;(this.moonSprite.material as THREE.SpriteMaterial).opacity = this.currentMoonOpacity
+    this.moonSprite.visible = this.currentMoonOpacity > 0.005
+    this.celestialGroup.add(this.moonSprite)
+
+    // 3. High-Mountain Zero-Light-Pollution Starfield (1,800 stars)
+    const starCount = 1800
+    const starPositions = new Float32Array(starCount * 3)
+    const starColors = new Float32Array(starCount * 3)
+    const colorPalette: [number, number, number][] = [
+      [1.0, 1.0, 1.0],       // Diamond white
+      [0.92, 0.96, 1.0],     // Ice blue
+      [0.78, 0.88, 1.0],     // Sapphire white
+      [1.0, 0.94, 0.82],     // Warm starlight
+      [1.0, 0.85, 0.65],     // Golden star
+    ]
+
+    for (let i = 0; i < starCount; i++) {
+      const u = Math.random()
+      const v = Math.random()
+      const theta = 0.06 + u * (Math.PI * 0.46)
+      const phi = v * Math.PI * 2
+      const r = 172 + (Math.random() - 0.5) * 4
+
+      starPositions[i * 3] = r * Math.sin(theta) * Math.cos(phi)
+      starPositions[i * 3 + 1] = r * Math.cos(theta) + 4
+      starPositions[i * 3 + 2] = r * Math.sin(theta) * Math.sin(phi)
+
+      const col = colorPalette[Math.floor(Math.random() * colorPalette.length)]
+      const brightness = 0.65 + Math.random() * 0.35
+      starColors[i * 3] = col[0] * brightness
+      starColors[i * 3 + 1] = col[1] * brightness
+      starColors[i * 3 + 2] = col[2] * brightness
+    }
+
+    const starGeo = new THREE.BufferGeometry()
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
+    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
+    this.starsMat = new THREE.PointsMaterial({
+      size: 1.35,
+      vertexColors: true,
+      transparent: true,
+      opacity: this.currentStarsOpacity,
+      depthWrite: false,
+      fog: false,
+    })
+    this.starsPoints = new THREE.Points(starGeo, this.starsMat)
+    this.starsPoints.visible = this.currentStarsOpacity > 0.005
+    this.celestialGroup.add(this.starsPoints)
+
+    // 4. Brilliant Major Constellation Stars (350 larger twinkling stars)
+    const brightCount = 350
+    const brightPositions = new Float32Array(brightCount * 3)
+    const brightColors = new Float32Array(brightCount * 3)
+    for (let i = 0; i < brightCount; i++) {
+      const u = Math.random()
+      const v = Math.random()
+      const theta = 0.08 + u * (Math.PI * 0.44)
+      const phi = v * Math.PI * 2
+      const r = 170 + (Math.random() - 0.5) * 4
+
+      brightPositions[i * 3] = r * Math.sin(theta) * Math.cos(phi)
+      brightPositions[i * 3 + 1] = r * Math.cos(theta) + 4
+      brightPositions[i * 3 + 2] = r * Math.sin(theta) * Math.sin(phi)
+
+      const col = colorPalette[Math.floor(Math.random() * colorPalette.length)]
+      brightColors[i * 3] = col[0]
+      brightColors[i * 3 + 1] = col[1]
+      brightColors[i * 3 + 2] = col[2]
+    }
+    const brightGeo = new THREE.BufferGeometry()
+    brightGeo.setAttribute('position', new THREE.BufferAttribute(brightPositions, 3))
+    brightGeo.setAttribute('color', new THREE.BufferAttribute(brightColors, 3))
+    this.starsBrightMat = new THREE.PointsMaterial({
+      size: 2.8,
+      vertexColors: true,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: this.currentStarsOpacity,
+      depthWrite: false,
+      fog: false,
+    })
+    this.starsBrightPoints = new THREE.Points(brightGeo, this.starsBrightMat)
+    this.starsBrightPoints.visible = this.currentStarsOpacity > 0.005
+    this.celestialGroup.add(this.starsBrightPoints)
+
+    // 5. Deep-Mountain Milky Way Galaxy Ribbon (900 stardust particles)
+    const mwCount = 900
+    const mwPositions = new Float32Array(mwCount * 3)
+    const mwColors = new Float32Array(mwCount * 3)
+    const mwPalette: [number, number, number][] = [
+      [0.35, 0.72, 0.98], // Cosmic cyan
+      [0.65, 0.45, 0.95], // Nebula violet
+      [0.95, 0.88, 0.75], // Stardust gold
+      [0.25, 0.52, 0.88], // Deep azure
+      [0.85, 0.92, 1.0],  // Brilliant white
+    ]
+
+    for (let i = 0; i < mwCount; i++) {
+      const t = (Math.random() - 0.5) * Math.PI * 0.95
+      const bandWidth = (Math.random() - 0.5) * 26
+      const bandHeight = (Math.random() - 0.5) * 16
+
+      const rad = 168 + (Math.random() - 0.5) * 6
+      const baseTheta = Math.PI * 0.5 - t * 0.85
+      const basePhi = 0.75 + t * 0.45
+
+      let x = rad * Math.sin(baseTheta) * Math.cos(basePhi) + bandWidth * Math.sin(basePhi)
+      let y = rad * Math.cos(baseTheta) + bandHeight + 10
+      let z = rad * Math.sin(baseTheta) * Math.sin(basePhi) - bandWidth * Math.cos(basePhi)
+
+      if (y < 8) y = 8 + Math.random() * 8
+
+      mwPositions[i * 3] = x
+      mwPositions[i * 3 + 1] = y
+      mwPositions[i * 3 + 2] = z
+
+      const col = mwPalette[Math.floor(Math.random() * mwPalette.length)]
+      const b = 0.55 + Math.random() * 0.45
+      mwColors[i * 3] = col[0] * b
+      mwColors[i * 3 + 1] = col[1] * b
+      mwColors[i * 3 + 2] = col[2] * b
+    }
+
+    const mwGeo = new THREE.BufferGeometry()
+    mwGeo.setAttribute('position', new THREE.BufferAttribute(mwPositions, 3))
+    mwGeo.setAttribute('color', new THREE.BufferAttribute(mwColors, 3))
+    this.milkyWayMat = new THREE.PointsMaterial({
+      size: 4.2,
+      vertexColors: true,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: this.currentMilkyWayOpacity,
+      depthWrite: false,
+      fog: false,
+    })
+    this.milkyWayPoints = new THREE.Points(mwGeo, this.milkyWayMat)
+    this.milkyWayPoints.visible = this.currentMilkyWayOpacity > 0.005
+    this.celestialGroup.add(this.milkyWayPoints)
+
+    this.scene.add(this.celestialGroup)
+  }
+
+  private renderMoonCanvas(canvas: HTMLCanvasElement, info: LunarPhaseInfo): void {
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, 256, 256)
+    const cx = 128
+    const cy = 128
+    const r = 68
+
+    // 1. Moonlight corona aura
+    const aura = ctx.createRadialGradient(cx, cy, r * 0.72, cx, cy, 126)
+    if (info.isMidAutumnFullMoon) {
+      aura.addColorStop(0, 'rgba(255, 245, 205, 0.65)')
+      aura.addColorStop(0.35, 'rgba(254, 215, 120, 0.32)')
+      aura.addColorStop(0.75, 'rgba(245, 158, 11, 0.12)')
+      aura.addColorStop(1.0, 'rgba(217, 119, 6, 0)')
+    } else {
+      aura.addColorStop(0, 'rgba(235, 248, 255, 0.58)')
+      aura.addColorStop(0.4, 'rgba(190, 225, 255, 0.25)')
+      aura.addColorStop(0.78, 'rgba(150, 195, 255, 0.09)')
+      aura.addColorStop(1.0, 'rgba(140, 180, 240, 0)')
+    }
+    ctx.fillStyle = aura
+    ctx.beginPath()
+    ctx.arc(cx, cy, 126, 0, Math.PI * 2)
+    ctx.fill()
+
+    // 2. Base unlit moon disc (earthshine)
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.closePath()
+    ctx.clip()
+
+    ctx.fillStyle = 'rgba(25, 36, 52, 0.38)'
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
+
+    // 3. Illuminated portion based on astronomical phase
+    const cosP = Math.cos(info.phase * 2 * Math.PI)
+    ctx.save()
+    ctx.beginPath()
+    if (info.phase < 0.5) {
+      // Waxing moon: right limb lit
+      ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2, false)
+      ctx.ellipse(cx, cy, Math.max(0.5, Math.abs(cosP) * r), r, 0, Math.PI / 2, -Math.PI / 2, cosP < 0)
+    } else {
+      // Waning moon: left limb lit
+      ctx.arc(cx, cy, r, Math.PI / 2, -Math.PI / 2, false)
+      ctx.ellipse(cx, cy, Math.max(0.5, Math.abs(cosP) * r), r, 0, -Math.PI / 2, Math.PI / 2, cosP >= 0)
+    }
+    ctx.closePath()
+    ctx.clip()
+
+    // Illuminated surface
+    const litGrad = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.25, 6, cx, cy, r)
+    if (info.isMidAutumnFullMoon) {
+      litGrad.addColorStop(0, '#fffdfa')
+      litGrad.addColorStop(0.4, '#fef3c7')
+      litGrad.addColorStop(0.8, '#fde68a')
+      litGrad.addColorStop(1.0, '#f59e0b')
+    } else {
+      litGrad.addColorStop(0, '#ffffff')
+      litGrad.addColorStop(0.45, '#f8fafc')
+      litGrad.addColorStop(0.8, '#e2e8f0')
+      litGrad.addColorStop(1.0, '#94a3b8')
+    }
+    ctx.fillStyle = litGrad
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
+
+    // Lunar maria (craters & basaltic plains)
+    const craters: [number, number, number][] = [
+      [-18, -16, 17],
+      [16, -22, 15],
+      [-24, 14, 19],
+      [12, 19, 23],
+      [32, 2, 13],
+      [-6, 6, 16],
+      [2, -32, 12],
+      [-22, 32, 14],
+      [25, 28, 11],
+    ]
+    ctx.fillStyle = info.isMidAutumnFullMoon ? 'rgba(217, 119, 6, 0.24)' : 'rgba(100, 116, 139, 0.35)'
+    for (const [ox, oy, cr] of craters) {
+      ctx.beginPath()
+      ctx.arc(cx + ox, cy + oy, cr, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    ctx.restore() // Unclip illuminated portion
+    ctx.restore() // Unclip base disc
+  }
+
+  refreshMoonPhase(date = new Date()): void {
+    this.lunarPhaseInfo = getLunarPhaseInfo(date)
+    if (this.moonCanvas && this.moonTexture) {
+      this.renderMoonCanvas(this.moonCanvas, this.lunarPhaseInfo)
+      this.moonTexture.needsUpdate = true
+    }
+  }
+
+  getLunarPhase(): LunarPhaseInfo {
+    return this.lunarPhaseInfo
+  }
+
   private renderSkyGradientWithColors(stops: [THREE.Color, THREE.Color, THREE.Color, THREE.Color]): void {
     if (!this.skyCv) return
     const ctx = this.skyCv.getContext('2d')
@@ -2546,6 +3011,12 @@ export class TempleWorld {
     this.targetSkyStops[1].set(cfg.skyStops[1])
     this.targetSkyStops[2].set(cfg.skyStops[2])
     this.targetSkyStops[3].set(cfg.skyStops[3])
+    this.targetSunVisualOpacity = cfg.sunVisualOpacity
+    this.targetSunVisualPos.set(...cfg.sunVisualPos)
+    this.targetMoonOpacity = cfg.moonOpacity
+    this.targetMoonPos.set(...cfg.moonPos)
+    this.targetStarsOpacity = cfg.starsOpacity
+    this.targetMilkyWayOpacity = cfg.milkyWayOpacity
     this.isSkyTransitioning = true
 
     if (immediate) {
@@ -2571,6 +3042,37 @@ export class TempleWorld {
       }
       this.renderSkyGradientWithColors(this.currentSkyStops)
       if (this.skyTex) this.skyTex.needsUpdate = true
+
+      this.currentSunVisualOpacity = cfg.sunVisualOpacity
+      this.currentSunVisualPos.set(...cfg.sunVisualPos)
+      this.currentMoonOpacity = cfg.moonOpacity
+      this.currentMoonPos.set(...cfg.moonPos)
+      this.currentStarsOpacity = cfg.starsOpacity
+      this.currentMilkyWayOpacity = cfg.milkyWayOpacity
+
+      if (this.sunSprite) {
+        this.sunSprite.position.copy(this.currentSunVisualPos)
+        ;(this.sunSprite.material as THREE.SpriteMaterial).opacity = this.currentSunVisualOpacity
+        this.sunSprite.visible = this.currentSunVisualOpacity > 0.005
+      }
+      if (this.moonSprite) {
+        this.moonSprite.position.copy(this.currentMoonPos)
+        ;(this.moonSprite.material as THREE.SpriteMaterial).opacity = this.currentMoonOpacity
+        this.moonSprite.visible = this.currentMoonOpacity > 0.005
+      }
+      if (this.starsMat) {
+        this.starsMat.opacity = this.currentStarsOpacity
+        this.starsPoints && (this.starsPoints.visible = this.currentStarsOpacity > 0.005)
+      }
+      if (this.starsBrightMat) {
+        this.starsBrightMat.opacity = this.currentStarsOpacity
+        this.starsBrightPoints && (this.starsBrightPoints.visible = this.currentStarsOpacity > 0.005)
+      }
+      if (this.milkyWayMat) {
+        this.milkyWayMat.opacity = this.currentMilkyWayOpacity
+        this.milkyWayPoints && (this.milkyWayPoints.visible = this.currentMilkyWayOpacity > 0.005)
+      }
+
       this.isSkyTransitioning = false
     }
   }
@@ -2725,6 +3227,7 @@ export class TempleWorld {
         if (currentReal !== this.timeOfDay) {
           this.timeOfDay = currentReal
           this.applyTimeConfig(TIME_CONFIGS[currentReal], false)
+          this.onTimeOfDayChange?.(currentReal)
         }
       }
     }
@@ -2771,6 +3274,46 @@ export class TempleWorld {
       if (maxDiff < 0.003 && Math.abs(this.sun.intensity - this.targetSunIntensity) < 0.005) {
         this.isSkyTransitioning = false
       }
+    }
+
+    // Celestial bodies (Sun, Moon, Starfield, Milky Way) smooth interpolation & twinkling
+    const cAlpha = Math.min(1.0, dt * 2.2)
+    this.currentSunVisualOpacity = THREE.MathUtils.lerp(this.currentSunVisualOpacity, this.targetSunVisualOpacity, cAlpha)
+    this.currentSunVisualPos.lerp(this.targetSunVisualPos, cAlpha)
+    this.currentMoonOpacity = THREE.MathUtils.lerp(this.currentMoonOpacity, this.targetMoonOpacity, cAlpha)
+    this.currentMoonPos.lerp(this.targetMoonPos, cAlpha)
+    this.currentStarsOpacity = THREE.MathUtils.lerp(this.currentStarsOpacity, this.targetStarsOpacity, cAlpha)
+    this.currentMilkyWayOpacity = THREE.MathUtils.lerp(this.currentMilkyWayOpacity, this.targetMilkyWayOpacity, cAlpha)
+
+    if (this.sunSprite) {
+      this.sunSprite.position.copy(this.currentSunVisualPos)
+      ;(this.sunSprite.material as THREE.SpriteMaterial).opacity = this.currentSunVisualOpacity
+      this.sunSprite.visible = this.currentSunVisualOpacity > 0.005
+    }
+    if (this.moonSprite) {
+      this.moonSprite.position.copy(this.currentMoonPos)
+      ;(this.moonSprite.material as THREE.SpriteMaterial).opacity = this.currentMoonOpacity
+      this.moonSprite.visible = this.currentMoonOpacity > 0.005
+    }
+    if (this.starsMat) {
+      this.starsMat.opacity = this.currentStarsOpacity
+      this.starsPoints && (this.starsPoints.visible = this.currentStarsOpacity > 0.005)
+    }
+    if (this.starsBrightMat) {
+      const twinkle = 0.82 + 0.18 * Math.sin(time * 2.8)
+      this.starsBrightMat.opacity = this.currentStarsOpacity * twinkle
+      this.starsBrightPoints && (this.starsBrightPoints.visible = this.currentStarsOpacity > 0.005)
+    }
+    if (this.milkyWayMat) {
+      this.milkyWayMat.opacity = this.currentMilkyWayOpacity
+      this.milkyWayPoints && (this.milkyWayPoints.visible = this.currentMilkyWayOpacity > 0.005)
+    }
+
+    // Periodic check for lunar phase date updates (every 60 seconds)
+    this.lunarCheckTimer += dt
+    if (this.lunarCheckTimer >= 60) {
+      this.lunarCheckTimer = 0
+      this.refreshMoonPhase()
     }
 
     // Face the camera only around the world Y axis. Copying the full camera

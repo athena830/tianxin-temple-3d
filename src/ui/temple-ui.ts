@@ -1,5 +1,5 @@
 import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId, type WishCategory, type WishBlessing } from '../game/temple-data'
-import { getRealWorldTimeOfDay, type ShrinePoint, type ShrinePointId, type TimeOfDay, type TimeSetting } from '../game/temple-world'
+import { getLunarPhaseInfo, getRealWorldTimeOfDay, type ShrinePoint, type ShrinePointId, type TimeOfDay, type TimeSetting } from '../game/temple-world'
 import { APP_VERSION } from '../version'
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
@@ -7,11 +7,18 @@ const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 
 const SAMPLE_WISHES = ['願家人身體健康，平安順遂。', '祈求考試順利，心定不慌。', '願世間少些病苦，多些溫柔。', '新的一年，工作踏實、心安自在。']
 
-const TIME_LABELS: Record<TimeOfDay, string> = {
-  day: '☀️ 晴空',
-  dusk: '🌇 夕陽',
-  night: '🌙 夜晚',
-  dawn: '🌅 晨曦',
+function getEffectiveTimeLabel(mode: TimeOfDay): string {
+  if (mode === 'night') {
+    const lunar = getLunarPhaseInfo()
+    return `🌙 ${lunar.name}`
+  }
+  const labels: Record<TimeOfDay, string> = {
+    day: '☀️ 晴空',
+    dusk: '🌇 夕陽',
+    night: '🌙 夜晚',
+    dawn: '🌅 晨曦',
+  }
+  return labels[mode]
 }
 
 export type TempleUiActions = {
@@ -45,7 +52,7 @@ export class TempleUi {
     const initReal = getRealWorldTimeOfDay().mode
     this.currentTimeSetting = 'auto'
     this.currentEffectiveTime = initReal
-    const initialTimeLabel = `⏰ 現實 (${TIME_LABELS[initReal]})`
+    const initialTimeLabel = `⏰ 現實 (${getEffectiveTimeLabel(initReal)})`
 
     this.root = document.getElementById('ui')!
     this.root.innerHTML = `
@@ -109,7 +116,7 @@ export class TempleUi {
         if (cur !== this.currentEffectiveTime) {
           this.currentEffectiveTime = cur
           const btn = this.root.querySelector<HTMLElement>('button[data-act="time"]')
-          if (btn) btn.textContent = `⏰ 現實 (${TIME_LABELS[cur]})`
+          if (btn) btn.textContent = `⏰ 現實 (${getEffectiveTimeLabel(cur)})`
         }
       }
     }, 8000)
@@ -406,20 +413,22 @@ export class TempleUi {
       const cycle: TimeSetting[] = ['auto', 'day', 'dusk', 'night', 'dawn']
       const next = cycle[(cycle.indexOf(this.currentTimeSetting) + 1) % cycle.length]
       this.currentTimeSetting = next
+      const lunar = getLunarPhaseInfo()
       if (next === 'auto') {
         this.currentEffectiveTime = getRealWorldTimeOfDay().mode
-        t.textContent = `⏰ 現實 (${TIME_LABELS[this.currentEffectiveTime]})`
+        t.textContent = `⏰ 現實 (${getEffectiveTimeLabel(this.currentEffectiveTime)})`
         this.actions.time('auto')
-        this.toast('已切換為「現實時間同步」：場景自動隨現實清晨、白天、黃昏與夜晚即時變換。')
+        const nightExtra = this.currentEffectiveTime === 'night' ? `（現為深山星空・${lunar.name}）` : ''
+        this.toast(`已切換為「現實時間同步」${nightExtra}：場景天象自動隨現實清晨、白天、黃昏與夜晚即時變換。`)
       } else {
         this.currentEffectiveTime = next
-        t.textContent = TIME_LABELS[next]
+        t.textContent = getEffectiveTimeLabel(next)
         this.actions.time(next)
         const toasts: Record<TimeOfDay, string> = {
-          day: '已切換為「白天（晴空）」時段，陽光普照。',
-          dusk: '已切換為「黃昏（夕陽）」時段，晚霞漫天。',
-          night: '已切換為「夜晚（夜間）」時段，宮燈齊明，金光熠熠。',
-          dawn: '已切換為「清晨（晨曦）」時段，紫氣東來。',
+          day: '已切換為「白天（晴空）」時段，旭日當空，光耀萬山。',
+          dusk: '已切換為「黃昏（夕陽）」時段，落日熔金，晚霞漫天。',
+          night: `已切換為「夜晚（夜間）」時段：深山無光害星空璀璨、銀河高懸，今夜天象為「${lunar.name}」(${lunar.description})，宮燈齊明。`,
+          dawn: '已切換為「清晨（晨曦）」時段，紫氣東來，初陽晨曦與曉星相映。',
         }
         this.toast(toasts[next])
       }
@@ -487,6 +496,18 @@ export class TempleUi {
       this.actions.ritual('chess')
       this.open('chess', `「${this.chessPiece}」${t.dataset.dir}：${result}`)
       this.chessPiece = ''
+    }
+  }
+
+  updateTimeSettingLabel(setting: TimeSetting, effectiveMode: TimeOfDay): void {
+    this.currentTimeSetting = setting
+    this.currentEffectiveTime = effectiveMode
+    const btn = this.root.querySelector<HTMLElement>('[data-act="time"]')
+    if (!btn) return
+    if (setting === 'auto') {
+      btn.textContent = `⏰ 現實 (${getEffectiveTimeLabel(effectiveMode)})`
+    } else {
+      btn.textContent = getEffectiveTimeLabel(setting)
     }
   }
 }

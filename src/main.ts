@@ -174,6 +174,7 @@ async function boot(): Promise<void> {
   g.onNear = point => ui.near(point)
   g.onGuide = (point, distance) => ui.guideTo(point, distance)
   g.world.onNpcDialogue = (speaker, text) => ui.showNpcDialogue(speaker, text)
+  g.world.onTimeOfDayChange = mode => ui.updateTimeSettingLabel(g.world.getTimeSetting(), mode)
   g.onClickResult = result => {
     if (!result) return
     if (Date.now() < interactBlockedUntil || g.worshipping) return
