@@ -69,11 +69,11 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     fogNear: 55,
     fogFar: 180,
     sunColor: '#ff7733',
-    sunIntensity: 0.98,
+    sunIntensity: 1.1,
     sunPosition: [35, 18, 20],
     hemiColor: '#ff9966',
-    hemiGroundColor: '#2d1e24',
-    hemiIntensity: 0.85,
+    hemiGroundColor: '#3a2b30',
+    hemiIntensity: 0.95,
     cloudColor: '#fca57c',
     cloudOpacity: 0.88,
     skyStops: ['#1c1c38', '#5e2348', '#a63e3d', '#e67e22'],
@@ -83,12 +83,12 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     fogColor: '#142236',
     fogNear: 70,
     fogFar: 190,
-    sunColor: '#9cbbe8',
-    sunIntensity: 0.88,
+    sunColor: '#a8c6f2',
+    sunIntensity: 0.98,
     sunPosition: [-15, 30, -25],
-    hemiColor: '#3e5c82',
-    hemiGroundColor: '#2a3748',
-    hemiIntensity: 0.95,
+    hemiColor: '#5275a2',
+    hemiGroundColor: '#3c4d62',
+    hemiIntensity: 1.18,
     cloudColor: '#526585',
     cloudOpacity: 0.55,
     skyStops: ['#0a1426', '#13223a', '#1e3354', '#2c476e'],
@@ -755,11 +755,32 @@ export class TempleWorld {
     caisson.add(lotusBoss)
 
     // Sacred Caisson Amber Halo Light (藻井天心垂照神龕祥和佛光)
-    const caissonGlow = new THREE.PointLight('#ffe8a3', 0.85, 9, 2)
+    const caissonGlow = new THREE.PointLight('#fff0be', 2.4, 22, 1.4)
     caissonGlow.position.y = 0.35
     caisson.add(caissonGlow)
 
     hall.add(caisson)
+
+    // Central Grand Hall Ambient Illumination (大殿中央開闊拜殿暖金華燈，全面照亮地面、石柱與壁堵)
+    const mainHallCenterLight = new THREE.PointLight('#fff3d6', 2.6, 26, 1.4)
+    mainHallCenterLight.position.set(0, 4.4, 0.2)
+    hall.add(mainHallCenterLight)
+
+    // Grand Altar Bright Lamp (觀世音菩薩神龕主供桌前明耀壇燈)
+    const altarBrightGlow = new THREE.PointLight('#ffe8a8', 2.2, 18, 1.4)
+    altarBrightGlow.position.set(0, 3.2, -4.2)
+    hall.add(altarBrightGlow)
+
+    // Flanking inner column palace lights (左右兩側走道與側壁暖金宮燈群)
+    for (const side of [-1, 1]) {
+      const innerAisleGlow = new THREE.PointLight('#ffc87a', 1.8, 16, 1.5)
+      innerAisleGlow.position.set(side * 6.2, 3.6, 0.5)
+      hall.add(innerAisleGlow)
+
+      const shrineSideGlow = new THREE.PointLight('#ffc070', 1.6, 14, 1.5)
+      shrineSideGlow.position.set(side * 5.2, 3.4, -4.8)
+      hall.add(shrineSideGlow)
+    }
 
     // Altar Base & Top (神龕供桌)
     const altarBase = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.48, 1.9), makeMat('#4a3025'))
@@ -810,18 +831,25 @@ export class TempleWorld {
     this.scene.add(this.roof)
     this.addRoofFinial(hall, 0, 0)
 
-    // Red Palace Lanterns (殿前紅色宮燈)
+    // Red Palace Lanterns & Portal Warm Lighting (殿前紅色宮燈與門庭神光)
     // No lantern on the central axis so the statue stays fully visible from the courtyard.
     for (const x of [-6.3, -3.2, 3.2, 6.3]) {
-      const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.34, 0.8, 10), makeMat(C.vermilionLight))
+      const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.34, 0.8, 10), makeMat('#d84332', 0.5, 0.1))
       lantern.position.set(x, 3.9, -0.4)
       hall.add(lantern)
       const cap = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.22, 8), gold)
       cap.position.set(x, 4.39, -0.4)
       hall.add(cap)
-      const glow = new THREE.PointLight('#f1b969', 0.22, 5, 2)
-      glow.position.set(x, 3.7, -0.4)
+      const glow = new THREE.PointLight('#ffaa48', 1.6, 12, 1.5)
+      glow.position.set(x, 3.6, -0.4)
       hall.add(glow)
+    }
+
+    // Portal Floor Illumination (大殿中門御門與龍虎二門迎賓暖光)
+    for (const x of [-6.75, 0, 6.75]) {
+      const portalLight = new THREE.PointLight('#ffc878', 1.6, 11, 1.6)
+      portalLight.position.set(x, 3.8, 6.2)
+      hall.add(portalLight)
     }
   }
 
@@ -874,6 +902,11 @@ export class TempleWorld {
       const corrRoof = this.createRoof(4.2, 4.8, 4.4, 5.5)
       corrRoof.position.set(side * 5.85, 0, -14.65)
       this.scene.add(corrRoof)
+
+      // Walkway warm ceiling lantern (穿堂連通迴廊暖金長明燈)
+      const corrLight = new THREE.PointLight('#ffbf66', 1.8, 12, 1.5)
+      corrLight.position.set(side * 5.85, 3.4, 10.45)
+      rear.add(corrLight)
     }
 
     // 2. Approach Steps & Imperial Dragon Ramp (登殿大階梯、中央雲龍陛與兩側望柱欄杆)
@@ -1131,10 +1164,26 @@ export class TempleWorld {
     haloRay.position.set(0, 3.8, throneZ - 1.48)
     rear.add(haloOuter, haloInner, haloRay)
 
-    // Divine Radiance Light
-    const rearLight = new THREE.PointLight('#ffe6a8', 1.5, 24, 2)
-    rearLight.position.set(0, 4.4, throneZ + 1.2)
+    // Divine Radiance Light (玉皇上帝御座神聖金光)
+    const rearLight = new THREE.PointLight('#fff3c4', 2.6, 28, 1.4)
+    rearLight.position.set(0, 4.6, throneZ + 1.2)
     rear.add(rearLight)
+
+    // Central Lingxiao Palace Grand Illumination (凌霄寶殿中央天心萬聖金光華燈，廣布大殿前堂)
+    const rearCenterLight = new THREE.PointLight('#fff4d6', 2.8, 28, 1.4)
+    rearCenterLight.position.set(0, 5.2, 1.5)
+    rear.add(rearCenterLight)
+
+    // Flanking imperial column lanterns (後殿金柱兩側護持明燈群)
+    for (const side of [-1, 1]) {
+      const colGlow = new THREE.PointLight('#ffca75', 1.8, 18, 1.5)
+      colGlow.position.set(side * 7.5, 4.2, 1.5)
+      rear.add(colGlow)
+
+      const throneColGlow = new THREE.PointLight('#ffd280', 1.8, 18, 1.5)
+      throneColGlow.position.set(side * 7.5, 4.2, -4.5)
+      rear.add(throneColGlow)
+    }
 
     // 8. Jade Imperial Offering Table (重簷九龍玉案供桌)
     const altarZ = -2.2
@@ -1174,7 +1223,7 @@ export class TempleWorld {
     const caissonBoss = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.6, 8), gold)
     caissonBoss.rotation.x = Math.PI
     caissonBoss.position.y = 0.65
-    const caissonLight = new THREE.PointLight('#ffe496', 1.1, 14, 2)
+    const caissonLight = new THREE.PointLight('#ffeaa8', 2.4, 22, 1.4)
     caissonLight.position.y = 0.45
     caisson.add(caissonOuter, caissonRing1, caissonRing2, caissonBoss, caissonLight)
     rear.add(caisson)
