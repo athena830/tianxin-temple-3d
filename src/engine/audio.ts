@@ -24,7 +24,6 @@ export class Audio {
   private taraLoopCount = 0
   private lastTTime = 0
   private taraAudio?: HTMLAudioElement
-  private heartAudio?: HTMLAudioElement
   private buffers = new Map<string, AudioBuffer>()
 
   onChantProgress?: (current: number, total: number) => void
@@ -52,7 +51,6 @@ export class Audio {
     this.music.gain.setTargetAtTime(targetMusicVol, t, 0.05)
     this.sfx.gain.setTargetAtTime(muted ? 0 : sfx * 0.8, t, 0.05)
     if (this.taraAudio) this.taraAudio.volume = targetMusicVol
-    if (this.heartAudio) this.heartAudio.volume = targetMusicVol
   }
 
   async load(url: string): Promise<AudioBuffer> {
@@ -162,75 +160,33 @@ export class Audio {
     return this.taraAudio
   }
 
-  private initHeartAudio(): HTMLAudioElement {
-    if (!this.heartAudio) {
-      const el = new window.Audio()
-      el.src = './audio/heart_sutra.mp3?v=3.42.0'
-      el.loop = true
-      el.preload = 'none'
-      el.volume = 0.45
-      this.heartAudio = el
-
-      try {
-        const source = this.ctx.createMediaElementSource(el)
-        source.connect(this.music)
-      } catch {}
+  switchToTrack(_track: MusicTrack, reason: 'auto_complete' | 'manual' | 'init' = 'manual'): void {
+    this.currentTrack = 'green_tara'
+    this.taraChantCount = 0
+    this.taraLoopCount = 0
+    this.lastTTime = 0
+    const ta = this.initTaraAudio()
+    if (this.musicOn) {
+      ta.currentTime = 0
+      void ta.play().catch(() => {})
     }
-    return this.heartAudio
+    this.onTrackChange?.('green_tara', '綠度母心咒', reason)
+    this.onChantProgress?.(1, TARGET_TARA_CHANTS)
   }
 
-  switchToTrack(track: MusicTrack, reason: 'auto_complete' | 'manual' | 'init' = 'manual'): void {
-    if (this.currentTrack === track) return
-    this.currentTrack = track
-
-    if (track === 'heart_sutra') {
-      this.play('wish-chime')
-      if (this.taraAudio) {
-        this.taraAudio.pause()
-      }
-      const ha = this.initHeartAudio()
-      if (this.musicOn) {
-        ha.currentTime = 0
-        void ha.play().catch(() => {})
-      }
-      this.onTrackChange?.('heart_sutra', '般若波羅蜜多心經', reason)
-    } else {
-      this.taraChantCount = 0
-      this.taraLoopCount = 0
-      this.lastTTime = 0
-      if (this.heartAudio) {
-        this.heartAudio.pause()
-      }
-      const ta = this.initTaraAudio()
-      if (this.musicOn) {
-        ta.currentTime = 0
-        void ta.play().catch(() => {})
-      }
-      this.onTrackChange?.('green_tara', '綠度母心咒', reason)
-      this.onChantProgress?.(1, TARGET_TARA_CHANTS)
-    }
-  }
-
-  /** Starts playing the background music (Green Tara or Heart Sutra depending on state). */
+  /** Starts playing the background music (Green Tara). */
   startMusic(): void {
     this.unlock()
     this.musicOn = true
-    if (this.currentTrack === 'green_tara') {
-      const ta = this.initTaraAudio()
-      void ta.play().catch(() => {})
-      this.onChantProgress?.(Math.max(1, this.taraChantCount), TARGET_TARA_CHANTS)
-      this.onTrackChange?.('green_tara', '綠度母心咒', 'init')
-    } else {
-      const ha = this.initHeartAudio()
-      void ha.play().catch(() => {})
-      this.onTrackChange?.('heart_sutra', '般若波羅蜜多心經', 'init')
-    }
+    const ta = this.initTaraAudio()
+    void ta.play().catch(() => {})
+    this.onChantProgress?.(Math.max(1, this.taraChantCount), TARGET_TARA_CHANTS)
+    this.onTrackChange?.('green_tara', '綠度母心咒', 'init')
   }
 
   stopMusic(): void {
     this.musicOn = false
     if (this.taraAudio) this.taraAudio.pause()
-    if (this.heartAudio) this.heartAudio.pause()
   }
 
   toggleMusic(): { playing: boolean; track: MusicTrack; chantCount: number } {
