@@ -275,29 +275,86 @@ export class FrontCourtyard {
     this.c.physics.addStaticBox(new THREE.Vector3(0, 2.1, z), new THREE.Vector3(wallW + 0.8, 4.6, 1.5))
   }
 
+  /**
+   * 原神璃月風格六角飛簷宮燈／霄燈（Genshin Impact Liyue Hexagonal Hanging Palace Lantern）
+   * 1. 雙層金飾挑角飛簷頂蓋（六角瓦簷＋頂部提梁懸金環）
+   * 2. 透光朱紅絹紗燈身＋六方金木邊框立柱＋聚光靈心內膽
+   * 3. 六角蓮華雕花托盤＋翡翠圓珠＋三束垂墜絲絛流蘇
+   * 4. 溫潤暖金長明神光，具呼吸微光起伏效果
+   */
   private lantern(x: number, y: number, z: number, size: number): void {
-    const mat = this.c.mat(PAL.lantern, 0.5)
-    mat.emissive.set('#a3301c')
-    mat.emissiveIntensity = 0.55
-    this.lanternMats.push(mat)
     const g = new THREE.Group()
     g.position.set(x, y, z)
-    const body = new THREE.Mesh(new THREE.SphereGeometry(size, 14, 10), mat)
-    body.scale.y = 1.2
-    const gold = this.c.mat(PAL.gold, 0.45, 0.2)
-    const capT = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.45, size * 0.55, size * 0.25, 10), gold)
-    capT.position.y = size * 1.2
-    const capB = capT.clone()
-    capB.position.y = -size * 1.2
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, size * 1.4, 4), gold)
-    cord.position.y = size * 2
-    const tassel = new THREE.Mesh(new THREE.ConeGeometry(size * 0.25, size * 0.8, 6), mat)
-    tassel.position.y = -size * 1.7
-    tassel.rotation.x = Math.PI
-    g.add(body, capT, capB, cord, tassel)
-    if (size >= 0.3) {
-      const light = new THREE.PointLight('#ff9238', 0.9, 8.5, 2)
-      light.position.y = -size * 0.5
+
+    const gold = this.c.mat(PAL.gold, 0.4, 0.3)
+    const darkWood = this.c.mat('#2c1b18', 0.6)
+    const silkMat = this.c.mat('#df4230', 0.5)
+    silkMat.emissive.set('#ff7830')
+    silkMat.emissiveIntensity = 0.65
+    this.lanternMats.push(silkMat)
+
+    const coreMat = this.c.mat('#fff1bd', 0.2)
+    coreMat.emissive.set('#ffa536')
+    coreMat.emissiveIntensity = 1.2
+    this.lanternMats.push(coreMat)
+
+    // 1. 頂部懸掛金索與吊環
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, size * 1.5, 6), gold)
+    cord.position.y = size * 2.0
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(size * 0.14, size * 0.03, 6, 12), gold)
+    ring.position.y = size * 1.35
+    ring.rotation.x = Math.PI / 2
+    g.add(cord, ring)
+
+    // 2. 原神璃月雙層六角飛簷寶頂（Pagoda Roof Cap with Upturned Eaves）
+    const roofTop = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.18, size * 0.76, size * 0.28, 6), darkWood)
+    roofTop.position.y = size * 1.14
+    const roofEave = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.78, size * 0.62, size * 0.08, 6), gold)
+    roofEave.position.y = size * 0.98
+    g.add(roofTop, roofEave)
+
+    // 3. 六角透光絹紗燈膽與明耀靈心（Silk Chamber & Luminous Core）
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.58, size * 0.52, size * 1.28, 6), silkMat)
+    body.position.y = size * 0.32
+    const innerCore = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.26, size * 0.26, size * 0.85, 6), coreMat)
+    innerCore.position.y = size * 0.32
+    g.add(body, innerCore)
+
+    // 4. 六方金雕護框立柱（Corner Filigree Posts）
+    const postR = size * 0.56
+    for (let i = 0; i < 6; i++) {
+      const ang = (i * Math.PI) / 3
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.032, size * 0.032, size * 1.32, 4), gold)
+      post.position.set(Math.cos(ang) * postR, size * 0.32, Math.sin(ang) * postR)
+      g.add(post)
+    }
+
+    // 5. 下方蓮華雕花托底（Hexagonal Lotus Bracket Base）
+    const baseTray = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.65, size * 0.35, size * 0.2, 6), gold)
+    baseTray.position.y = -size * 0.42
+    const jadeBeadMat = this.c.mat('#3fa878', 0.3, 0.4)
+    const bead = new THREE.Mesh(new THREE.DodecahedronGeometry(size * 0.14), jadeBeadMat)
+    bead.position.y = -size * 0.58
+    g.add(baseTray, bead)
+
+    // 6. 三束飄逸垂墜紅金流蘇（Flowing Silk Tassels）
+    const tasselMat = this.c.mat('#d03628', 0.7)
+    const centerTassel = new THREE.Mesh(new THREE.ConeGeometry(size * 0.16, size * 0.95, 6), tasselMat)
+    centerTassel.position.y = -size * 1.1
+    centerTassel.rotation.x = Math.PI
+    g.add(centerTassel)
+    for (const sideAng of [-0.4, 0.4]) {
+      const sideTassel = new THREE.Mesh(new THREE.ConeGeometry(size * 0.1, size * 0.65, 5), tasselMat)
+      sideTassel.position.set(Math.sin(sideAng) * size * 0.22, -size * 0.92, Math.cos(sideAng) * size * 0.22)
+      sideTassel.rotation.x = Math.PI
+      sideTassel.rotation.z = sideAng * 0.35
+      g.add(sideTassel)
+    }
+
+    // 7. 廣角暖金環境光輝
+    if (size >= 0.22) {
+      const light = new THREE.PointLight('#ffa645', size >= 0.3 ? 1.3 : 0.85, 9.5, 1.8)
+      light.position.y = size * 0.32
       g.add(light)
     }
     this.add(g, false)
@@ -693,16 +750,22 @@ export class FrontCourtyard {
       g.add(m)
     }
 
-    // Traditional Stone Water Lantern atop rock (池畔水榭石燈籠)
-    const lanternBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.18, 6), stoneWall)
+    // Traditional Genshin Liyue Waterside Stone Lantern atop rock (池畔水榭原神璃月仙風石燈籠)
+    const lanternBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 0.16, 6), stoneWall)
     lanternBase.position.set(rx * 0.72, 1.42, -rz * 0.22)
-    const lanternWindow = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.24, 0.28), this.c.mat('#f0c36b', 0.4, 0.2))
+    const waterLampMat = this.c.mat('#ffe896', 0.35)
+    waterLampMat.emissive.set('#ff9e30')
+    waterLampMat.emissiveIntensity = 0.9
+    this.lanternMats.push(waterLampMat)
+    const lanternWindow = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.28, 6), waterLampMat)
     lanternWindow.position.set(rx * 0.72, 1.62, -rz * 0.22)
-    const lanternRoof = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.22, 6), stoneWall)
+    const lanternRoof = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.42, 0.2, 6), stoneWall)
     lanternRoof.position.set(rx * 0.72, 1.84, -rz * 0.22)
-    g.add(lanternBase, lanternWindow, lanternRoof)
+    const lanternFinial = new THREE.Mesh(new THREE.DodecahedronGeometry(0.07), this.c.mat(PAL.gold, 0.4, 0.3))
+    lanternFinial.position.set(rx * 0.72, 1.98, -rz * 0.22)
+    g.add(lanternBase, lanternWindow, lanternRoof, lanternFinial)
 
-    const lanternLight = new THREE.PointLight('#ffbe55', 0.8, 6, 2)
+    const lanternLight = new THREE.PointLight('#ffbe55', 1.0, 7.5, 1.8)
     lanternLight.position.set(rx * 0.72, 1.62, -rz * 0.22)
     g.add(lanternLight)
 
@@ -943,77 +1006,164 @@ export class FrontCourtyard {
   }
 
   private addPlanting(): void {
-    // Shrubs and stone lanterns along the road edges (outside |x| < 2), skipping the Tiangong and pavilion approaches.
+    // 原神風格景觀步道植栽與雕花石燈台（沿主要參道兩側對稱排列）
     for (const side of [-1, 1]) {
       for (const z of [14, 24, 34, 44]) this.shrub(side * 3.6, z)
       for (const z of [19, 39]) this.stoneLantern(side * 3.6, z)
     }
-    for (const [x, z] of [[-24, 44], [24, 44], [-24, 18], [24, 22], [-17, 8], [17, 8]] as const) this.tree(x, z)
+
+    // 前庭與外圍景觀神木群（全面升級為原神動漫仙境風格）
+    let treeSeed = 10
+    for (const [x, z] of [
+      [-24, 44], [24, 44],
+      [-24, 18], [24, 22],
+      [-17, 8], [17, 8],
+      [-17, 28], [18, 36],
+      [-12, 48], [12, 48]
+    ] as const) {
+      this.genshinTree(x, z, treeSeed++)
+    }
+
     for (const [x, z, a] of [[-6.4, 18, 0], [6.4, 18, 0], [-19, 36, Math.PI / 2], [19, 30, Math.PI / 2]] as const) this.bench(x, z, a)
   }
 
+  /**
+   * 原神風格雕花玉盆靈栽（Genshin Impact Stylized Jade Planter Bonsai）
+   * 1. 六角雕花翡翠青瓷盆台（白瓷玉潤／金邊浮雕）
+   * 2. 蒼勁微型盆景枝幹
+   * 3. 蓬鬆多簇動漫雲團樹葉（翠綠漸層）
+   * 4. 點綴原神霓裳花／琉璃百合靈花花簇
+   */
   private shrub(x: number, z: number): void {
     const g = new THREE.Group()
     g.position.set(x, 0, z)
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.34, 0.45, 10), this.c.mat(PAL.red, 0.8))
-    pot.position.y = 0.22
-    g.add(pot)
-    for (let i = 0; i < 3; i += 1) {
-      const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42 - i * 0.06, 0), this.c.mat(i === 1 ? PAL.leaf : PAL.jade, 0.85))
-      leaf.position.set((i - 1) * 0.16, 0.72 + i * 0.12, (i % 2) * 0.1)
-      g.add(leaf)
+
+    // 1. 六角白玉青瓷盆
+    const jadePorcelain = this.c.mat('#e3ede6', 0.35, 0.15)
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.32, 0.36, 6), jadePorcelain)
+    pot.position.y = 0.18
+    const goldRim = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.44, 0.06, 6), this.c.mat(PAL.gold, 0.4, 0.3))
+    goldRim.position.y = 0.35
+    const soil = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.38, 0.05, 6), this.c.mat('#38281a', 0.95))
+    soil.position.y = 0.36
+    g.add(pot, goldRim, soil)
+
+    // 2. 蒼勁微盆景小主幹
+    const miniTrunkMat = this.c.mat('#4e3422', 0.85)
+    const miniTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.45, 6), miniTrunkMat)
+    miniTrunk.position.set(0.02, 0.54, 0)
+    miniTrunk.rotation.z = -0.18
+    g.add(miniTrunk)
+
+    // 3. 原神風格雙層蓬鬆雲團樹葉簇（Anime Cel-shaded Shrub Puffs）
+    const foliageMat1 = this.c.mat('#2d7348', 0.6)
+    const foliageMat2 = this.c.mat('#59b378', 0.55)
+    const puff1 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 1), foliageMat1)
+    puff1.position.set(-0.12, 0.72, 0.06)
+    puff1.scale.set(1.15, 0.75, 1.1)
+    const puff2 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35, 1), foliageMat2)
+    puff2.position.set(0.1, 0.82, -0.05)
+    puff2.scale.set(1.2, 0.8, 1.15)
+    const puffTop = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 1), this.c.mat('#8ee0a6', 0.5))
+    puffTop.position.set(0.02, 1.02, 0.02)
+    g.add(puff1, puff2, puffTop)
+
+    // 4. 原神仙草靈花（微光落櫻／琉璃仙花花蕊）
+    const flowerMat = this.c.mat('#ffb8cf', 0.4)
+    flowerMat.emissive.set('#ff6994')
+    flowerMat.emissiveIntensity = 0.5
+    for (const [fx, fy, fz] of [[-0.22, 0.82, 0.18], [0.22, 0.88, 0.14], [0.05, 1.12, -0.1]]) {
+      const flower = new THREE.Mesh(new THREE.DodecahedronGeometry(0.06), flowerMat)
+      flower.position.set(fx, fy, fz)
+      g.add(flower)
     }
+
     this.add(g)
-    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.5, z), 0.42, 1)
+    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.5, z), 0.45, 1.0)
   }
 
+  /**
+   * 原神璃月風格玉京台雕花石燈台（Genshin Impact Liyue Sculpted Stone Garden Lantern）
+   * 1. 多階六角蓮華雕刻石基座（青石基座＋仰覆蓮瓣承座）
+   * 2. 圓潤束腰雕花中柱
+   * 3. 六角鏤空石窗火袋＋透光暖紙窗＋內置金焰靈心
+   * 4. 飛簷翹角六角石頂（笠石）＋頂部葫蘆寶珠石雕
+   * 5. 灑落步道溫暖金黃神光
+   */
   private stoneLantern(x: number, z: number): void {
-    const stone = this.c.mat('#b0a894', 0.92)
+    const stone = this.c.mat('#a29a88', 0.9)
+    const darkStone = this.c.mat('#6b655a', 0.85)
+    const goldAcc = this.c.mat(PAL.gold, 0.45, 0.25)
     const g = new THREE.Group()
     g.position.set(x, 0, z)
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.45, 0.3, 6), stone)
-    base.position.y = 0.15
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.9, 6), stone)
-    shaft.position.y = 0.75
-    const lightMat = this.c.mat('#f2c472', 0.5)
-    lightMat.emissive.set('#e39b3c')
-    lightMat.emissiveIntensity = 0.7
-    const box = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.42), lightMat)
-    box.position.y = 1.38
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.34, 6), stone)
-    roof.position.y = 1.73
-    const groundLight = new THREE.PointLight('#ffc366', 1.25, 9.5, 1.8)
-    groundLight.position.y = 1.38
-    g.add(base, shaft, box, roof, groundLight)
-    this.add(g)
-    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.9, z), 0.4, 1.8)
-  }
 
-  private tree(x: number, z: number): void {
-    const tree = new THREE.Group()
-    tree.position.set(x, 0, z)
-    const plinth = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.4, 0.22, 10), this.c.mat('#c4ad82', 0.95))
-    plinth.position.y = 0.11
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.72, 0.8, 8), this.c.mat(PAL.red))
-    pot.position.y = 0.6
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.19, 2.3, 7), this.c.mat('#39291f'))
-    trunk.position.y = 1.95
-    tree.add(plinth, pot, trunk)
-    for (let j = 0; j < 3; j += 1) {
-      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.82 - j * 0.11, 1.2, 7), this.c.mat(j === 1 ? PAL.leaf : PAL.jade))
-      leaf.position.set(j % 2 ? -0.15 : 0.14, 2.8 + j * 0.67, 0)
-      leaf.rotation.z = j % 2 ? 0.1 : -0.12
-      tree.add(leaf)
+    // 1. 基座（六角多階台基）
+    const base1 = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.54, 0.16, 6), darkStone)
+    base1.position.y = 0.08
+    const base2 = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.45, 0.22, 6), stone)
+    base2.position.y = 0.25
+    g.add(base1, base2)
+
+    // 2. 束腰蓮華石中柱
+    const shaft1 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 0.5, 6), stone)
+    shaft1.position.y = 0.6
+    const shaftRing = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.14, 6), darkStone)
+    shaftRing.position.y = 0.9
+    const shaft2 = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.35, 6), stone)
+    shaft2.position.y = 1.12
+    g.add(shaft1, shaftRing, shaft2)
+
+    // 3. 中台（火袋承托六角盤）
+    const midTray = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.32, 0.14, 6), stone)
+    midTray.position.y = 1.34
+    g.add(midTray)
+
+    // 4. 火袋（六角透光鏤空燈室）
+    const lightMat = this.c.mat('#ffea9f', 0.35)
+    lightMat.emissive.set('#ffa338')
+    lightMat.emissiveIntensity = 0.85
+    this.lanternMats.push(lightMat)
+
+    const windowCore = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.38, 6), lightMat)
+    windowCore.position.y = 1.6
+    g.add(windowCore)
+
+    // 六方石質立柱格窗
+    for (let i = 0; i < 6; i++) {
+      const ang = (i * Math.PI) / 3
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.4, 4), darkStone)
+      post.position.set(Math.cos(ang) * 0.35, 1.6, Math.sin(ang) * 0.35)
+      g.add(post)
     }
-    this.add(tree)
-    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 0.95, 3)
+
+    // 內置金焰靈心
+    const flameMat = this.c.mat('#ffffff', 0.1)
+    flameMat.emissive.set('#ff8a00')
+    flameMat.emissiveIntensity = 1.6
+    const flame = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12), flameMat)
+    flame.position.y = 1.6
+    g.add(flame)
+
+    // 5. 飛簷石頂（笠石）與頂石寶珠
+    const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.62, 0.26, 6), stone)
+    roof.position.y = 1.92
+    const finial = new THREE.Mesh(new THREE.DodecahedronGeometry(0.11), goldAcc)
+    finial.position.y = 2.13
+    g.add(roof, finial)
+
+    // 6. 步道照明光暈
+    const groundLight = new THREE.PointLight('#ffc060', 1.45, 10.5, 1.8)
+    groundLight.position.y = 1.6
+    g.add(groundLight)
+
+    this.add(g)
+    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.9, z), 0.48, 1.8)
   }
 
   /**
    * 原神風格唯美仙境神木（Genshin Impact Anime Cel-shaded Stylized Tree）
-   * 專門用於通往昇龍觀音的朝聖神道兩側：
    * 1. 遒勁自然曲折的動漫風樹幹與自然地景盤根（捨棄生硬幾何花盆與底座）
-   * 2. 多層次雲團簇狀蓬鬆樹冠（雙色階調翡翠碧玉／琉璃金杏動漫配色）
+   * 2. 多層次雲團簇狀蓬鬆樹冠（璃月金秋銀杏／稻妻緋櫻仙木／璃月翡翠仙松）
    * 3. 唯美下垂枝葉飄帶與仙氣微光氛圍
    */
   private genshinTree(x: number, z: number, seed: number): void {
@@ -1023,6 +1173,10 @@ export class FrontCourtyard {
     // 隨機角度與微幅姿態變異
     const rotY = (seed * 1.37) % (Math.PI * 2)
     tree.rotation.y = rotY
+
+    // 微幅體積尺度自然隨機性
+    const s = 0.92 + ((seed * 7) % 5) * 0.05
+    tree.scale.set(s, s, s)
 
     // 1. 自然草苔地景盤根（Natural Mossy Root Base）
     const mossMat = this.c.mat('#445b3d', 0.9)
@@ -1071,30 +1225,45 @@ export class FrontCourtyard {
     tree.add(branchB)
 
     // 3. 原神風格雲團簇狀蓬鬆樹冠（Anime Cel-shaded Cloud Foliage Clumps）
-    // 配色方案：朝聖神道以「璃月／須彌翡翠碧玉」與部分「秋月金杏」交錯
-    const isGold = seed % 3 === 0
-    const colDeep = isGold ? '#b06500' : '#1e5235'   // 樹冠底層深色
-    const colMid = isGold ? '#e59500' : '#3d8b5a'    // 樹冠中層碧綠/金黃
-    const colHigh = isGold ? '#f7c844' : '#6ec287'   // 頂部高光鮮亮
-    const colBright = isGold ? '#ffe680' : '#a3e8b5' // 頂層陽光微暈
+    // 配色方案：
+    // - seed % 3 === 0: 璃月金秋銀杏／秋月神木（Genshin Liyue Golden Ginkgo）
+    // - seed % 3 === 1: 稻妻緋櫻仙木／桃花神木（Genshin Inazuma Sacred Sakura）
+    // - seed % 3 === 2: 璃月翡翠青松／常青仙木（Genshin Liyue Jade Pine）
+    const type = seed % 3
+    let colDeep: string, colMid: string, colHigh: string, colBright: string
+    let emDeep: string, emMid: string, emHigh: string, emBright: string
+
+    if (type === 0) {
+      // 璃月金秋銀杏
+      colDeep = '#b06500'; colMid = '#e59500'; colHigh = '#f7c844'; colBright = '#ffe680'
+      emDeep = '#452200'; emMid = '#552f00'; emHigh = '#663c00'; emBright = '#805500'
+    } else if (type === 1) {
+      // 稻妻緋櫻仙木
+      colDeep = '#75243e'; colMid = '#ba3d62'; colHigh = '#f27c9e'; colBright = '#fed2df'
+      emDeep = '#3d0d1b'; emMid = '#5c192d'; emHigh = '#78263d'; emBright = '#943851'
+    } else {
+      // 璃月翡翠仙松
+      colDeep = '#18452c'; colMid = '#337b4f'; colHigh = '#5db777'; colBright = '#96e0a9'
+      emDeep = '#0a2113'; emMid = '#12331f'; emHigh = '#1a482b'; emBright = '#225d37'
+    }
 
     const matDeep = this.c.mat(colDeep, 0.6)
-    matDeep.emissive.set(isGold ? '#452200' : '#0c2415')
+    matDeep.emissive.set(emDeep)
     matDeep.emissiveIntensity = 0.2
 
     const matMid = this.c.mat(colMid, 0.55)
-    matMid.emissive.set(isGold ? '#552f00' : '#133520')
+    matMid.emissive.set(emMid)
     matMid.emissiveIntensity = 0.22
 
     const matHigh = this.c.mat(colHigh, 0.5)
-    matHigh.emissive.set(isGold ? '#663c00' : '#1d4d2f')
+    matHigh.emissive.set(emHigh)
     matHigh.emissiveIntensity = 0.25
 
     const matBright = this.c.mat(colBright, 0.45)
-    matBright.emissive.set(isGold ? '#805500' : '#27683e')
+    matBright.emissive.set(emBright)
     matBright.emissiveIntensity = 0.28
 
-    // 定義 6 個雲團蓬鬆簇（立體橢圓球狀、層次錯落）
+    // 定義 7 個雲團蓬鬆簇（立體橢圓球狀、層次錯落）
     const clusters: { pos: [number, number, number]; scale: [number, number, number]; mat: THREE.Material }[] = [
       // 底部托球（深色打底）
       { pos: [-0.6, 2.5, 0.2], scale: [0.95, 0.65, 0.95], mat: matDeep },
@@ -1337,29 +1506,45 @@ export class FrontCourtyard {
       this.c.physics.addStaticBox(new THREE.Vector3(platX + px, 0.545 + 0.45, platZ + pz), new THREE.Vector3(0.24, 0.9, 2.7), rotY(a + Math.PI / 2))
     }
 
-    // (E) 四方通天金頂石燈台（分佈於大平台四隅，晝夜長明神光）
+    // (E) 原神璃月四方通天金頂石燈樓（分佈於昇龍觀音大平台四隅，晝夜長明神光）
     for (const [dx, dz] of [[-8.8, -8.8], [-8.8, 8.8], [7.5, -8.8], [7.5, 8.8]]) {
       const lampTower = new THREE.Group()
       lampTower.position.set(dx, 0.54, dz)
 
-      const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.85, 0.4, 8), stone)
-      lampBase.position.y = 0.2
-      const lampPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.32, 1.8, 8), stone)
-      lampPillar.position.y = 1.3
-      const lampCoreMat = this.c.mat('#ffe088', 0.3)
-      lampCoreMat.emissive.set('#e5a83b')
-      lampCoreMat.emissiveIntensity = 0.8
-      const lampCore = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.65), lampCoreMat)
-      lampCore.position.y = 2.45
-      const lampRoof = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.5, 8), this.c.mat(PAL.wallCap, 0.8))
-      lampRoof.position.y = 3.0
-      const lampGourd = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), gold)
-      lampGourd.position.y = 3.35
+      const lampBase1 = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.92, 0.22, 8), stone)
+      lampBase1.position.y = 0.11
+      const lampBase2 = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.74, 0.26, 8), stone)
+      lampBase2.position.y = 0.35
+      const lampPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 1.5, 8), stone)
+      lampPillar.position.y = 1.23
+      const lampTray = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.42, 0.16, 8), stone)
+      lampTray.position.y = 2.06
 
-      const lampLight = new THREE.PointLight('#ffda7a', 0.8, 12, 2)
-      lampLight.position.set(0, 2.5, 0)
+      const lampCoreMat = this.c.mat('#ffe48a', 0.3)
+      lampCoreMat.emissive.set('#ff9e28')
+      lampCoreMat.emissiveIntensity = 0.95
+      this.lanternMats.push(lampCoreMat)
+      const lampCore = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.58, 8), lampCoreMat)
+      lampCore.position.y = 2.43
 
-      lampTower.add(lampBase, lampPillar, lampCore, lampRoof, lampGourd, lampLight)
+      for (let i = 0; i < 8; i++) {
+        const ang = (i * Math.PI) / 4
+        const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.62, 4), stone)
+        strut.position.set(Math.cos(ang) * 0.48, 2.43, Math.sin(ang) * 0.48)
+        lampTower.add(strut)
+      }
+
+      const lampRoof = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.88, 0.32, 8), this.c.mat(PAL.wallCap, 0.75))
+      lampRoof.position.y = 2.88
+      const lampGourd = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), gold)
+      lampGourd.position.y = 3.16
+      const lampSpire = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.26, 8), gold)
+      lampSpire.position.y = 3.36
+
+      const lampLight = new THREE.PointLight('#ffda7a', 1.2, 14, 1.8)
+      lampLight.position.set(0, 2.45, 0)
+
+      lampTower.add(lampBase1, lampBase2, lampPillar, lampTray, lampCore, lampRoof, lampGourd, lampSpire, lampLight)
       platGroup.add(lampTower)
 
       this.c.physics.addStaticCylinder(new THREE.Vector3(platX + dx, 1.5, platZ + dz), 0.7, 3.2)

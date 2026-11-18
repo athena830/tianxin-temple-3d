@@ -963,18 +963,76 @@ export class TempleWorld {
     this.scene.add(this.roof)
     this.addRoofFinial(hall, 0, 0)
 
-    // Red Palace Lanterns & Portal Warm Lighting (殿前紅色宮燈與門庭神光)
+    // Grand Genshin Liyue Octagonal Palace Lanterns (大殿前階璃月御製八角挑簷長明宮燈)
     // No lantern on the central axis so the statue stays fully visible from the courtyard.
+    const lanternRoofWood = makeMat('#2b1916', 0.65, 0.1)
+    const silkRed = makeMat('#df3a28', 0.45, 0.1)
+    silkRed.emissive.set('#ff7830')
+    silkRed.emissiveIntensity = 0.75
+    const divineCore = makeMat('#fff5c2', 0.2, 0.1)
+    divineCore.emissive.set('#ffa638')
+    divineCore.emissiveIntensity = 1.3
+
     for (const x of [-6.3, -3.2, 3.2, 6.3]) {
-      const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.34, 0.8, 10), makeMat('#d84332', 0.5, 0.1))
-      lantern.position.set(x, 3.9, -0.4)
-      hall.add(lantern)
-      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.22, 8), gold)
-      cap.position.set(x, 4.39, -0.4)
-      hall.add(cap)
-      const glow = new THREE.PointLight('#ffaa48', 1.6, 12, 1.5)
-      glow.position.set(x, 3.6, -0.4)
-      hall.add(glow)
+      const g = new THREE.Group()
+      g.position.set(x, 3.8, -0.4)
+
+      // 1. 懸金吊索與頂部懸環
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.7, 6), gold)
+      cord.position.y = 0.85
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.016, 6, 12), gold)
+      ring.position.y = 0.52
+      ring.rotation.x = Math.PI / 2
+      g.add(cord, ring)
+
+      // 2. 雙層金飾挑角飛簷八角頂蓋（Pagoda Roof Cap with Upturned Eaves）
+      const roofTop = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.46, 0.18, 8), lanternRoofWood)
+      roofTop.position.y = 0.41
+      const roofEave = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.38, 0.06, 8), gold)
+      roofEave.position.y = 0.3
+      g.add(roofTop, roofEave)
+
+      // 3. 八角透光朱紅絹紗燈膽＋金框立柱
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.32, 0.82, 8), silkRed)
+      body.position.y = -0.12
+      const innerFlame = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.52, 8), divineCore)
+      innerFlame.position.y = -0.12
+      g.add(body, innerFlame)
+
+      for (let i = 0; i < 8; i++) {
+        const ang = (i * Math.PI) / 4
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.84, 4), gold)
+        post.position.set(Math.cos(ang) * 0.35, -0.12, Math.sin(ang) * 0.35)
+        g.add(post)
+      }
+
+      // 4. 八角蓮華雕花托底盤與翡翠圓珠
+      const baseTray = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.22, 0.14, 8), gold)
+      baseTray.position.y = -0.58
+      const bead = new THREE.Mesh(new THREE.DodecahedronGeometry(0.08), makeMat('#3fa878', 0.3, 0.4))
+      bead.position.y = -0.68
+      g.add(baseTray, bead)
+
+      // 5. 三束飄逸垂墜紅金流蘇
+      const tasselMat = makeMat('#d03628', 0.7)
+      const centerTassel = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.55, 6), tasselMat)
+      centerTassel.position.y = -0.98
+      centerTassel.rotation.x = Math.PI
+      g.add(centerTassel)
+      for (const sideAng of [-0.35, 0.35]) {
+        const sideTassel = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.38, 5), tasselMat)
+        sideTassel.position.set(Math.sin(sideAng) * 0.14, -0.88, Math.cos(sideAng) * 0.14)
+        sideTassel.rotation.x = Math.PI
+        sideTassel.rotation.z = sideAng * 0.3
+        g.add(sideTassel)
+      }
+
+      // 6. 殿前暖金神光
+      const glow = new THREE.PointLight('#ffaa48', 1.85, 13, 1.5)
+      glow.position.set(0, -0.12, 0)
+      g.add(glow)
+
+      hall.add(g)
     }
 
     // Portal Floor Illumination (大殿中門御門與龍虎二門迎賓暖光)
@@ -1035,7 +1093,26 @@ export class TempleWorld {
       corrRoof.position.set(side * 5.85, 0, -14.65)
       this.scene.add(corrRoof)
 
-      // Walkway warm ceiling lantern (穿堂連通迴廊暖金長明燈)
+      // Walkway warm ceiling lantern (穿堂連通迴廊原神璃月六角挑簷長明宮燈)
+      const corrLantern = new THREE.Group()
+      corrLantern.position.set(side * 5.85, 3.6, 10.45)
+      const corrCord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.45, 4), gold)
+      corrCord.position.y = 0.32
+      const corrCap = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.32, 0.14, 6), gold)
+      corrCap.position.y = 0.12
+      const corrBodyMat = makeMat('#e24630', 0.45)
+      corrBodyMat.emissive.set('#ff8035')
+      corrBodyMat.emissiveIntensity = 0.8
+      const corrBody = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.22, 0.48, 6), corrBodyMat)
+      corrBody.position.y = -0.16
+      const corrBase = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.14, 0.1, 6), gold)
+      corrBase.position.y = -0.44
+      const corrTassel = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.38, 5), makeMat('#d03628', 0.7))
+      corrTassel.position.y = -0.66
+      corrTassel.rotation.x = Math.PI
+      corrLantern.add(corrCord, corrCap, corrBody, corrBase, corrTassel)
+      rear.add(corrLantern)
+
       const corrLight = new THREE.PointLight('#ffbf66', 1.8, 12, 1.5)
       corrLight.position.set(side * 5.85, 3.4, 10.45)
       rear.add(corrLight)
@@ -1302,8 +1379,31 @@ export class TempleWorld {
     rearCenterLight.position.set(0, 5.2, 1.5)
     rear.add(rearCenterLight)
 
-    // Flanking imperial column lanterns (後殿金柱兩側護持明燈群)
+    // Flanking imperial column lanterns (後殿金柱原神璃月祥雲托架護持宮燈群)
     for (const side of [-1, 1]) {
+      for (const z of [1.5, -4.5]) {
+        const sconce = new THREE.Group()
+        sconce.position.set(side * 7.5, 4.2, z)
+        // 祥雲托架金臂
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.08, 0.08), gold)
+        arm.position.x = -side * 0.22
+        // 托架宮燈本體
+        const sconceCap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.22, 0.1, 6), gold)
+        sconceCap.position.set(-side * 0.42, 0.18, 0)
+        const sconceMat = makeMat('#e2442e', 0.4)
+        sconceMat.emissive.set('#ff7830')
+        sconceMat.emissiveIntensity = 0.85
+        const sconceBody = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.16, 0.36, 6), sconceMat)
+        sconceBody.position.set(-side * 0.42, 0, 0)
+        const sconceBase = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.1, 0.08, 6), gold)
+        sconceBase.position.set(-side * 0.42, -0.21, 0)
+        const sconceTassel = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.28, 5), makeMat('#d03628', 0.7))
+        sconceTassel.position.set(-side * 0.42, -0.38, 0)
+        sconceTassel.rotation.x = Math.PI
+        sconce.add(arm, sconceCap, sconceBody, sconceBase, sconceTassel)
+        rear.add(sconce)
+      }
+
       const colGlow = new THREE.PointLight('#ffca75', 1.8, 18, 1.5)
       colGlow.position.set(side * 7.5, 4.2, 1.5)
       rear.add(colGlow)
@@ -1519,32 +1619,68 @@ export class TempleWorld {
     this.scene.add(urn)
     this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, -2.55), 0.86, 1.1)
 
-    // Lamp stand: three separate lights; progress is reflected on the 3D objects.
+    // 原神璃月風格七星蓮華祈願長明神燈（平安燈、財神燈、文昌燈）
     this.lamps.forEach((lamp, i) => {
-      const stand = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.44, 1.3), wood)
-      stand.position.set(lamp.position.x, 0.28, lamp.position.z)
-      this.scene.add(stand)
-      const bodyMat = makeMat(C.vermilion, 0.42, 0.04)
+      // 1. 雕花八角紅木與金飾神龕基座
+      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.8, 0.38, 8), wood)
+      stand.position.set(lamp.position.x, 0.19, lamp.position.z)
+      const standTrim = new THREE.Mesh(new THREE.CylinderGeometry(0.76, 0.72, 0.08, 8), gold)
+      standTrim.position.y = 0.38
+      this.scene.add(stand, standTrim)
+
+      // 2. 仰覆蓮華承托金盤（Lotus Petal Pedestal）
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 0.22, 8), gold)
+      base.position.set(lamp.position.x, 0.53, lamp.position.z)
+      this.scene.add(base)
+
+      // 3. 原神靈氣結晶／絹紗八面長明燈身
+      const baseCol = [C.vermilion, '#e59500', '#258880'][i]
+      const bodyMat = makeMat(baseCol, 0.4, 0.1)
       bodyMat.emissive.set('#280a06')
-      bodyMat.emissiveIntensity = 0.08
+      bodyMat.emissiveIntensity = 0.12
       this.lampMats.set(lamp.id, bodyMat)
-      const body = new THREE.Mesh(new THREE.OctahedronGeometry(0.55, 1), bodyMat)
-      body.scale.y = 1.35
-      body.position.set(lamp.position.x, 1.18, lamp.position.z)
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.36, 0.95, 8), bodyMat)
+      body.position.set(lamp.position.x, 1.12, lamp.position.z)
       body.castShadow = true
       this.scene.add(body)
-      const top = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.28, 8), gold)
-      top.position.set(lamp.position.x, 2.05, lamp.position.z)
-      this.scene.add(top)
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.43, 0.52, 0.18, 8), gold)
-      base.position.set(lamp.position.x, 0.68, lamp.position.z)
-      this.scene.add(base)
-      const light = new THREE.PointLight('#f5a84c', 0.16, 6, 2)
-      light.position.set(lamp.position.x, 1.55, lamp.position.z)
+
+      // 八方金雕立柱護框
+      for (let k = 0; k < 8; k++) {
+        const ang = (k * Math.PI) / 4
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.98, 4), gold)
+        post.position.set(lamp.position.x + Math.cos(ang) * 0.41, 1.12, lamp.position.z + Math.sin(ang) * 0.41)
+        this.scene.add(post)
+      }
+
+      // 4. 飛簷挑角金頂八角寶蓋（Pagoda Roof Cap & Jewel Finial）
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.56, 0.26, 8), gold)
+      top.position.set(lamp.position.x, 1.73, lamp.position.z)
+      const finial = new THREE.Mesh(new THREE.DodecahedronGeometry(0.12), gold)
+      finial.position.set(lamp.position.x, 1.96, lamp.position.z)
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.22, 8), gold)
+      spire.position.set(lamp.position.x, 2.15, lamp.position.z)
+      this.scene.add(top, finial, spire)
+
+      // 5. 垂墜蓮華吊穗
+      const tasselMat = makeMat('#d03628', 0.7)
+      for (const ang of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+        const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.3, 5), tasselMat)
+        tassel.position.set(lamp.position.x + Math.cos(ang) * 0.48, 1.5, lamp.position.z + Math.sin(ang) * 0.48)
+        tassel.rotation.x = Math.PI
+        this.scene.add(tassel)
+      }
+
+      // 6. 神火仙光
+      const lampCol = ['#ff9e3b', '#ffd242', '#4ae2d8'][i]
+      const light = new THREE.PointLight(lampCol, 0.2, 6.5, 2)
+      light.position.set(lamp.position.x, 1.25, lamp.position.z)
       this.scene.add(light)
       this.lampLights.set(lamp.id, light)
-      const label = new THREE.Mesh(new THREE.PlaneGeometry(1.18, 0.32), this.textMaterial(['平安', '財神', '文昌'][i], '#f4d88f', '#40271d'))
-      label.position.set(lamp.position.x, 0.56, lamp.position.z + 0.67)
+
+      // 7. 金雕名籤牌
+      const label = new THREE.Mesh(new THREE.PlaneGeometry(1.18, 0.32), this.textMaterial(['平安燈', '財神燈', '文昌燈'][i], '#f4d88f', '#40271d'))
+      label.position.set(lamp.position.x, 0.46, lamp.position.z + 0.76)
       this.scene.add(label)
     })
 
@@ -3046,8 +3182,10 @@ export class TempleWorld {
       const id = action.slice(5) as LampId
       const mat = this.lampMats.get(id)
       const light = this.lampLights.get(id)
-      if (mat) { mat.emissive.set('#e6973b'); mat.emissiveIntensity = 0.9 }
-      if (light) light.intensity = 1.35
+      const glowCol = id === 'wealth' ? '#ffd700' : id === 'study' ? '#45d8cf' : '#ff9b34'
+      const lightCol = id === 'wealth' ? '#ffd84a' : id === 'study' ? '#55e5db' : '#ffaa42'
+      if (mat) { mat.emissive.set(glowCol); mat.emissiveIntensity = 0.95 }
+      if (light) { light.color.set(lightCol); light.intensity = 1.45 }
     }
     if (action.startsWith('offer-')) {
       const id = action.slice(6) as OfferingId
