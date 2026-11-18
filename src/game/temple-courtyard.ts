@@ -457,9 +457,7 @@ export class FrontCourtyard {
       this.fairyMesh = mesh
       this.c.scene.add(mesh)
     }
-    loader.load('./assets/tianxin-fairy.webp', applyFairy, undefined, () => {
-      loader.load('./assets/tianxin-fairy.png', applyFairy)
-    })
+    loader.load('./assets/tianxin-fairy.webp', applyFairy)
   }
 
   private boardTexture(): THREE.CanvasTexture {

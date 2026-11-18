@@ -1274,11 +1274,7 @@ export class TempleWorld {
       statueMat.map = tex
       statueMat.needsUpdate = true
     }
-    yuhuangLoader.load('./assets/yuhuang.webp', applyYuhuangTex, undefined, () => {
-      yuhuangLoader.load('./assets/yuhuang.png', applyYuhuangTex, undefined, () => {
-        yuhuangLoader.load('/assets/yuhuang.png', applyYuhuangTex)
-      })
-    })
+    yuhuangLoader.load('./assets/yuhuang.webp', applyYuhuangTex)
 
     const yuhuangMesh = new THREE.Mesh(statueGeo, statueMat)
     yuhuangMesh.position.set(0, statueH / 2, 0)
@@ -1741,19 +1737,13 @@ export class TempleWorld {
         metalness: 0.12,
       })
       const primaryUrl = god === 'qin' ? './assets/menshen-qin.webp' : './assets/menshen-yuchi.webp'
-      const fallbackUrl1 = god === 'qin' ? './assets/menshen-qin.png' : './assets/menshen-yuchi.png'
-      const fallbackUrl2 = god === 'qin' ? '/assets/menshen-qin.png' : '/assets/menshen-yuchi.png'
       const loader = new THREE.TextureLoader()
       const applyTex = (tex: THREE.Texture) => {
         tex.colorSpace = THREE.SRGBColorSpace
         mat.map = tex
         mat.needsUpdate = true
       }
-      loader.load(primaryUrl, applyTex, undefined, () => {
-        loader.load(fallbackUrl1, applyTex, undefined, () => {
-          loader.load(fallbackUrl2, applyTex)
-        })
-      })
+      loader.load(primaryUrl, applyTex)
       return mat
     }
 
@@ -2306,14 +2296,6 @@ export class TempleWorld {
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), mat)
       mesh.position.set(0, 0.32 + statueH / 2, 0)
       root.add(mesh)
-    }, undefined, () => {
-      new THREE.TextureLoader().load('./assets/guanyin-golden.png', tex => {
-        tex.colorSpace = THREE.SRGBColorSpace
-        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide })
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), mat)
-        mesh.position.set(0, 0.32 + statueH / 2, 0)
-        root.add(mesh)
-      })
     })
   }
 
@@ -2468,11 +2450,7 @@ export class TempleWorld {
     }
 
     const loader = new THREE.TextureLoader()
-    loader.load('./guanyin.webp', applyTexture, undefined, () => {
-      loader.load('./guanyin.png', applyTexture, undefined, () => {
-        loader.load('/guanyin.png', applyTexture)
-      })
-    })
+    loader.load('./assets/guanyin.webp', applyTexture)
 
     // Soft oval contact shadow, horizontally aligned to the platform. It lives in
     // the same anchored group as the sprite, so the contact stays correct when

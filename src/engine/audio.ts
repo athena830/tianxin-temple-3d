@@ -127,9 +127,9 @@ export class Audio {
   private initTaraAudio(): HTMLAudioElement {
     if (!this.taraAudio) {
       const el = new window.Audio()
-      el.src = './audio/green_tara.mp3?v=3.35.2'
+      el.src = './audio/green_tara.mp3?v=3.42.0'
       el.loop = true
-      el.preload = 'auto'
+      el.preload = 'none'
       el.volume = 0.45
       this.taraAudio = el
 
@@ -165,9 +165,9 @@ export class Audio {
   private initHeartAudio(): HTMLAudioElement {
     if (!this.heartAudio) {
       const el = new window.Audio()
-      el.src = './audio/heart_sutra.mp3?v=3.35.2'
+      el.src = './audio/heart_sutra.mp3?v=3.42.0'
       el.loop = true
-      el.preload = 'auto'
+      el.preload = 'none'
       el.volume = 0.45
       this.heartAudio = el
 
