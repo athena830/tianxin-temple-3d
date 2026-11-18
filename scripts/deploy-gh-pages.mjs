@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process'
 import { join } from 'node:path'
-import { rmSync, copyFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
+import { rmSync, copyFileSync, writeFileSync, readdirSync, mkdirSync, unlinkSync } from 'node:fs'
 
 const rootDir = process.cwd()
 const distDir = join(rootDir, 'dist')
@@ -11,7 +11,14 @@ execSync('node ./node_modules/vite/bin/vite.js build', { stdio: 'inherit' })
 
 console.log('[deploy] Syncing compiled assets to root assets/ for GitHub Pages main branch support...')
 mkdirSync(rootAssetsDir, { recursive: true })
-for (const file of readdirSync(join(distDir, 'assets'))) {
+const distFiles = new Set(readdirSync(join(distDir, 'assets')))
+for (const existing of readdirSync(rootAssetsDir)) {
+  if (existing === 'models' || existing === 'share') continue
+  if (!distFiles.has(existing)) {
+    unlinkSync(join(rootAssetsDir, existing))
+  }
+}
+for (const file of distFiles) {
   copyFileSync(join(distDir, 'assets', file), join(rootAssetsDir, file))
 }
 

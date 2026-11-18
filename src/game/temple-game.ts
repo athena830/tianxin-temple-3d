@@ -91,14 +91,9 @@ export class TempleGame {
     this.physics.world.step()
   }
 
-  async loadModels(assets: Assets): Promise<void> {
-    if (typeof location !== 'undefined' && location.hostname.endsWith('github.io')) {
-      this.world.showStatueImageFallback()
-      return
-    }
-    // The visitor is the procedural chibi placeholder; only the Guanyin statue is a loaded model.
-    try { this.world.setStatue((await assets.gltf(TEMPLE_MODEL_URLS.guanyin)).scene) }
-    catch (err) { console.warn('statue model failed', err); this.world.showStatueImageFallback() }
+  async loadModels(_assets: Assets): Promise<void> {
+    // Main hall Guanyin, Cai Shen, and Yue Lao are sculpted directly as 3D matte-clay chibi statues.
+    void TEMPLE_MODEL_URLS
   }
 
   get position(): THREE.Vector3 {

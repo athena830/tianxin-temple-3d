@@ -409,6 +409,9 @@ export class TempleWorld {
   private auraParticleData?: { radius: number; angle: number; speed: number; rotSpeed: number }[]
   private dragonGuanyinUrnPos?: THREE.Vector3
   private dragonPuffTimer = 1.2
+  private readonly kneelingWorshippers: { torso: THREE.Group; head: THREE.Group; hands: THREE.Group; phase: number }[] = []
+  private readonly mainHallSmokeSpots: THREE.Vector3[] = []
+  private mainHallSmokeTimer = 0.75
   readonly npcs: NpcManager
   onNpcDialogue?: (speaker: string, text: string) => void
   onTimeOfDayChange?: (mode: TimeOfDay) => void
@@ -914,18 +917,33 @@ export class TempleWorld {
       hall.add(shrineSideGlow)
     }
 
-    // Altar Base & Top (神龕供桌)
-    const altarBase = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.48, 1.9), makeMat('#4a3025'))
+    // Altar Base & Top (三聖同祀啞光黏土暖木神龕供桌：奶油白、蜜桃粉與暖金配色)
+    const clayAltarWood = makeMat('#c48f65', 0.9, 0.02)
+    const clayAltarTrim = makeMat('#e5b968', 0.85, 0.08)
+    const clayCream = makeMat('#f7efe2', 0.94, 0.01)
+    const clayPeach = makeMat('#f2b6a6', 0.92, 0.01)
+
+    const altarBase = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.48, 1.9), clayAltarWood)
     altarBase.position.set(0, 0.82, -4.55)
     altarBase.castShadow = true
     altarBase.receiveShadow = true
     hall.add(altarBase)
-    for (const x of [-2.6, 2.6]) for (const z of [-5.2, -3.9]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.23, 1.2, 0.23), red)
-      leg.position.set(x, 0.55, z)
-      hall.add(leg)
+
+    // 神桌正面奶油白與暖金雕花裙板
+    const altarApron = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.28, 0.06), clayCream)
+    altarApron.position.set(0, 1.24, -3.58)
+    const altarGoldBand = new THREE.Mesh(new THREE.BoxGeometry(7.35, 0.08, 1.98), clayAltarTrim)
+    altarGoldBand.position.set(0, 1.4, -4.55)
+    hall.add(altarApron, altarGoldBand)
+
+    for (const x of [-3.3, -1.2, 1.2, 3.3]) for (const z of [-5.2, -3.9]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.25, 0.24), clayAltarWood)
+      leg.position.set(x, 0.58, z)
+      const footRing = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.28), clayAltarTrim)
+      footRing.position.set(x, 0.34, z)
+      hall.add(leg, footRing)
     }
-    const altarTop = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.25, 2.1), makeMat('#74452e', 0.56))
+    const altarTop = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.24, 2.1), makeMat('#b57d52', 0.88, 0.02))
     altarTop.position.set(0, 1.55, -4.55)
     altarTop.castShadow = true
     altarTop.receiveShadow = true
@@ -933,19 +951,39 @@ export class TempleWorld {
     this.offeringDisplay.position.set(-2.25, 1.75, -4.55)
     hall.add(this.offeringDisplay)
 
-    // Center Statue Plinths (神像底座)
-    const centerPlinth = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.6, 2.5), makeMat('#6c5543'))
-    centerPlinth.position.set(0, 0.8, -5.7)
+    // Three-Deity Statue Plinths (三聖同祀神像須彌底座：中央觀世音菩薩、右側龍邊財神爺、左側虎邊月下老人)
+    const centerPlinth = new THREE.Mesh(new THREE.BoxGeometry(7.6, 1.56, 2.35), makeMat('#cfa57e', 0.92, 0.02))
+    centerPlinth.position.set(0, 0.8, -5.68)
+    centerPlinth.castShadow = true
+    centerPlinth.receiveShadow = true
     hall.add(centerPlinth)
-    const topPlinth = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.22, 2.7), gold)
-    topPlinth.position.set(0, 1.71, -5.7)
+
+    const waistPlinth = new THREE.Mesh(new THREE.BoxGeometry(7.72, 0.18, 2.42), clayPeach)
+    waistPlinth.position.set(0, 1.22, -5.68)
+    hall.add(waistPlinth)
+
+    const topPlinth = new THREE.Mesh(new THREE.BoxGeometry(7.85, 0.22, 2.55), clayAltarTrim)
+    topPlinth.position.set(0, 1.71, -5.68)
     hall.add(topPlinth)
 
-    // Golden Bodhisattva Statue in Main Hall (大殿觀世音菩薩法相金身)
+    // 1. 中央主祀：溫柔 Q 版啞光黏土觀世音菩薩 (Gentle Chibi Clay Guanyin at Center x = 0)
     const statue = this.createGuanyinStatue()
     this.guanyinRoot = statue
-    statue.position.set(0, 1.82, -5.7)
+    statue.position.set(0, 1.82, -5.68)
     hall.add(statue)
+
+    // 2. 龍邊陪祀（面對神桌右側）：Q 版啞光黏土財神爺 (Chibi Clay Cai Shen at x = +2.48)
+    const caiShenStatue = this.createCaiShenStatue()
+    caiShenStatue.position.set(2.48, 1.82, -5.64)
+    hall.add(caiShenStatue)
+
+    // 3. 虎邊陪祀（面對神桌左側）：Q 版啞光黏土月下老人 (Chibi Clay Yue Lao at x = -2.48)
+    const yueLaoStatue = this.createYueLaoStatue()
+    yueLaoStatue.position.set(-2.48, 1.82, -5.64)
+    hall.add(yueLaoStatue)
+
+    // 4. 大殿內部 Q 版啞光黏土微縮場景（奶油白地坪、蜜桃暖金雕花背屏、案上供品、三足香爐、發光圓燈籠、6 座整齊紅拜墊與 1 對 1 跪拜持香信眾）
+    this.addMainHallDiorama(hall)
 
     // Main Hall Signboard (觀世音菩薩匾額)
     const sign = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.4, 0.25), makeMat('#35251c'))
@@ -1775,8 +1813,8 @@ export class TempleWorld {
     this.physics.addStaticBox(new THREE.Vector3(15.2, 0.6, -8), new THREE.Vector3(2.4, 1.2, 2.2))
     this.physics.addStaticBox(new THREE.Vector3(17.2, 0.9, 0.2), new THREE.Vector3(0.4, 1.7, 2.2))
     for (const lamp of this.lamps) this.physics.addStaticBox(new THREE.Vector3(lamp.position.x, 1, lamp.position.z), new THREE.Vector3(1.3, 2, 1.3))
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.9, -11.55), new THREE.Vector3(6.8, 1.8, 2.1))
-    this.physics.addStaticBox(new THREE.Vector3(0, 1, -12.7), new THREE.Vector3(3.5, 2, 2.7))
+    this.physics.addStaticBox(new THREE.Vector3(0, 0.9, -11.55), new THREE.Vector3(7.5, 1.8, 2.1))
+    this.physics.addStaticBox(new THREE.Vector3(0, 1, -12.68), new THREE.Vector3(7.85, 2, 2.55))
   }
 
   private addMarkers(): void {
@@ -2435,34 +2473,979 @@ export class TempleWorld {
     })
   }
 
+  /**
+   * 【中央主祀】3D 啞光黏土溫柔 Q 版觀世音菩薩坐像（Gentle Chibi Matte-Clay Guanyin Statue）
+   * - 採用 Pop Mart 潮玩微縮模型啞光黏土質感（高粗糙度消光、溫潤柔和）
+   * - 奶油白（Pastel Cream）、蜜桃粉（Soft Peach）與暖金色（Warm Gold）配色
+   */
   private createGuanyinStatue(): THREE.Group {
     const root = new THREE.Group()
-    const goldMat = new THREE.MeshStandardMaterial({ color: '#dca44b', roughness: 0.35, metalness: 0.6 })
-    const haloMat = new THREE.MeshBasicMaterial({ color: '#ffeaad', transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+    this.guanyinModelPlaced = true
 
-    // 1. Multi-tier Lotus Throne (金雕蓮花寶台基座)
-    const lotusBase = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 0.35, 24), goldMat)
-    lotusBase.position.y = 0.18
-    lotusBase.castShadow = true
-    root.add(lotusBase)
+    const clayCream = makeMat('#fbf4e8', 0.92, 0.02)
+    const clayCreamShade = makeMat('#efe3d0', 0.92, 0.02)
+    const clayPeach = makeMat('#f3b3a2', 0.9, 0.02)
+    const clayPeachLight = makeMat('#fad6cb', 0.9, 0.02)
+    const clayGold = makeMat('#e5b966', 0.78, 0.14)
+    const claySkin = makeMat('#fde7d6', 0.92, 0.01)
+    const clayHair = makeMat('#422e25', 0.92, 0.01)
+    const clayJade = makeMat('#8fc2a9', 0.85, 0.05)
 
-    // 2. The 3D statue itself is added by setStatue() once the GLB model loads.
+    // 1. 雙層蜜桃粉與暖金啞光黏土蓮花寶座 (Pastel Peach & Warm Gold Lotus Throne)
+    const goldBase = new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1.24, 0.24, 24), clayGold)
+    goldBase.position.y = 0.12
+    goldBase.castShadow = true
+    root.add(goldBase)
 
-    // 3. Radiant Holy Backlight Halo (圓滿大放神光背光金輪)
-    const halo = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.75, 36), haloMat)
-    halo.position.set(0, 2.1, -0.75)
-    root.add(halo)
+    const lotusPod = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.86, 0.26, 24), clayCreamShade)
+    lotusPod.position.y = 0.34
+    root.add(lotusPod)
 
-    const haloInner = new THREE.Mesh(new THREE.CircleGeometry(0.82, 36), new THREE.MeshBasicMaterial({ color: '#ffebb3', transparent: true, opacity: 0.3 }))
-    haloInner.position.set(0, 2.1, -0.74)
-    root.add(haloInner)
+    // 下層與上層圓潤飽滿蜜桃粉黏土蓮花瓣
+    for (let tier = 0; tier < 2; tier++) {
+      const count = 14
+      const radius = tier === 0 ? 1.02 : 0.9
+      const y = tier === 0 ? 0.24 : 0.42
+      for (let i = 0; i < count; i++) {
+        const ang = (i / count) * Math.PI * 2 + tier * (Math.PI / count)
+        const petal = new THREE.Mesh(
+          new THREE.SphereGeometry(0.24, 14, 10),
+          tier === 0 ? clayPeach : clayPeachLight
+        )
+        petal.scale.set(0.95, 1.35, 0.52)
+        petal.position.set(Math.cos(ang) * radius, y, Math.sin(ang) * radius)
+        petal.rotation.set(0.28 * Math.cos(ang), -ang, -0.28 * Math.sin(ang))
+        petal.castShadow = true
+        root.add(petal)
+      }
+    }
 
-    // Warm Divine Aura Light (微弱聖光，照亮四周神龕但不直接在畫像上反光)
-    const statueGlow = new THREE.PointLight('#ffe6a3', 0.6, 7, 2)
-    statueGlow.position.set(0, 2.2, 0.7)
+    // 2. Q 版盤腿坐姿與奶油白暖金天衣 (Seated Chibi Body & Pastel Cream Robes)
+    // 盤腿下擺
+    const crossedLegs = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.76, 0.34, 24), clayCream)
+    crossedLegs.scale.set(1.18, 1, 0.88)
+    crossedLegs.position.set(0, 0.62, 0.04)
+    crossedLegs.castShadow = true
+    root.add(crossedLegs)
+
+    // 暖金裙襬滾邊
+    const skirtTrim = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.042, 10, 28), clayGold)
+    skirtTrim.rotation.x = Math.PI / 2
+    skirtTrim.scale.set(1.16, 0.88, 1)
+    skirtTrim.position.set(0, 0.5, 0.04)
+    root.add(skirtTrim)
+
+    // 圓潤上身軀幹
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.52, 0.72, 22), clayCream)
+    torso.position.set(0, 1.08, 0)
+    torso.castShadow = true
+    root.add(torso)
+
+    // 蜜桃粉與暖金交領胸飾＋瓔珞金項圈
+    const innerCollar = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.048, 10, 20), clayPeach)
+    innerCollar.rotation.x = Math.PI / 2 + 0.25
+    innerCollar.position.set(0, 1.36, 0.08)
+    const goldNecklace = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.032, 10, 22), clayGold)
+    goldNecklace.rotation.x = Math.PI / 2 + 0.3
+    goldNecklace.position.set(0, 1.28, 0.12)
+    root.add(innerCollar, goldNecklace)
+
+    // 雙肩柔和寬袖與腹前結印小手
+    for (const side of [-1, 1]) {
+      const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), clayCream)
+      shoulder.scale.set(0.95, 1.25, 0.95)
+      shoulder.position.set(side * 0.42, 1.18, 0.04)
+      const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.42, 14), clayCream)
+      forearm.position.set(side * 0.26, 0.92, 0.28)
+      forearm.rotation.set(0.85, 0, -side * 0.55)
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.105, 14, 12), claySkin)
+      hand.position.set(side * 0.11, 0.86, 0.42)
+      // 蜜桃粉仙家披帛飄帶
+      const ribbon = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.045, 10, 20, Math.PI * 1.15), clayPeach)
+      ribbon.position.set(side * 0.46, 0.96, 0.14)
+      ribbon.rotation.set(0.3, side * 0.4, side * 0.5)
+      root.add(shoulder, forearm, hand, ribbon)
+    }
+
+    // 掌中羊脂白玉甘露淨瓶與翠綠楊柳枝
+    const vaseBody = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 12), clayCream)
+    vaseBody.scale.set(1, 1.3, 1)
+    vaseBody.position.set(0, 0.95, 0.45)
+    const vaseNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.048, 0.14, 12), clayGold)
+    vaseNeck.position.set(0, 1.09, 0.45)
+    const willowBranch = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.22, 8), clayJade)
+    willowBranch.position.set(0.04, 1.22, 0.46)
+    willowBranch.rotation.z = -0.35
+    root.add(vaseBody, vaseNeck, willowBranch)
+
+    // 3. 溫柔 Q 版大頭部（二頭身潮玩比例、慈祥閉目笑顏）
+    const head = new THREE.Group()
+    head.position.set(0, 1.88, 0.04)
+
+    // 圓潤 Q 版臉龐
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.48, 28, 22), claySkin)
+    face.scale.set(1.04, 0.98, 0.96)
+    face.castShadow = true
+    head.add(face)
+
+    // 雙耳與慈悲垂耳瑞相
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), claySkin)
+      ear.scale.set(0.55, 1.35, 0.7)
+      ear.position.set(side * 0.48, -0.04, 0.02)
+      head.add(ear)
+    }
+
+    // 溫潤深褐黏土髮罩與前額中分柔順髮髻
+    const hairBack = new THREE.Mesh(
+      new THREE.SphereGeometry(0.505, 26, 20, 0, Math.PI * 2, 0, Math.PI * 0.62),
+      clayHair
+    )
+    hairBack.rotation.x = -0.24
+    hairBack.position.set(0, 0.04, -0.03)
+    head.add(hairBack)
+
+    for (const side of [-1, 1]) {
+      const templeHair = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), clayHair)
+      templeHair.scale.set(1.15, 0.62, 0.85)
+      templeHair.position.set(side * 0.22, 0.3, 0.33)
+      templeHair.rotation.set(0.25, side * 0.3, side * 0.28)
+      head.add(templeHair)
+    }
+
+    // 高聳寶髻與暖金蓮花觀音寶冠
+    const topBun = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 14), clayHair)
+    topBun.scale.set(1, 1.25, 1)
+    topBun.position.set(0, 0.56, -0.04)
+    const crownBase = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.28, 0.14, 18), clayGold)
+    crownBase.position.set(0, 0.44, 0.04)
+    const crownFlame = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.32, 12), clayGold)
+    crownFlame.scale.set(1.1, 1, 0.45)
+    crownFlame.position.set(0, 0.62, 0.22)
+    const crownGem = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), clayPeach)
+    crownGem.position.set(0, 0.55, 0.29)
+    head.add(topBun, crownBase, crownFlame, crownGem)
+
+    // 奶油白觀音披紗（自寶冠後方柔順垂落雙肩）
+    const veilTop = new THREE.Mesh(
+      new THREE.SphereGeometry(0.535, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      clayCream
+    )
+    veilTop.rotation.x = -0.45
+    veilTop.position.set(0, 0.08, -0.08)
+    head.add(veilTop)
+    for (const side of [-1, 1]) {
+      const veilDrape = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.22, 0.95, 14), clayCream)
+      veilDrape.position.set(side * 0.44, -0.36, -0.06)
+      veilDrape.rotation.z = -side * 0.18
+      head.add(veilDrape)
+    }
+
+    // 慈祥閉目彎彎眼睫、蜜桃粉腮紅、眉心吉祥紅痣與溫柔微笑
+    const browDot = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), makeMat('#d94b3d', 0.8))
+    browDot.position.set(0, 0.14, 0.46)
+    head.add(browDot)
+
+    for (const side of [-1, 1]) {
+      // 溫柔閉目弧線
+      const closedEye = new THREE.Mesh(
+        new THREE.TorusGeometry(0.075, 0.014, 8, 16, Math.PI * 0.85),
+        clayHair
+      )
+      closedEye.rotation.set(0.15, side * 0.22, Math.PI + side * 0.08)
+      closedEye.position.set(side * 0.17, 0.02, 0.445)
+      // 柔和彎眉
+      const eyebrow = new THREE.Mesh(
+        new THREE.TorusGeometry(0.08, 0.01, 6, 14, Math.PI * 0.75),
+        clayHair
+      )
+      eyebrow.rotation.set(-0.1, side * 0.22, side * 0.05)
+      eyebrow.position.set(side * 0.17, 0.11, 0.44)
+      // 粉嫩蜜桃腮紅
+      const blush = new THREE.Mesh(
+        new THREE.CircleGeometry(0.075, 16),
+        new THREE.MeshBasicMaterial({ color: '#f6a69b', transparent: true, opacity: 0.75 })
+      )
+      blush.position.set(side * 0.27, -0.09, 0.42)
+      blush.rotation.y = side * 0.48
+      head.add(closedEye, eyebrow, blush)
+    }
+
+    const smile = new THREE.Mesh(
+      new THREE.TorusGeometry(0.048, 0.01, 8, 14, Math.PI * 0.85),
+      makeMat('#c86d61', 0.85)
+    )
+    smile.rotation.z = Math.PI * 1.07
+    smile.position.set(0, -0.11, 0.46)
+    head.add(smile)
+
+    root.add(head)
+
+    // 4. 溫暖奶油金圓滿背光輪 (Soft Warm Gold & Pastel Cream Halo)
+    const haloMat = new THREE.MeshBasicMaterial({ color: '#ffeab5', transparent: true, opacity: 0.52, side: THREE.DoubleSide })
+    const halo = new THREE.Mesh(new THREE.RingGeometry(0.88, 1.55, 36), haloMat)
+    halo.position.set(0, 1.75, -0.52)
+    const haloInner = new THREE.Mesh(new THREE.CircleGeometry(0.88, 36), new THREE.MeshBasicMaterial({ color: '#fff3cf', transparent: true, opacity: 0.28 }))
+    haloInner.position.set(0, 1.75, -0.51)
+    root.add(halo, haloInner)
+
+    const statueGlow = new THREE.PointLight('#ffe5a8', 0.85, 8, 1.8)
+    statueGlow.position.set(0, 2.0, 0.75)
     root.add(statueGlow)
 
     return root
+  }
+
+  /**
+   * 【龍邊陪祀（右側）】3D 啞光黏土 Q 版天官武財神／財神爺（Chibi Matte-Clay Cai Shen - God of Wealth）
+   * - 頭戴暖金展翅財神官帽、圓潤喜氣笑顏與翹鬍鬚、喜慶朱紅與暖金錦袍
+   * - 雙手捧著發光大金元寶（Glowing Golden Ingot），坐於聚寶金蓮座上
+   */
+  private createCaiShenStatue(): THREE.Group {
+    const root = new THREE.Group()
+
+    const clayRed = makeMat('#d64937', 0.9, 0.02)
+    const clayGold = makeMat('#ebb85e', 0.76, 0.16)
+    const clayPeach = makeMat('#f3b2a2', 0.9, 0.02)
+    const claySkin = makeMat('#fde4d0', 0.92, 0.01)
+    const clayDark = makeMat('#33221b', 0.92, 0.01)
+
+    // 發光大金元寶材質
+    const ingotGlowMat = makeMat('#ffd86b', 0.45, 0.28)
+    ingotGlowMat.emissive.set('#ffa826')
+    ingotGlowMat.emissiveIntensity = 0.65
+
+    // 1. 招財聚寶金蓮台座
+    const base1 = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.94, 0.2, 20), clayGold)
+    base1.position.y = 0.1
+    const base2 = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.78, 0.22, 20), clayRed)
+    base2.position.y = 0.28
+    const baseRing = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.04, 10, 24), clayGold)
+    baseRing.rotation.x = Math.PI / 2
+    baseRing.position.y = 0.39
+    root.add(base1, base2, baseRing)
+
+    // 2. Q 版福相盤坐身姿與朱紅織金錦袍
+    const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 0.28, 20), clayRed)
+    legs.scale.set(1.15, 1, 0.88)
+    legs.position.set(0, 0.52, 0.03)
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.46, 0.62, 20), clayRed)
+    torso.position.set(0, 0.92, 0)
+    // 暖金玉帶
+    const jadeBelt = new THREE.Mesh(new THREE.TorusGeometry(0.39, 0.042, 10, 22), clayGold)
+    jadeBelt.rotation.x = Math.PI / 2
+    jadeBelt.position.set(0, 0.82, 0.02)
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.042, 8, 18), clayGold)
+    collar.rotation.x = Math.PI / 2 + 0.2
+    collar.position.set(0, 1.18, 0.06)
+    root.add(legs, torso, jadeBelt, collar)
+
+    // 雙臂合捧大金元寶
+    for (const side of [-1, 1]) {
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.38, 14), clayRed)
+      sleeve.position.set(side * 0.32, 0.9, 0.2)
+      sleeve.rotation.set(0.78, 0, -side * 0.48)
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 10), claySkin)
+      hand.position.set(side * 0.16, 0.86, 0.36)
+      root.add(sleeve, hand)
+    }
+
+    // 胸前發光大金元寶 (Glowing Golden Ingot)
+    const ingotGroup = new THREE.Group()
+    ingotGroup.position.set(0, 0.92, 0.4)
+    const ingotBoat = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.14, 0.14, 16), ingotGlowMat)
+    ingotBoat.scale.set(1.35, 1, 0.78)
+    const ingotBump = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 12), ingotGlowMat)
+    ingotBump.scale.set(1.15, 0.85, 0.85)
+    ingotBump.position.y = 0.07
+    ingotGroup.add(ingotBoat, ingotBump)
+    root.add(ingotGroup)
+
+    // 3. Q 版喜氣財神大頭與展翅財神官帽
+    const head = new THREE.Group()
+    head.position.set(0, 1.62, 0.03)
+
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 20), claySkin)
+    face.scale.set(1.06, 0.96, 0.96)
+    head.add(face)
+
+    // 喜氣彎彎笑眼與蜜桃腮紅
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(
+        new THREE.TorusGeometry(0.065, 0.014, 8, 14, Math.PI * 0.85),
+        clayDark
+      )
+      eye.rotation.set(-0.1, side * 0.2, 0)
+      eye.position.set(side * 0.15, 0.04, 0.39)
+
+      const blush = new THREE.Mesh(
+        new THREE.CircleGeometry(0.068, 14),
+        new THREE.MeshBasicMaterial({ color: '#f59c8e', transparent: true, opacity: 0.78 })
+      )
+      blush.position.set(side * 0.25, -0.06, 0.37)
+      blush.rotation.y = side * 0.45
+      head.add(eye, blush)
+    }
+
+    // 可愛翹八字鬍與圓潤福鬚
+    for (const side of [-1, 1]) {
+      const mustache = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), clayDark)
+      mustache.scale.set(1.4, 0.52, 0.6)
+      mustache.position.set(side * 0.09, -0.08, 0.41)
+      mustache.rotation.z = side * 0.28
+      head.add(mustache)
+    }
+    const chinBeard = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.22, 10), clayDark)
+    chinBeard.rotation.x = Math.PI
+    chinBeard.scale.set(1, 1, 0.55)
+    chinBeard.position.set(0, -0.24, 0.39)
+    head.add(chinBeard)
+
+    // 展翅宰相財神官帽 (Winged Cai Shen Official Hat)
+    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.43, 0.14, 20), clayRed)
+    hatBrim.position.set(0, 0.28, -0.01)
+    const hatGoldBand = new THREE.Mesh(new THREE.CylinderGeometry(0.41, 0.435, 0.05, 20), clayGold)
+    hatGoldBand.position.set(0, 0.23, -0.01)
+    const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.24, 18), clayRed)
+    hatCrown.position.set(0, 0.44, -0.04)
+    const hatGem = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), ingotGlowMat)
+    hatGem.position.set(0, 0.36, 0.34)
+    head.add(hatBrim, hatGoldBand, hatCrown, hatGem)
+
+    // 左右水平展翅金葉帽翅
+    for (const side of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.04), clayGold)
+      wing.position.set(side * 0.54, 0.34, -0.04)
+      wing.rotation.z = side * 0.12
+      const wingTip = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), clayPeach)
+      wingTip.scale.set(1, 1, 0.45)
+      wingTip.position.set(side * 0.74, 0.36, -0.04)
+      head.add(wing, wingTip)
+    }
+
+    root.add(head)
+
+    // 4. 暖金財氣背光輪
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(0.65, 1.12, 32),
+      new THREE.MeshBasicMaterial({ color: '#ffe294', transparent: true, opacity: 0.46, side: THREE.DoubleSide })
+    )
+    halo.position.set(0, 1.48, -0.44)
+    root.add(halo)
+
+    root.traverse(obj => {
+      if (obj instanceof THREE.Mesh) {
+        obj.castShadow = true
+        obj.receiveShadow = true
+      }
+    })
+    return root
+  }
+
+  /**
+   * 【虎邊陪祀（左側）】3D 啞光黏土 Q 版月下老人（Chibi Matte-Clay Yue Lao - God of Marriage & Love）
+   * - 慈祥白眉白鬚仙翁笑臉、粉嫩蜜桃腮紅、蜜桃粉與奶油白仙袍
+   * - 一手捧姻緣簿、雙手牽發光姻緣紅線（Glowing Red Thread of Fate）、身側倚桃花仙杖
+   */
+  private createYueLaoStatue(): THREE.Group {
+    const root = new THREE.Group()
+
+    const clayPeach = makeMat('#f29e8e', 0.9, 0.02)
+    const clayPeachLight = makeMat('#fad5cb', 0.9, 0.02)
+    const clayCream = makeMat('#fbf4e8', 0.92, 0.02)
+    const clayGold = makeMat('#e6ba66', 0.78, 0.14)
+    const claySkin = makeMat('#fde6d5', 0.92, 0.01)
+    const clayWhiteHair = makeMat('#fcf9f2', 0.94, 0.01)
+    const clayDark = makeMat('#3a2720', 0.92, 0.01)
+
+    // 發光姻緣紅線材質
+    const redThreadMat = makeMat('#ff3b52', 0.4, 0.1)
+    redThreadMat.emissive.set('#ff2442')
+    redThreadMat.emissiveIntensity = 0.85
+
+    // 1. 蜜桃粉與奶油白祥雲瑞蓮座
+    const base1 = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.94, 0.2, 20), clayGold)
+    base1.position.y = 0.1
+    const base2 = new THREE.Mesh(new THREE.CylinderGeometry(0.74, 0.8, 0.22, 20), clayPeachLight)
+    base2.position.y = 0.28
+    root.add(base1, base2)
+
+    for (let i = 0; i < 12; i++) {
+      const ang = (i / 12) * Math.PI * 2
+      const cloudPetal = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), clayPeach)
+      cloudPetal.scale.set(1.1, 0.95, 0.6)
+      cloudPetal.position.set(Math.cos(ang) * 0.78, 0.28, Math.sin(ang) * 0.78)
+      root.add(cloudPetal)
+    }
+
+    // 2. Q 版仙翁盤坐身姿與蜜桃粉奶油白仙袍
+    const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 0.28, 20), clayCream)
+    legs.scale.set(1.15, 1, 0.88)
+    legs.position.set(0, 0.52, 0.03)
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.46, 0.62, 20), clayPeach)
+    torso.position.set(0, 0.92, 0)
+    const sash = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.04, 10, 22), clayGold)
+    sash.rotation.x = Math.PI / 2
+    sash.position.set(0, 0.82, 0.02)
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.042, 8, 18), clayCream)
+    collar.rotation.x = Math.PI / 2 + 0.2
+    collar.position.set(0, 1.18, 0.06)
+    root.add(legs, torso, sash, collar)
+
+    // 雙臂：左手捧「姻緣簿」，雙手間牽發光姻緣紅線
+    for (const side of [-1, 1]) {
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.38, 14), clayPeach)
+      sleeve.position.set(side * 0.32, 0.9, 0.2)
+      sleeve.rotation.set(0.75, 0, -side * 0.42)
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.095, 12, 10), claySkin)
+      hand.position.set(side * 0.18, 0.86, 0.36)
+      root.add(sleeve, hand)
+    }
+
+    // 朱紅金邊「姻緣簿」與發光姻緣紅線 (Book of Destiny & Glowing Red Thread)
+    const book = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.06), makeMat('#c93b35', 0.85))
+    book.position.set(-0.16, 0.94, 0.4)
+    book.rotation.set(-0.35, 0.25, 0.15)
+    const bookGoldCover = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.22, 0.065), clayGold)
+    bookGoldCover.position.copy(book.position)
+    bookGoldCover.rotation.copy(book.rotation)
+    root.add(book, bookGoldCover)
+
+    // 雙手之間垂弧發光姻緣紅線與同心紅結
+    const redThreadArc = new THREE.Mesh(
+      new THREE.TorusGeometry(0.18, 0.018, 8, 20, Math.PI),
+      redThreadMat
+    )
+    redThreadArc.rotation.z = Math.PI
+    redThreadArc.position.set(0, 0.9, 0.42)
+    const heartKnot = new THREE.Mesh(new THREE.OctahedronGeometry(0.055, 1), redThreadMat)
+    heartKnot.position.set(0, 0.72, 0.43)
+    root.add(redThreadArc, heartKnot)
+
+    // 身旁斜倚盛開桃花仙杖 (Peach Blossom Staff)
+    const staffPole = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.038, 1.55, 10), makeMat('#8c5d3c', 0.9))
+    staffPole.position.set(0.46, 1.12, 0.22)
+    staffPole.rotation.set(0.12, 0, -0.16)
+    root.add(staffPole)
+    for (const [bx, by, bz] of [[0.56, 1.84, 0.3], [0.48, 1.92, 0.26], [0.62, 1.76, 0.24]] as const) {
+      const blossom = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), clayPeach)
+      blossom.position.set(bx, by, bz)
+      root.add(blossom)
+    }
+
+    // 3. Q 版慈祥白眉白鬚仙翁大頭與逍遙仙冠
+    const head = new THREE.Group()
+    head.position.set(0, 1.62, 0.03)
+
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 20), claySkin)
+    face.scale.set(1.04, 0.97, 0.96)
+    head.add(face)
+
+    // 雪白髮罩、道髻與暖金紅玉逍遙冠
+    const hairCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.44, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      clayWhiteHair
+    )
+    hairCap.rotation.x = -0.25
+    hairCap.position.set(0, 0.03, -0.02)
+    const topBun = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), clayWhiteHair)
+    topBun.position.set(0, 0.46, -0.03)
+    const crownRing = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.21, 0.12, 16), clayGold)
+    crownRing.position.set(0, 0.42, -0.02)
+    const crownRuby = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), redThreadMat)
+    crownRuby.position.set(0, 0.44, 0.18)
+    head.add(hairCap, topBun, crownRing, crownRuby)
+
+    // 蓬鬆雪白長眉、溫柔笑眼與粉嫩蜜桃腮紅
+    for (const side of [-1, 1]) {
+      const whiteBrow = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 10), clayWhiteHair)
+      whiteBrow.scale.set(1.6, 0.52, 0.65)
+      whiteBrow.position.set(side * 0.16, 0.13, 0.39)
+      whiteBrow.rotation.z = -side * 0.22
+
+      const eye = new THREE.Mesh(
+        new THREE.TorusGeometry(0.062, 0.013, 8, 14, Math.PI * 0.85),
+        clayDark
+      )
+      eye.rotation.set(-0.1, side * 0.2, 0)
+      eye.position.set(side * 0.15, 0.03, 0.39)
+
+      const blush = new THREE.Mesh(
+        new THREE.CircleGeometry(0.072, 14),
+        new THREE.MeshBasicMaterial({ color: '#f69e92', transparent: true, opacity: 0.8 })
+      )
+      blush.position.set(side * 0.25, -0.06, 0.37)
+      blush.rotation.y = side * 0.45
+      head.add(whiteBrow, eye, blush)
+    }
+
+    // 圓滾滾蓬鬆雪白長仙鬚
+    const beardUpper = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), clayWhiteHair)
+    beardUpper.scale.set(1.3, 0.85, 0.65)
+    beardUpper.position.set(0, -0.18, 0.38)
+    const beardLower = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.34, 14), clayWhiteHair)
+    beardLower.rotation.x = Math.PI
+    beardLower.scale.set(1.1, 1, 0.62)
+    beardLower.position.set(0, -0.35, 0.37)
+    head.add(beardUpper, beardLower)
+
+    root.add(head)
+
+    // 4. 蜜桃暖金柔和背光輪
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(0.65, 1.12, 32),
+      new THREE.MeshBasicMaterial({ color: '#ffd6c4', transparent: true, opacity: 0.46, side: THREE.DoubleSide })
+    )
+    halo.position.set(0, 1.48, -0.44)
+    root.add(halo)
+
+    root.traverse(obj => {
+      if (obj instanceof THREE.Mesh) {
+        obj.castShadow = true
+        obj.receiveShadow = true
+      }
+    })
+    return root
+  }
+
+  /**
+   * 大殿內部 Q 版啞光黏土微縮場景（3D Miniature Diorama Main Hall Interior）
+   * - 奶油白（Pastel Cream）、蜜桃粉（Soft Peach）與暖金色（Warm Gold）啞光黏土配色
+   * - 三聖神龕雕花背屏與匾額（觀音、財神、月老）
+   * - 神桌精緻供品（蜜桃粉蓮花瓶、壽桃塔、財神聚寶盆金元寶、月老桃花瓶與同心紅線結）
+   * - 內堂中央三足雙耳古銅香爐
+   * - 兩側懸掛圓潤發光蜜桃金燈籠與溫暖電影級打光
+   * - 整齊排列的 6 座紅金拜墊，每座拜墊精準跪坐 1 位 Pop Mart 風格 Q 版信眾（部分手持發光線香與柔和香煙）
+   */
+  private addMainHallDiorama(hall: THREE.Group): void {
+    const clayCream = makeMat('#f6eee2', 0.94, 0.01)
+    const clayCreamTile = makeMat('#f3e8d8', 0.94, 0.01)
+    const clayPeach = makeMat('#f2b2a2', 0.9, 0.02)
+    const clayPeachSoft = makeMat('#f9d6cb', 0.9, 0.01)
+    const clayGold = makeMat('#e5b968', 0.78, 0.14)
+    const clayWarmWood = makeMat('#dcbe94', 0.9, 0.02)
+    const clayCushionRed = makeMat('#d6493a', 0.9, 0.02)
+    const clayBronze = makeMat('#9c7344', 0.65, 0.25)
+
+    // =========================================================================
+    // 1. 奶油白啞光黏土大殿地坪、中央暖木參拜御道與案前蜜桃金迎神地毯
+    // =========================================================================
+    const creamFloor = new THREE.Mesh(new THREE.BoxGeometry(17.6, 0.016, 10.6), clayCreamTile)
+    creamFloor.position.set(0, 0.282, -0.4)
+    creamFloor.receiveShadow = true
+    hall.add(creamFloor)
+
+    // 中央暖木參拜御道（連接殿門至內堂香爐，如微縮場景圖中央木棧道）
+    const woodRunner = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.022, 7.2), clayWarmWood)
+    woodRunner.position.set(0, 0.286, 0.75)
+    woodRunner.receiveShadow = true
+    hall.add(woodRunner)
+
+    // 神桌前蜜桃粉與暖金雕花祈福地毯
+    const carpetBorder = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.02, 1.55), clayGold)
+    carpetBorder.position.set(0, 0.285, -3.28)
+    const carpetInner = new THREE.Mesh(new THREE.BoxGeometry(4.56, 0.024, 1.35), clayPeachSoft)
+    carpetInner.position.set(0, 0.287, -3.28)
+    carpetBorder.receiveShadow = true
+    carpetInner.receiveShadow = true
+    hall.add(carpetBorder, carpetInner)
+
+    // =========================================================================
+    // 2. 三聖神龕奶油白與暖金雕花背屏、內殿額匾與對聯掛軸
+    // =========================================================================
+    const screenBacking = new THREE.Mesh(new THREE.BoxGeometry(7.9, 4.7, 0.12), clayCream)
+    screenBacking.position.set(0, 2.65, -6.04)
+    hall.add(screenBacking)
+
+    // 四根暖金雕花神龕界柱（將背屏劃分為：左月老龕、中觀音龕、右財神龕）
+    for (const sx of [-3.85, -1.35, 1.35, 3.85]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 4.75, 12), clayGold)
+      post.position.set(sx, 2.65, -5.96)
+      hall.add(post)
+    }
+
+    // 神龕上方三面內殿匾額（奶油底深褐金字／朱紅金字）
+    const innerPlaques: { x: number; y: number; w: number; h: number; text: string; fg: string; bg: string }[] = [
+      { x: 0, y: 4.58, w: 2.35, h: 0.68, text: '觀 音 殿', fg: '#5a3a22', bg: '#f6ebd8' },
+      { x: 2.55, y: 4.45, w: 2.1, h: 0.56, text: '天 官 武 財 神', fg: '#fce29c', bg: '#9e3326' },
+      { x: -2.55, y: 4.45, w: 2.1, h: 0.56, text: '月 下 老 人', fg: '#fff0eb', bg: '#c95b58' },
+    ]
+    for (const p of innerPlaques) {
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(p.w + 0.16, p.h + 0.14, 0.1), clayGold)
+      frame.position.set(p.x, p.y, -5.92)
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(p.w, p.h), this.textMaterial(p.text, p.fg, p.bg))
+      face.position.set(p.x, p.y, -5.86)
+      hall.add(frame, face)
+    }
+
+    // =========================================================================
+    // 3. 神桌案上三聖專屬啞光黏土供品（觀音蓮花壽桃、財神聚寶盆元寶、月老桃花紅線）
+    // =========================================================================
+    const altarY = 1.67
+    const altarZ = -4.35
+
+    // (A) 中央觀音菩薩案前：小金香爐、雙側蜜桃粉蓮花花瓶、奶油蜜桃壽桃盤、暖光粉蓮燭台
+    const miniCenser = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.22, 16), clayGold)
+    miniCenser.position.set(0, altarY + 0.11, altarZ + 0.22)
+    hall.add(miniCenser)
+    for (const dx of [-0.05, 0, 0.05]) {
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.28, 6), clayWarmWood)
+      stick.position.set(dx, altarY + 0.28, altarZ + 0.22)
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffb84d' }))
+      tip.position.set(dx, altarY + 0.43, altarZ + 0.22)
+      hall.add(stick, tip)
+    }
+
+    // 雙側奶油白瓷蜜桃蓮花花瓶
+    for (const side of [-1, 1]) {
+      const vx = side * 1.18
+      const vase = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.42, 16), clayCream)
+      vase.position.set(vx, altarY + 0.21, altarZ - 0.1)
+      hall.add(vase)
+      for (const [ox, oy, oz] of [[0, 0.48, 0], [-0.1, 0.44, 0.06], [0.1, 0.45, -0.05]] as const) {
+        const bloom = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), clayPeach)
+        bloom.position.set(vx + ox, altarY + oy, altarZ - 0.1 + oz)
+        hall.add(bloom)
+      }
+      // 暖光蠟燭台
+      const candleHolder = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.14, 12), clayGold)
+      candleHolder.position.set(side * 0.72, altarY + 0.07, altarZ + 0.18)
+      const candleBody = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.048, 0.26, 12), clayPeach)
+      candleBody.position.set(side * 0.72, altarY + 0.24, altarZ + 0.18)
+      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.09, 8), new THREE.MeshBasicMaterial({ color: '#ffcf66' }))
+      flame.position.set(side * 0.72, altarY + 0.41, altarZ + 0.18)
+      hall.add(candleHolder, candleBody, flame)
+    }
+
+    // 奶油蜜桃壽桃供盤
+    const peachPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.06, 16), clayGold)
+    peachPlate.position.set(0.42, altarY + 0.03, altarZ - 0.05)
+    hall.add(peachPlate)
+    for (const [px, py, pz] of [[0, 0.11, 0], [-0.09, 0.1, 0.07], [0.09, 0.1, 0.07], [0, 0.2, 0.03]] as const) {
+      const bun = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), clayPeachSoft)
+      bun.position.set(0.42 + px, altarY + py, altarZ - 0.05 + pz)
+      hall.add(bun)
+    }
+
+    // (B) 龍邊（右側 x = +2.48）財神爺案前：招財聚寶盆與發光小金元寶堆
+    const treasureBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.22, 0.24, 18), clayGold)
+    treasureBowl.position.set(2.48, altarY + 0.12, altarZ + 0.1)
+    hall.add(treasureBowl)
+    const goldIngotMat = makeMat('#ffd768', 0.45, 0.25)
+    goldIngotMat.emissive.set('#ffa622')
+    goldIngotMat.emissiveIntensity = 0.5
+    for (const [ix, iy, iz] of [[0, 0.27, 0], [-0.12, 0.24, 0.08], [0.12, 0.24, 0.08], [0, 0.25, -0.1]] as const) {
+      const miniIngot = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 10), goldIngotMat)
+      miniIngot.scale.set(1.3, 0.75, 0.85)
+      miniIngot.position.set(2.48 + ix, altarY + iy, altarZ + 0.1 + iz)
+      hall.add(miniIngot)
+    }
+
+    // (C) 虎邊（左側 x = -2.48）月下老人案前：盛開桃花白玉瓶與發光同心紅線結
+    const peachVase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.38, 16), clayCream)
+    peachVase.position.set(-2.78, altarY + 0.19, altarZ + 0.02)
+    hall.add(peachVase)
+    for (const [bx, by, bz] of [[0, 0.45, 0], [-0.09, 0.41, 0.06], [0.09, 0.42, -0.05]] as const) {
+      const pFlower = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 8), clayPeach)
+      pFlower.position.set(-2.78 + bx, altarY + by, altarZ + 0.02 + bz)
+      hall.add(pFlower)
+    }
+    const knotMat = makeMat('#ff3b52', 0.5, 0.1)
+    knotMat.emissive.set('#ff2442')
+    knotMat.emissiveIntensity = 0.65
+    const loveKnot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.11, 0.028, 36, 8), knotMat)
+    loveKnot.rotation.x = -Math.PI / 4
+    loveKnot.position.set(-2.22, altarY + 0.14, altarZ + 0.15)
+    hall.add(loveKnot)
+
+    // =========================================================================
+    // 4. 內堂中央三足雙耳古銅大香爐（如微縮場景圖正中央，插發光清香與蓮花）
+    // =========================================================================
+    const hallUrn = new THREE.Group()
+    hallUrn.position.set(0, 0.285, -2.95)
+    const urnBelly = new THREE.Mesh(new THREE.SphereGeometry(0.46, 20, 16), clayBronze)
+    urnBelly.scale.set(1.1, 0.85, 1.1)
+    urnBelly.position.y = 0.46
+    const urnNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.38, 0.16, 20), clayGold)
+    urnNeck.position.y = 0.78
+    hallUrn.add(urnBelly, urnNeck)
+
+    // 三足圓腿與雙耳提把
+    for (let i = 0; i < 3; i++) {
+      const ang = (i / 3) * Math.PI * 2 + Math.PI / 6
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.065, 0.28, 10), clayBronze)
+      leg.position.set(Math.cos(ang) * 0.32, 0.14, Math.sin(ang) * 0.32)
+      hallUrn.add(leg)
+    }
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.036, 8, 16, Math.PI * 1.2), clayGold)
+      ear.position.set(side * 0.46, 0.64, 0)
+      ear.rotation.z = -side * 0.3
+      hallUrn.add(ear)
+    }
+    // 爐內發光清香與粉白蓮花飾
+    for (const dx of [-0.08, 0, 0.08]) {
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6), clayWarmWood)
+      stick.position.set(dx, 1.02, 0)
+      const ember = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffb84d' }))
+      ember.position.set(dx, 1.24, 0)
+      hallUrn.add(stick, ember)
+    }
+    hall.add(hallUrn)
+    // 記錄世界座標香煙發射點 (hall.position.z = -7)
+    this.mainHallSmokeSpots.push(new THREE.Vector3(0, 1.55, -2.95 - 7))
+    this.mainHallSmokeSpots.push(new THREE.Vector3(0, 2.15, -4.15 - 7))
+
+    // =========================================================================
+    // 5. 大殿內部懸掛圓潤發光蜜桃暖金燈籠與電影級柔和暖光 (Glowing Diorama Lanterns)
+    // =========================================================================
+    const lanternGlowMat = makeMat('#ffbfa0', 0.45, 0.05)
+    lanternGlowMat.emissive.set('#ff9248')
+    lanternGlowMat.emissiveIntensity = 0.92
+
+    const interiorLanternPositions: [number, number, number][] = [
+      [-3.85, 3.85, -2.6],
+      [-4.65, 3.85, -0.8],
+      [-5.35, 3.85, 1.0],
+      [3.85, 3.85, -2.6],
+      [4.65, 3.85, -0.8],
+      [5.35, 3.85, 1.0],
+    ]
+    for (const [lx, ly, lz] of interiorLanternPositions) {
+      const lg = new THREE.Group()
+      lg.position.set(lx, ly, lz)
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 1.3, 6), clayGold)
+      cord.position.y = 0.85
+      const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 14), lanternGlowMat)
+      sphere.scale.set(1.08, 0.92, 1.08)
+      const capTop = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.08, 14), clayGold)
+      capTop.position.y = 0.32
+      const capBot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.08, 14), clayGold)
+      capBot.position.y = -0.32
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.32, 8), clayCushionRed)
+      tassel.rotation.x = Math.PI
+      tassel.position.y = -0.52
+      lg.add(cord, sphere, capTop, capBot, tassel)
+      hall.add(lg)
+    }
+
+    // =========================================================================
+    // 6. 整齊排列的 6 座紅色拜墊 ＋ 1 對 1 跪拜持香 Pop Mart Q 版信眾 (6 Cushions & 6 Kneeling Chibis)
+    // =========================================================================
+    const worshipperSpecs: {
+      x: number
+      z: number
+      heading: number
+      robe: string
+      sash: string
+      hair: string
+      hairStyle: 'bun' | 'braids' | 'bob' | 'short'
+      hasIncense: boolean
+    }[] = [
+      // 左側 3 座拜墊（朝向觀音與月下老人）
+      { x: -1.85, z: -2.4, heading: Math.PI - 0.08, robe: '#b8cfa8', sash: '#e8dfc8', hair: '#4a352a', hairStyle: 'bun', hasIncense: true },
+      { x: -3.25, z: -2.4, heading: Math.PI + 0.06, robe: '#f0a78b', sash: '#f7e5d8', hair: '#593e31', hairStyle: 'braids', hasIncense: true },
+      { x: -2.55, z: -0.95, heading: Math.PI - 0.05, robe: '#e8b396', sash: '#7c6a5a', hair: '#463228', hairStyle: 'bun', hasIncense: false },
+      // 右側 3 座拜墊（朝向觀音與財神爺）
+      { x: 1.85, z: -2.4, heading: Math.PI + 0.08, robe: '#f5e4be', sash: '#d9b066', hair: '#4a362c', hairStyle: 'short', hasIncense: true },
+      { x: 3.25, z: -2.4, heading: Math.PI - 0.06, robe: '#f2cf94', sash: '#74848c', hair: '#5c4336', hairStyle: 'bob', hasIncense: false },
+      { x: 2.55, z: -0.95, heading: Math.PI + 0.05, robe: '#a6bfd4', sash: '#e8e0d0', hair: '#3d2c24', hairStyle: 'short', hasIncense: true },
+    ]
+
+    worshipperSpecs.forEach((spec, idx) => {
+      const unit = new THREE.Group()
+      unit.position.set(spec.x, 0.285, spec.z)
+      unit.rotation.y = spec.heading
+
+      // (1) 圓潤朱紅鑲金邊啞光黏土拜墊 (Neatly Arranged Red Prayer Cushion)
+      const cushionCore = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.5, 0.14, 24), clayCushionRed)
+      cushionCore.position.y = 0.07
+      const cushionRim = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.065, 12, 24), clayCushionRed)
+      cushionRim.rotation.x = Math.PI / 2
+      cushionRim.position.y = 0.07
+      const goldStitch = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.015, 8, 24), clayGold)
+      goldStitch.rotation.x = Math.PI / 2
+      goldStitch.position.y = 0.14
+      unit.add(cushionCore, cushionRim, goldStitch)
+
+      // 拜墊四角金色小流蘇結
+      for (let c = 0; c < 4; c++) {
+        const cAng = (c / 4) * Math.PI * 2 + Math.PI / 4
+        const knot = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), clayGold)
+        knot.position.set(Math.cos(cAng) * 0.49, 0.05, Math.sin(cAng) * 0.49)
+        unit.add(knot)
+      }
+
+      // (2) 拜墊上精準 1 位跪坐合十祈禱的 Pop Mart Q 版信眾 (Kneeling Chibi Worshipper)
+      const robeMat = makeMat(spec.robe, 0.92, 0.01)
+      const sashMat = makeMat(spec.sash, 0.9, 0.01)
+      const hairMat = makeMat(spec.hair, 0.92, 0.01)
+      const skinMat = makeMat('#fde6d4', 0.92, 0.01)
+      const shoeMat = makeMat('#5a4033', 0.92, 0.01)
+
+      const chibiGroup = new THREE.Group()
+      // 拜墊頂面高度 y = 0.14
+      chibiGroup.position.y = 0.14
+
+      // 雙膝跪坐摺疊小腿與黏土圓鞋（向後摺疊於拜墊上）
+      for (const side of [-1, 1]) {
+        const kneelingLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.105, 0.34, 14), sashMat)
+        kneelingLeg.rotation.x = Math.PI / 2
+        kneelingLeg.position.set(side * 0.12, 0.09, -0.05)
+        const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.088, 12, 10), shoeMat)
+        shoe.scale.set(0.95, 1.2, 0.75)
+        shoe.position.set(side * 0.12, 0.09, -0.24)
+        chibiGroup.add(kneelingLeg, shoe)
+      }
+
+      // 軀幹與合十雙手容器（供呼吸與微幅敬拜動畫驅動）
+      const torsoGroup = new THREE.Group()
+      torsoGroup.position.set(0, 0.14, 0.02)
+
+      const bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.31, 0.44, 20), robeMat)
+      bodyMesh.position.y = 0.22
+      const collarMesh = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.032, 8, 18), sashMat)
+      collarMesh.rotation.x = Math.PI / 2
+      collarMesh.position.y = 0.42
+      torsoGroup.add(bodyMesh, collarMesh)
+
+      // 胸前虔誠合十雙臂與小手
+      const handsGroup = new THREE.Group()
+      handsGroup.position.set(0, 0.3, 0.24)
+      for (const side of [-1, 1]) {
+        const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.105, 0.26, 14), robeMat)
+        sleeve.position.set(side * 0.16, 0.02, -0.08)
+        sleeve.rotation.set(1.05, 0, -side * 0.55)
+        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 10), skinMat)
+        hand.scale.set(0.75, 1.15, 1)
+        hand.position.set(side * 0.042, 0.04, 0.03)
+        handsGroup.add(sleeve, hand)
+      }
+
+      // 手持發光線香 (Holding Glowing Incense Stick)
+      if (spec.hasIncense) {
+        const incenseStick = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.36, 6), clayWarmWood)
+        incenseStick.position.set(0, 0.18, 0.05)
+        incenseStick.rotation.x = 0.18
+        const emberMat = new THREE.MeshBasicMaterial({ color: '#ffbe55' })
+        const emberTip = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 6), emberMat)
+        emberTip.position.set(0, 0.36, 0.082)
+        handsGroup.add(incenseStick, emberTip)
+
+        // 記錄持香信眾香頭世界座標，使香煙自然從香頭升起
+        const worldSmokeX = spec.x + Math.sin(spec.heading) * 0.28
+        const worldSmokeZ = spec.z - 7 + Math.cos(spec.heading) * 0.28
+        this.mainHallSmokeSpots.push(new THREE.Vector3(worldSmokeX, 1.05, worldSmokeZ))
+      }
+
+      torsoGroup.add(handsGroup)
+
+      // Q 版大頭與閉目虔誠祈禱五官 (Cute Chibi Head with Closed Praying Eyes & Soft Peach Blush)
+      const headGroup = new THREE.Group()
+      headGroup.position.set(0, 0.68, 0.02)
+
+      const face = new THREE.Mesh(new THREE.SphereGeometry(0.32, 26, 20), skinMat)
+      face.scale.set(1.04, 0.96, 0.96)
+      headGroup.add(face)
+
+      // 雙耳
+      for (const side of [-1, 1]) {
+        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.068, 10, 8), skinMat)
+        ear.position.set(side * 0.32, -0.03, 0)
+        headGroup.add(ear)
+      }
+
+      // 蓬鬆黏土後髮罩與立體瀏海
+      const hairCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.338, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.6),
+        hairMat
+      )
+      hairCap.rotation.x = -0.24
+      hairCap.position.set(0, 0.02, -0.02)
+      headGroup.add(hairCap)
+
+      for (const bx of [-0.14, 0, 0.14]) {
+        const bang = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), hairMat)
+        bang.scale.set(1.05, 0.65, 0.78)
+        bang.position.set(bx, 0.16, 0.26)
+        bang.rotation.x = 0.32
+        headGroup.add(bang)
+      }
+
+      // 依角色設定不同可愛髮型（丸子頭、雙麻花辮、妹妹頭短髮、清爽短髮）
+      if (spec.hairStyle === 'bun') {
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 12), hairMat)
+        bun.position.set(0, 0.33, -0.06)
+        const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.32, 8), clayGold)
+        pin.rotation.z = Math.PI / 2
+        pin.position.copy(bun.position)
+        headGroup.add(bun, pin)
+      } else if (spec.hairStyle === 'braids') {
+        for (const side of [-1, 1]) {
+          const braid1 = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), hairMat)
+          braid1.position.set(side * 0.28, -0.08, -0.08)
+          const braid2 = new THREE.Mesh(new THREE.SphereGeometry(0.072, 10, 8), hairMat)
+          braid2.position.set(side * 0.3, -0.19, -0.06)
+          headGroup.add(braid1, braid2)
+        }
+      } else if (spec.hairStyle === 'bob') {
+        for (const side of [-1, 1]) {
+          const sideBob = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), hairMat)
+          sideBob.scale.set(0.65, 1.15, 0.95)
+          sideBob.position.set(side * 0.27, -0.02, 0.04)
+          headGroup.add(sideBob)
+        }
+      }
+
+      // 溫柔閉目祈禱眼睫、蜜桃腮紅與安詳小嘴
+      for (const side of [-1, 1]) {
+        const closedEye = new THREE.Mesh(
+          new THREE.TorusGeometry(0.048, 0.009, 6, 14, Math.PI * 0.85),
+          hairMat
+        )
+        closedEye.rotation.set(0.15, side * 0.2, Math.PI + side * 0.06)
+        closedEye.position.set(side * 0.11, 0.01, 0.295)
+
+        const brow = new THREE.Mesh(
+          new THREE.TorusGeometry(0.052, 0.007, 6, 12, Math.PI * 0.7),
+          hairMat
+        )
+        brow.rotation.set(-0.1, side * 0.2, side * 0.08)
+        brow.position.set(side * 0.11, 0.085, 0.29)
+
+        const blush = new THREE.Mesh(
+          new THREE.CircleGeometry(0.052, 14),
+          new THREE.MeshBasicMaterial({ color: '#f7a69a', transparent: true, opacity: 0.78 })
+        )
+        blush.position.set(side * 0.19, -0.06, 0.275)
+        blush.rotation.y = side * 0.48
+        headGroup.add(closedEye, brow, blush)
+      }
+
+      const smile = new THREE.Mesh(
+        new THREE.TorusGeometry(0.028, 0.006, 6, 12, Math.PI * 0.85),
+        makeMat('#c46a5e', 0.85)
+      )
+      smile.rotation.z = Math.PI * 1.07
+      smile.position.set(0, -0.085, 0.305)
+      headGroup.add(smile)
+
+      torsoGroup.add(headGroup)
+      chibiGroup.add(torsoGroup)
+      unit.add(chibiGroup)
+
+      unit.traverse(obj => {
+        if (obj instanceof THREE.Mesh) {
+          obj.castShadow = true
+          obj.receiveShadow = true
+        }
+      })
+
+      hall.add(unit)
+      this.kneelingWorshippers.push({ torso: torsoGroup, head: headGroup, hands: handsGroup, phase: idx * 1.15 })
+      // 拜墊與跪拜信眾輕量圓柱碰撞（半徑 0.48m，保留中央大道與四周通道完全順暢）
+      this.physics.addStaticCylinder(new THREE.Vector3(spec.x, 0.8, spec.z - 7), 0.48, 1.3)
+    })
   }
 
   private addGiantDragonGuanyin(): void {
@@ -3336,6 +4319,22 @@ export class TempleWorld {
     if (this.dragonPuffTimer <= 0 && !this.reducedSmoke && this.dragonGuanyinUrnPos) {
       this.dragonPuffTimer = 1.3
       this.spawnPuff(this.dragonGuanyinUrnPos)
+    }
+
+    // 大殿內部 6 位跪拜 Q 版信眾溫柔呼吸與合十點頭祈福動畫
+    for (const w of this.kneelingWorshippers) {
+      const wave = Math.sin(time * 1.4 + w.phase) * 0.5 + 0.5
+      w.torso.rotation.x = wave * 0.12
+      w.head.rotation.x = 0.08 + wave * 0.16
+      w.hands.position.y = 0.3 + wave * 0.025
+    }
+
+    // 大殿內堂香爐與持香信眾柔和香火煙霧氛圍 (Soft Atmospheric Incense Smoke)
+    this.mainHallSmokeTimer -= dt
+    if (this.mainHallSmokeTimer <= 0 && !this.reducedSmoke && this.mainHallSmokeSpots.length > 0) {
+      this.mainHallSmokeTimer = 0.9
+      const spot = this.mainHallSmokeSpots[Math.floor(Math.random() * this.mainHallSmokeSpots.length)]
+      this.spawnPuff(spot)
     }
 
     // Gentle cloud drifting animation across celestial dome
