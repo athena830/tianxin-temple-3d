@@ -13,21 +13,20 @@
     <div class="app-version-badge" id="app-version">VER 3.44.0</div>
     <canvas id="game"></canvas>
     <div id="ui"></div>
-    <script type="module">
-      const isLocalDev = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
-      if (isLocalDev) {
-        import('/src/main.ts').catch(() => {
-          const s = document.createElement('script');
-          s.type = 'module';
-          s.src = './assets/index.js';
-          document.head.appendChild(s);
-        });
-      } else {
-        const s = document.createElement('script');
-        s.type = 'module';
-        s.src = './assets/index.js';
-        document.head.appendChild(s);
-      }
+    <script type="module" src="/src/main.ts"></script>
+    <script>
+      // Fallback for static hosting (GitHub Pages) where /src/main.ts is not served by a Vite dev server
+      window.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () {
+          if (!window.__TEMPLE_LOADED__) {
+            var s = document.createElement('script');
+            s.type = 'module';
+            s.crossOrigin = '';
+            s.src = './assets/index.js';
+            document.head.appendChild(s);
+          }
+        }, 80);
+      });
     </script>
   </body>
 </html>

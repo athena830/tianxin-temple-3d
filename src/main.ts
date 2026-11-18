@@ -12,6 +12,7 @@ import { TempleUi } from './ui/temple-ui'
 import { TouchControls } from './ui/touch'
 
 document.documentElement.lang = 'zh-TW'
+;(window as any).__TEMPLE_LOADED__ = true
 
 async function boot(): Promise<void> {
   const canvas = document.querySelector<HTMLCanvasElement>('#game')!
