@@ -471,6 +471,9 @@ export class TempleUi {
         return `<p class="eyebrow">祈願牆</p><h2>一念善願</h2><p>此牆展示你在此裝置寫下的心願，以及數則示例祈願。</p>${note}
           <ul class="wall">${mine}${sample}</ul><button class="btn primary" data-open="prayer">寫下新的心願</button>`
       }
+      case 'cushion':
+        return `<p class="eyebrow">觀世音菩薩主殿</p><h2>觀音拜墊・跪拜祈福</h2><p>於觀世音菩薩前虔誠跪拜，靜心默念心願，願菩薩慈悲護佑，平安吉祥，福慧圓滿。</p>${note}
+          <div class="row"><button class="btn primary" data-act="cushion-pray">立即跪拜祈福</button></div>`
       case 'records': {
         const rows = d.records.map(r => `<li><b>${esc(r.action)}</b><span>${esc(r.detail)}</span><small>${formatRecordDate(r.at)}</small></li>`).join('')
         return `<p class="eyebrow">祈福紀錄</p><h2>參拜足跡</h2><p>共 ${d.records.length} 筆紀錄，保存在此瀏覽器中。</p>${note}
@@ -507,6 +510,7 @@ export class TempleUi {
     else if (act === 'wish-again') { e.preventDefault(); this.hideWishBanner(); this.actions.ritual('coin') }
     else if (act === 'wish-close') { e.preventDefault(); this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
+    else if (act === 'cushion-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'cushion' })) }
     else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
     else if (act === 'music') {

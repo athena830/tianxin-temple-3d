@@ -10,7 +10,33 @@ export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
 export type ShrinePointId =
   | 'incense' | 'prayer' | 'offerings' | 'daily-lot' | 'chess'
   | 'lamps' | 'woodfish' | 'bell' | 'wishing-pool' | 'prayer-wall' | 'records' | 'tiangong'
-  | 'drum' | 'yuhuang' | 'gold-furnace' | 'guanyin-dragon'
+  | 'drum' | 'yuhuang' | 'gold-furnace' | 'guanyin-dragon' | 'cushion'
+
+export interface CushionWorshipper {
+  group: THREE.Group
+  torso: THREE.Group
+  head: THREE.Group
+  hands: THREE.Group
+  phase: number
+  hasIncense: boolean
+  smokeSpot?: THREE.Vector3
+  materials: THREE.Material[]
+}
+
+export interface CushionSlot {
+  index: number
+  x: number // hall local x
+  z: number // hall local z
+  worldX: number // world x
+  worldZ: number // world z (z - 7)
+  heading: number
+  cushionGroup: THREE.Group
+  glowRing: THREE.Mesh
+  state: 'empty' | 'praying' | 'leaving' | 'player'
+  timer: number // countdown seconds for current state
+  leaveDuration: number
+  worshipper?: CushionWorshipper
+}
 
 export type TimeOfDay = 'day' | 'dawn' | 'dusk' | 'night'
 export type TimeSetting = 'auto' | TimeOfDay
@@ -409,7 +435,7 @@ export class TempleWorld {
   private auraParticleData?: { radius: number; angle: number; speed: number; rotSpeed: number }[]
   private dragonGuanyinUrnPos?: THREE.Vector3
   private dragonPuffTimer = 1.2
-  private readonly kneelingWorshippers: { torso: THREE.Group; head: THREE.Group; hands: THREE.Group; phase: number }[] = []
+  readonly cushionSlots: CushionSlot[] = []
   private readonly mainHallSmokeSpots: THREE.Vector3[] = []
   private mainHallSmokeTimer = 0.75
   readonly npcs: NpcManager
@@ -1822,7 +1848,7 @@ export class TempleWorld {
       incense: '#e8bb71', prayer: '#e8bb71', offerings: '#d8a45e', 'daily-lot': '#d8a45e', chess: '#a9c2a9',
       lamps: '#edba61', woodfish: '#d68c63', bell: '#e8c77d', 'wishing-pool': '#a8d2c6', 'prayer-wall': '#e8c77d',
       records: '#e8c77d', tiangong: '#f0c070', drum: '#d68c63', yuhuang: '#f5d77f', 'gold-furnace': '#e27b4e',
-      'guanyin-dragon': '#ffea70',
+      'guanyin-dragon': '#ffea70', cushion: '#e5b968',
     }
     for (const point of this.points) {
       const mat = new THREE.MeshBasicMaterial({ color: colors[point.id], transparent: true, opacity: 0.42, depthWrite: false })
@@ -3230,29 +3256,55 @@ export class TempleWorld {
     }
 
     // =========================================================================
-    // 6. 整齊排列的 6 座紅色拜墊 ＋ 1 對 1 跪拜持香 Pop Mart Q 版信眾 (6 Cushions & 6 Kneeling Chibis)
+    // 6. 整齊排列的 6 座紅色拜墊 ＋ 動態輪替 Q 版參拜信眾 (6 Cushions & Dynamic Worshippers)
+    //    NPC 拜拜約 5~20 秒後隨機禮成離開，拜墊保持空位供使用者隨時跪下拜拜祈福
     // =========================================================================
-    const worshipperSpecs: {
+    const cushionLayouts: {
       x: number
       z: number
       heading: number
-      robe: string
-      sash: string
-      hair: string
-      hairStyle: 'bun' | 'braids' | 'bob' | 'short'
-      hasIncense: boolean
+      initialState: 'empty' | 'praying'
+      initialTimer: number
+      preset?: {
+        robe: string
+        sash: string
+        hair: string
+        hairStyle: 'bun' | 'braids' | 'bob' | 'short'
+        hasIncense: boolean
+      }
     }[] = [
       // 左側 3 座拜墊（朝向觀音與月下老人）
-      { x: -1.85, z: -2.4, heading: Math.PI - 0.08, robe: '#b8cfa8', sash: '#e8dfc8', hair: '#4a352a', hairStyle: 'bun', hasIncense: true },
-      { x: -3.25, z: -2.4, heading: Math.PI + 0.06, robe: '#f0a78b', sash: '#f7e5d8', hair: '#593e31', hairStyle: 'braids', hasIncense: true },
-      { x: -2.55, z: -0.95, heading: Math.PI - 0.05, robe: '#e8b396', sash: '#7c6a5a', hair: '#463228', hairStyle: 'bun', hasIncense: false },
+      {
+        x: -1.85, z: -2.4, heading: Math.PI - 0.08,
+        initialState: 'praying', initialTimer: 6.5,
+        preset: { robe: '#b8cfa8', sash: '#e8dfc8', hair: '#4a352a', hairStyle: 'bun', hasIncense: true },
+      },
+      {
+        x: -3.25, z: -2.4, heading: Math.PI + 0.06,
+        initialState: 'empty', initialTimer: 12.0,
+      },
+      {
+        x: -2.55, z: -0.95, heading: Math.PI - 0.05,
+        initialState: 'praying', initialTimer: 18.0,
+        preset: { robe: '#e8b396', sash: '#7c6a5a', hair: '#463228', hairStyle: 'bun', hasIncense: false },
+      },
       // 右側 3 座拜墊（朝向觀音與財神爺）
-      { x: 1.85, z: -2.4, heading: Math.PI + 0.08, robe: '#f5e4be', sash: '#d9b066', hair: '#4a362c', hairStyle: 'short', hasIncense: true },
-      { x: 3.25, z: -2.4, heading: Math.PI - 0.06, robe: '#f2cf94', sash: '#74848c', hair: '#5c4336', hairStyle: 'bob', hasIncense: false },
-      { x: 2.55, z: -0.95, heading: Math.PI + 0.05, robe: '#a6bfd4', sash: '#e8e0d0', hair: '#3d2c24', hairStyle: 'short', hasIncense: true },
+      {
+        x: 1.85, z: -2.4, heading: Math.PI + 0.08,
+        initialState: 'praying', initialTimer: 13.5,
+        preset: { robe: '#f5e4be', sash: '#d9b066', hair: '#4a362c', hairStyle: 'short', hasIncense: true },
+      },
+      {
+        x: 3.25, z: -2.4, heading: Math.PI - 0.06,
+        initialState: 'empty', initialTimer: 15.0,
+      },
+      {
+        x: 2.55, z: -0.95, heading: Math.PI + 0.05,
+        initialState: 'empty', initialTimer: 9.0,
+      },
     ]
 
-    worshipperSpecs.forEach((spec, idx) => {
+    cushionLayouts.forEach((spec, idx) => {
       const unit = new THREE.Group()
       unit.position.set(spec.x, 0.285, spec.z)
       unit.rotation.y = spec.heading
@@ -3260,9 +3312,11 @@ export class TempleWorld {
       // (1) 圓潤朱紅鑲金邊啞光黏土拜墊 (Neatly Arranged Red Prayer Cushion)
       const cushionCore = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.5, 0.14, 24), clayCushionRed)
       cushionCore.position.y = 0.07
+      cushionCore.userData = { cushionIndex: idx }
       const cushionRim = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.065, 12, 24), clayCushionRed)
       cushionRim.rotation.x = Math.PI / 2
       cushionRim.position.y = 0.07
+      cushionRim.userData = { cushionIndex: idx }
       const goldStitch = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.015, 8, 24), clayGold)
       goldStitch.rotation.x = Math.PI / 2
       goldStitch.position.y = 0.14
@@ -3276,163 +3330,41 @@ export class TempleWorld {
         unit.add(knot)
       }
 
-      // (2) 拜墊上精準 1 位跪坐合十祈禱的 Pop Mart Q 版信眾 (Kneeling Chibi Worshipper)
-      const robeMat = makeMat(spec.robe, 0.92, 0.01)
-      const sashMat = makeMat(spec.sash, 0.9, 0.01)
-      const hairMat = makeMat(spec.hair, 0.92, 0.01)
-      const skinMat = makeMat('#fde6d4', 0.92, 0.01)
-      const shoeMat = makeMat('#5a4033', 0.92, 0.01)
+      // 空拜墊周圍柔和金色蓮華光圈（呼吸光暈提示玩家此處為空位可跪拜）
+      const glowRingMat = new THREE.MeshBasicMaterial({ color: '#ffcf66', transparent: true, opacity: 0, depthWrite: false })
+      const glowRing = new THREE.Mesh(new THREE.RingGeometry(0.48, 0.6, 24), glowRingMat)
+      glowRing.rotation.x = -Math.PI / 2
+      glowRing.position.y = 0.02
+      unit.add(glowRing)
 
-      const chibiGroup = new THREE.Group()
-      // 拜墊頂面高度 y = 0.14
-      chibiGroup.position.y = 0.14
+      const worldX = spec.x
+      const worldZ = spec.z - 7
 
-      // 雙膝跪坐摺疊小腿與黏土圓鞋（向後摺疊於拜墊上）
-      for (const side of [-1, 1]) {
-        const kneelingLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.105, 0.34, 14), sashMat)
-        kneelingLeg.rotation.x = Math.PI / 2
-        kneelingLeg.position.set(side * 0.12, 0.09, -0.05)
-        const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.088, 12, 10), shoeMat)
-        shoe.scale.set(0.95, 1.2, 0.75)
-        shoe.position.set(side * 0.12, 0.09, -0.24)
-        chibiGroup.add(kneelingLeg, shoe)
+      let worshipper: CushionWorshipper | undefined
+      if (spec.initialState === 'praying' && spec.preset) {
+        worshipper = this.createChibiWorshipper({
+          ...spec.preset,
+          worldX,
+          worldZ,
+          heading: spec.heading,
+        })
+        unit.add(worshipper.group)
       }
 
-      // 軀幹與合十雙手容器（供呼吸與微幅敬拜動畫驅動）
-      const torsoGroup = new THREE.Group()
-      torsoGroup.position.set(0, 0.14, 0.02)
-
-      const bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.31, 0.44, 20), robeMat)
-      bodyMesh.position.y = 0.22
-      const collarMesh = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.032, 8, 18), sashMat)
-      collarMesh.rotation.x = Math.PI / 2
-      collarMesh.position.y = 0.42
-      torsoGroup.add(bodyMesh, collarMesh)
-
-      // 胸前虔誠合十雙臂與小手
-      const handsGroup = new THREE.Group()
-      handsGroup.position.set(0, 0.3, 0.24)
-      for (const side of [-1, 1]) {
-        const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.105, 0.26, 14), robeMat)
-        sleeve.position.set(side * 0.16, 0.02, -0.08)
-        sleeve.rotation.set(1.05, 0, -side * 0.55)
-        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 10), skinMat)
-        hand.scale.set(0.75, 1.15, 1)
-        hand.position.set(side * 0.042, 0.04, 0.03)
-        handsGroup.add(sleeve, hand)
-      }
-
-      // 手持發光線香 (Holding Glowing Incense Stick)
-      if (spec.hasIncense) {
-        const incenseStick = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.36, 6), clayWarmWood)
-        incenseStick.position.set(0, 0.18, 0.05)
-        incenseStick.rotation.x = 0.18
-        const emberMat = new THREE.MeshBasicMaterial({ color: '#ffbe55' })
-        const emberTip = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 6), emberMat)
-        emberTip.position.set(0, 0.36, 0.082)
-        handsGroup.add(incenseStick, emberTip)
-
-        // 記錄持香信眾香頭世界座標，使香煙自然從香頭升起
-        const worldSmokeX = spec.x + Math.sin(spec.heading) * 0.28
-        const worldSmokeZ = spec.z - 7 + Math.cos(spec.heading) * 0.28
-        this.mainHallSmokeSpots.push(new THREE.Vector3(worldSmokeX, 1.05, worldSmokeZ))
-      }
-
-      torsoGroup.add(handsGroup)
-
-      // Q 版大頭與閉目虔誠祈禱五官 (Cute Chibi Head with Closed Praying Eyes & Soft Peach Blush)
-      const headGroup = new THREE.Group()
-      headGroup.position.set(0, 0.68, 0.02)
-
-      const face = new THREE.Mesh(new THREE.SphereGeometry(0.32, 26, 20), skinMat)
-      face.scale.set(1.04, 0.96, 0.96)
-      headGroup.add(face)
-
-      // 雙耳
-      for (const side of [-1, 1]) {
-        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.068, 10, 8), skinMat)
-        ear.position.set(side * 0.32, -0.03, 0)
-        headGroup.add(ear)
-      }
-
-      // 蓬鬆黏土後髮罩與立體瀏海
-      const hairCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.338, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.56),
-        hairMat
-      )
-      hairCap.rotation.x = 0.34
-      hairCap.position.set(0, 0.02, -0.02)
-      headGroup.add(hairCap)
-
-      for (const bx of [-0.14, 0, 0.14]) {
-        const bang = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), hairMat)
-        bang.scale.set(1.05, 0.65, 0.78)
-        bang.position.set(bx, 0.17, 0.25)
-        bang.rotation.x = 0.32
-        headGroup.add(bang)
-      }
-
-      // 依角色設定不同可愛髮型（丸子頭、雙麻花辮、妹妹頭短髮、清爽短髮）
-      if (spec.hairStyle === 'bun') {
-        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 12), hairMat)
-        bun.position.set(0, 0.33, -0.06)
-        const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.32, 8), clayGold)
-        pin.rotation.z = Math.PI / 2
-        pin.position.copy(bun.position)
-        headGroup.add(bun, pin)
-      } else if (spec.hairStyle === 'braids') {
-        for (const side of [-1, 1]) {
-          const braid1 = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), hairMat)
-          braid1.position.set(side * 0.28, -0.08, -0.08)
-          const braid2 = new THREE.Mesh(new THREE.SphereGeometry(0.072, 10, 8), hairMat)
-          braid2.position.set(side * 0.3, -0.19, -0.06)
-          headGroup.add(braid1, braid2)
-        }
-      } else if (spec.hairStyle === 'bob') {
-        for (const side of [-1, 1]) {
-          const sideBob = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), hairMat)
-          sideBob.scale.set(0.65, 1.15, 0.95)
-          sideBob.position.set(side * 0.27, -0.02, 0.04)
-          headGroup.add(sideBob)
-        }
-      }
-
-      // 溫柔閉目祈禱眼睫、蜜桃腮紅與安詳小嘴
-      for (const side of [-1, 1]) {
-        const closedEye = new THREE.Mesh(
-          new THREE.TorusGeometry(0.048, 0.01, 6, 14, Math.PI * 0.85),
-          hairMat
-        )
-        closedEye.rotation.set(0.15, side * 0.2, Math.PI + side * 0.06)
-        closedEye.position.set(side * 0.105, 0.01, 0.312)
-
-        const brow = new THREE.Mesh(
-          new THREE.TorusGeometry(0.052, 0.008, 6, 12, Math.PI * 0.7),
-          hairMat
-        )
-        brow.rotation.set(-0.1, side * 0.2, side * 0.08)
-        brow.position.set(side * 0.105, 0.085, 0.308)
-
-        const blush = new THREE.Mesh(
-          new THREE.CircleGeometry(0.052, 14),
-          new THREE.MeshBasicMaterial({ color: '#f7a69a', transparent: true, opacity: 0.78 })
-        )
-        blush.position.set(side * 0.18, -0.055, 0.288)
-        blush.rotation.y = side * 0.42
-        headGroup.add(closedEye, brow, blush)
-      }
-
-      const smile = new THREE.Mesh(
-        new THREE.TorusGeometry(0.028, 0.007, 6, 12, Math.PI * 0.85),
-        makeMat('#c46a5e', 0.85)
-      )
-      smile.rotation.z = Math.PI * 1.07
-      smile.position.set(0, -0.085, 0.315)
-      headGroup.add(smile)
-
-      torsoGroup.add(headGroup)
-      chibiGroup.add(torsoGroup)
-      unit.add(chibiGroup)
+      this.cushionSlots.push({
+        index: idx,
+        x: spec.x,
+        z: spec.z,
+        worldX,
+        worldZ,
+        heading: spec.heading,
+        cushionGroup: unit,
+        glowRing,
+        state: spec.initialState,
+        timer: spec.initialTimer,
+        leaveDuration: 2.4,
+        worshipper,
+      })
 
       unit.traverse(obj => {
         if (obj instanceof THREE.Mesh) {
@@ -3442,10 +3374,196 @@ export class TempleWorld {
       })
 
       hall.add(unit)
-      this.kneelingWorshippers.push({ torso: torsoGroup, head: headGroup, hands: handsGroup, phase: idx * 1.15 })
-      // 拜墊與跪拜信眾輕量圓柱碰撞（半徑 0.48m，保留中央大道與四周通道完全順暢）
-      this.physics.addStaticCylinder(new THREE.Vector3(spec.x, 0.8, spec.z - 7), 0.48, 1.3)
+      // 拜墊為柔軟坐墊，不阻礙玩家走動與跪拜（中央御道與兩側通道完全通暢無穿牆卡頓）
     })
+  }
+
+  private createChibiWorshipper(spec: {
+    robe: string
+    sash: string
+    hair: string
+    hairStyle: 'bun' | 'braids' | 'bob' | 'short'
+    hasIncense: boolean
+    worldX: number
+    worldZ: number
+    heading: number
+  }): CushionWorshipper {
+    const materials: THREE.Material[] = []
+    const trackMat = <T extends THREE.Material>(m: T): T => { materials.push(m); return m }
+
+    const robeMat = trackMat(makeMat(spec.robe, 0.92, 0.01))
+    const sashMat = trackMat(makeMat(spec.sash, 0.9, 0.01))
+    const hairMat = trackMat(makeMat(spec.hair, 0.92, 0.01))
+    const skinMat = trackMat(makeMat('#fde6d4', 0.92, 0.01))
+    const shoeMat = trackMat(makeMat('#5a4033', 0.92, 0.01))
+    const clayWarmWood = trackMat(makeMat('#dcbe94', 0.9, 0.02))
+    const clayGold = trackMat(makeMat('#e5b968', 0.78, 0.14))
+
+    const chibiGroup = new THREE.Group()
+    // 拜墊頂面高度 y = 0.14
+    chibiGroup.position.y = 0.14
+
+    // 雙膝跪坐摺疊小腿與黏土圓鞋（向後摺疊於拜墊上）
+    for (const side of [-1, 1]) {
+      const kneelingLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.105, 0.34, 14), sashMat)
+      kneelingLeg.rotation.x = Math.PI / 2
+      kneelingLeg.position.set(side * 0.12, 0.09, -0.05)
+      const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.088, 12, 10), shoeMat)
+      shoe.scale.set(0.95, 1.2, 0.75)
+      shoe.position.set(side * 0.12, 0.09, -0.24)
+      chibiGroup.add(kneelingLeg, shoe)
+    }
+
+    // 軀幹與合十雙手容器（供呼吸與微幅敬拜動畫驅動）
+    const torsoGroup = new THREE.Group()
+    torsoGroup.position.set(0, 0.14, 0.02)
+
+    const bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.31, 0.44, 20), robeMat)
+    bodyMesh.position.y = 0.22
+    const collarMesh = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.032, 8, 18), sashMat)
+    collarMesh.rotation.x = Math.PI / 2
+    collarMesh.position.y = 0.42
+    torsoGroup.add(bodyMesh, collarMesh)
+
+    // 胸前虔誠合十雙臂與小手
+    const handsGroup = new THREE.Group()
+    handsGroup.position.set(0, 0.3, 0.24)
+    for (const side of [-1, 1]) {
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.105, 0.26, 14), robeMat)
+      sleeve.position.set(side * 0.16, 0.02, -0.08)
+      sleeve.rotation.set(1.05, 0, -side * 0.55)
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.068, 12, 10), skinMat)
+      hand.scale.set(0.75, 1.15, 1)
+      hand.position.set(side * 0.042, 0.04, 0.03)
+      handsGroup.add(sleeve, hand)
+    }
+
+    // 手持發光線香 (Holding Glowing Incense Stick)
+    let smokeSpot: THREE.Vector3 | undefined
+    if (spec.hasIncense) {
+      const incenseStick = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.36, 6), clayWarmWood)
+      incenseStick.position.set(0, 0.18, 0.05)
+      incenseStick.rotation.x = 0.18
+      const emberMat = trackMat(new THREE.MeshBasicMaterial({ color: '#ffbe55' }))
+      const emberTip = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 6), emberMat)
+      emberTip.position.set(0, 0.36, 0.082)
+      handsGroup.add(incenseStick, emberTip)
+
+      const worldSmokeX = spec.worldX + Math.sin(spec.heading) * 0.28
+      const worldSmokeZ = spec.worldZ + Math.cos(spec.heading) * 0.28
+      smokeSpot = new THREE.Vector3(worldSmokeX, 1.05, worldSmokeZ)
+    }
+
+    torsoGroup.add(handsGroup)
+
+    // Q 版大頭與閉目虔誠祈禱五官 (Cute Chibi Head with Closed Praying Eyes & Soft Peach Blush)
+    const headGroup = new THREE.Group()
+    headGroup.position.set(0, 0.68, 0.02)
+
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.32, 26, 20), skinMat)
+    face.scale.set(1.04, 0.96, 0.96)
+    headGroup.add(face)
+
+    // 雙耳
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.068, 10, 8), skinMat)
+      ear.position.set(side * 0.32, -0.03, 0)
+      headGroup.add(ear)
+    }
+
+    // 蓬鬆黏土後髮罩與立體瀏海
+    const hairCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.338, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.56),
+      hairMat
+    )
+    hairCap.rotation.x = 0.34
+    hairCap.position.set(0, 0.02, -0.02)
+    headGroup.add(hairCap)
+
+    for (const bx of [-0.14, 0, 0.14]) {
+      const bang = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), hairMat)
+      bang.scale.set(1.05, 0.65, 0.78)
+      bang.position.set(bx, 0.17, 0.25)
+      bang.rotation.x = 0.32
+      headGroup.add(bang)
+    }
+
+    // 依角色設定不同可愛髮型（丸子頭、雙麻花辮、妹妹頭短髮、清爽短髮）
+    if (spec.hairStyle === 'bun') {
+      const bun = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 12), hairMat)
+      bun.position.set(0, 0.33, -0.06)
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.32, 8), clayGold)
+      pin.rotation.z = Math.PI / 2
+      pin.position.copy(bun.position)
+      headGroup.add(bun, pin)
+    } else if (spec.hairStyle === 'braids') {
+      for (const side of [-1, 1]) {
+        const braid1 = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), hairMat)
+        braid1.position.set(side * 0.28, -0.08, -0.08)
+        const braid2 = new THREE.Mesh(new THREE.SphereGeometry(0.072, 10, 8), hairMat)
+        braid2.position.set(side * 0.3, -0.19, -0.06)
+        headGroup.add(braid1, braid2)
+      }
+    } else if (spec.hairStyle === 'bob') {
+      for (const side of [-1, 1]) {
+        const sideBob = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), hairMat)
+        sideBob.scale.set(0.65, 1.15, 0.95)
+        sideBob.position.set(side * 0.27, -0.02, 0.04)
+        headGroup.add(sideBob)
+      }
+    }
+
+    // 溫柔閉目祈禱眼睫、蜜桃腮紅與安詳小嘴
+    const blushMat = trackMat(new THREE.MeshBasicMaterial({ color: '#f7a69a', transparent: true, opacity: 0.78 }))
+    for (const side of [-1, 1]) {
+      const closedEye = new THREE.Mesh(
+        new THREE.TorusGeometry(0.048, 0.01, 6, 14, Math.PI * 0.85),
+        hairMat
+      )
+      closedEye.rotation.set(0.15, side * 0.2, Math.PI + side * 0.06)
+      closedEye.position.set(side * 0.105, 0.01, 0.312)
+
+      const brow = new THREE.Mesh(
+        new THREE.TorusGeometry(0.052, 0.008, 6, 12, Math.PI * 0.7),
+        hairMat
+      )
+      brow.rotation.set(-0.1, side * 0.2, side * 0.08)
+      brow.position.set(side * 0.105, 0.085, 0.308)
+
+      const blush = new THREE.Mesh(new THREE.CircleGeometry(0.052, 14), blushMat)
+      blush.position.set(side * 0.18, -0.055, 0.288)
+      blush.rotation.y = side * 0.42
+      headGroup.add(closedEye, brow, blush)
+    }
+
+    const smile = new THREE.Mesh(
+      new THREE.TorusGeometry(0.028, 0.007, 6, 12, Math.PI * 0.85),
+      trackMat(makeMat('#c46a5e', 0.85))
+    )
+    smile.rotation.z = Math.PI * 1.07
+    smile.position.set(0, -0.085, 0.315)
+    headGroup.add(smile)
+
+    torsoGroup.add(headGroup)
+    chibiGroup.add(torsoGroup)
+
+    chibiGroup.traverse(obj => {
+      if (obj instanceof THREE.Mesh) {
+        obj.castShadow = true
+        obj.receiveShadow = true
+      }
+    })
+
+    return {
+      group: chibiGroup,
+      torso: torsoGroup,
+      head: headGroup,
+      hands: handsGroup,
+      phase: Math.random() * Math.PI * 2,
+      hasIncense: spec.hasIncense,
+      smokeSpot,
+      materials,
+    }
   }
 
   private addGiantDragonGuanyin(): void {
@@ -4131,7 +4249,49 @@ export class TempleWorld {
   }
   setAvatarVisible(visible: boolean): void { this.avatarStand.visible = visible }
 
+  getNearestEmptyCushion(pos: THREE.Vector3, maxDist = 1.6): CushionSlot | null {
+    let nearest: CushionSlot | null = null
+    let bestDist = maxDist
+    for (const slot of this.cushionSlots) {
+      if (slot.state !== 'empty') continue
+      const d = Math.hypot(slot.worldX - pos.x, slot.worldZ - pos.z)
+      if (d < bestDist) {
+        bestDist = d
+        nearest = slot
+      }
+    }
+    return nearest
+  }
+
+  getCushionByIndex(idx: number): CushionSlot | undefined {
+    return this.cushionSlots.find(s => s.index === idx)
+  }
+
+  setPlayerOnCushion(slotIndex: number, active: boolean): void {
+    const slot = this.getCushionByIndex(slotIndex)
+    if (!slot) return
+    if (active) {
+      slot.state = 'player'
+      ;(slot.glowRing.material as THREE.MeshBasicMaterial).opacity = 0
+    } else {
+      slot.state = 'empty'
+      slot.timer = 12.0
+    }
+  }
+
   nearestPoint(position: THREE.Vector3): ShrinePoint | null {
+    // 優先檢查是否靠近觀音殿前空著的紅色拜墊（跪拜祈福）
+    const emptyCushion = this.getNearestEmptyCushion(position, 1.45)
+    if (emptyCushion) {
+      return {
+        id: 'cushion',
+        title: '觀音拜墊・跪拜祈福',
+        subtitle: '按 E 跪下向觀世音菩薩祈福',
+        radius: 1.45,
+        position: new THREE.Vector3(emptyCushion.worldX, 0.35, emptyCushion.worldZ),
+      }
+    }
+
     let nearest: ShrinePoint | null = null
     let best = Infinity
     for (const point of this.points) {
@@ -4321,19 +4481,106 @@ export class TempleWorld {
       this.spawnPuff(this.dragonGuanyinUrnPos)
     }
 
-    // 大殿內部 6 位跪拜 Q 版信眾溫柔呼吸與合十點頭祈福動畫
-    for (const w of this.kneelingWorshippers) {
-      const wave = Math.sin(time * 1.4 + w.phase) * 0.5 + 0.5
-      w.torso.rotation.x = wave * 0.12
-      w.head.rotation.x = 0.08 + wave * 0.16
-      w.hands.position.y = 0.3 + wave * 0.025
+    // 觀世音菩薩前拜墊與 Q 版信眾動態參拜巡迴系統 (Dynamic Worshippers & Available Cushions)
+    const activeSmokeSpots: THREE.Vector3[] = [...this.mainHallSmokeSpots]
+
+    for (const slot of this.cushionSlots) {
+      if (slot.state === 'praying' && slot.worshipper) {
+        slot.timer -= dt
+        const w = slot.worshipper
+        const wave = Math.sin(time * 1.4 + w.phase) * 0.5 + 0.5
+        w.torso.rotation.x = wave * 0.12
+        w.head.rotation.x = 0.08 + wave * 0.16
+        w.hands.position.y = 0.3 + wave * 0.025
+        if (w.smokeSpot) activeSmokeSpots.push(w.smokeSpot)
+
+        // 到達 5~20 秒隨機祈福時間，起立並恭敬離開拜墊
+        if (slot.timer <= 0) {
+          slot.state = 'leaving'
+          slot.timer = 2.4
+          slot.leaveDuration = 2.4
+        }
+      } else if (slot.state === 'leaving' && slot.worshipper) {
+        slot.timer -= dt
+        const progress = THREE.MathUtils.clamp(1 - slot.timer / slot.leaveDuration, 0, 1)
+        const w = slot.worshipper
+
+        // 前半段階段：合十小手放下放鬆，身形由跪姿升起為站姿 (0 -> 0.35)
+        const standProgress = Math.min(1, progress / 0.35)
+        w.group.position.y = THREE.MathUtils.lerp(0.14, 0.28, standProgress)
+        w.hands.position.y = THREE.MathUtils.lerp(0.3, 0.15, standProgress)
+        w.hands.position.z = THREE.MathUtils.lerp(0.24, 0.08, standProgress)
+        w.torso.rotation.x = THREE.MathUtils.lerp(0, 0, standProgress)
+
+        // 後半段階段：轉向中央走道與殿門，向後/向外邁步並淡出 (0.25 -> 1.0)
+        if (progress > 0.25) {
+          const leaveMove = (progress - 0.25) / 0.75
+          const walkX = Math.sign(slot.x) * leaveMove * 0.3
+          const walkZ = leaveMove * 1.5
+          w.group.position.x = walkX
+          w.group.position.z = walkZ
+          w.group.rotation.y = THREE.MathUtils.lerp(0, Math.PI, leaveMove)
+          const opacity = Math.max(0, 1 - leaveMove)
+          for (const m of w.materials) {
+            m.transparent = true
+            m.opacity = opacity
+          }
+        }
+
+        // 離開完畢：移除模型，拜墊轉為空位
+        if (slot.timer <= 0) {
+          slot.cushionGroup.remove(w.group)
+          w.materials.forEach(m => m.dispose())
+          slot.worshipper = undefined
+          slot.state = 'empty'
+          // 拜墊保留 8~18 秒冷卻空檔，確保使用者有充足空位跪下拜拜
+          slot.timer = 8.0 + Math.random() * 10.0
+        }
+      } else if (slot.state === 'empty') {
+        slot.timer -= dt
+        // 柔和金色光圈呼吸脈衝，提示使用者此拜墊為空位可跪下拜拜
+        const ringMat = slot.glowRing.material as THREE.MeshBasicMaterial
+        ringMat.opacity = 0.32 + 0.16 * Math.sin(time * 3 + slot.index * 1.2)
+
+        // 若殿內參拜人數少於 3 人（確保至少 3 個拜墊永遠為使用者留空），且冷卻結束、玩家不在附近，才迎來下一位新信眾
+        const activeCount = this.cushionSlots.filter(s => s.state === 'praying' || s.state === 'leaving').length
+        const distToPlayer = Math.hypot(playerPosition.x - slot.worldX, playerPosition.z - slot.worldZ)
+        if (slot.timer <= 0 && activeCount < 3 && distToPlayer > 1.8) {
+          const palettes = [
+            { robe: '#b8cfa8', sash: '#e8dfc8', hair: '#4a352a', hairStyle: 'bun' as const, hasIncense: true },
+            { robe: '#f0a78b', sash: '#f7e5d8', hair: '#593e31', hairStyle: 'braids' as const, hasIncense: true },
+            { robe: '#e8b396', sash: '#7c6a5a', hair: '#463228', hairStyle: 'bun' as const, hasIncense: false },
+            { robe: '#f5e4be', sash: '#d9b066', hair: '#4a362c', hairStyle: 'short' as const, hasIncense: true },
+            { robe: '#f2cf94', sash: '#74848c', hair: '#5c4336', hairStyle: 'bob' as const, hasIncense: false },
+            { robe: '#a6bfd4', sash: '#e8e0d0', hair: '#3d2c24', hairStyle: 'short' as const, hasIncense: true },
+            { robe: '#d7b5d8', sash: '#f2e6f4', hair: '#48342a', hairStyle: 'braids' as const, hasIncense: true },
+            { robe: '#b2d5c8', sash: '#647c72', hair: '#3f2d24', hairStyle: 'bob' as const, hasIncense: false },
+          ]
+          const p = palettes[Math.floor(Math.random() * palettes.length)]
+          const newWorshipper = this.createChibiWorshipper({
+            ...p,
+            worldX: slot.worldX,
+            worldZ: slot.worldZ,
+            heading: slot.heading,
+          })
+          slot.cushionGroup.add(newWorshipper.group)
+          slot.worshipper = newWorshipper
+          slot.state = 'praying'
+          // 5~20 秒隨機參拜時長
+          slot.timer = 5.0 + Math.random() * 15.0
+          ringMat.opacity = 0
+        }
+      } else if (slot.state === 'player') {
+        const ringMat = slot.glowRing.material as THREE.MeshBasicMaterial
+        ringMat.opacity = 0
+      }
     }
 
     // 大殿內堂香爐與持香信眾柔和香火煙霧氛圍 (Soft Atmospheric Incense Smoke)
     this.mainHallSmokeTimer -= dt
-    if (this.mainHallSmokeTimer <= 0 && !this.reducedSmoke && this.mainHallSmokeSpots.length > 0) {
+    if (this.mainHallSmokeTimer <= 0 && !this.reducedSmoke && activeSmokeSpots.length > 0) {
       this.mainHallSmokeTimer = 0.9
-      const spot = this.mainHallSmokeSpots[Math.floor(Math.random() * this.mainHallSmokeSpots.length)]
+      const spot = activeSmokeSpots[Math.floor(Math.random() * activeSmokeSpots.length)]
       this.spawnPuff(spot)
     }
 

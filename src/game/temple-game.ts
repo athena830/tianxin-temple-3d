@@ -193,6 +193,15 @@ export class TempleGame {
     this.camDistance = 4.2
   }
 
+  /** Position visitor onto a location (such as an empty prayer cushion) */
+  teleportTo(x: number, z: number): void {
+    const p = this.body.translation()
+    this.body.setTranslation({ x, y: p.y, z }, true)
+    this.body.setNextKinematicTranslation({ x, y: p.y, z })
+    this.targetDestination = null
+    this.clickMarker.visible = false
+  }
+
   get worshipping(): boolean { return this.ritualLeft > 0 }
   get inTemple(): boolean { return this.mode === 'browse' || this.mode === 'explore' || this.mode === 'panel' }
 
@@ -305,6 +314,57 @@ export class TempleGame {
     const hit = this.raycaster.intersectObjects(this.world.scene.children, true).find(h => h.object instanceof THREE.Mesh && visible(h.object))
     if (!hit) return null
 
+    const p = this.body.translation()
+
+    // 0. Check if clicked directly on or near a prayer cushion
+    let clickedCushionIndex: number | undefined
+    let obj: THREE.Object3D | null = hit.object
+    while (obj) {
+      if (obj.userData && typeof obj.userData.cushionIndex === 'number') {
+        clickedCushionIndex = obj.userData.cushionIndex
+        break
+      }
+      obj = obj.parent
+    }
+
+    if (clickedCushionIndex !== undefined) {
+      const slot = this.world.getCushionByIndex(clickedCushionIndex)
+      if (slot) {
+        if (slot.state === 'empty') {
+          const reach = Math.hypot(slot.worldX - p.x, slot.worldZ - p.z)
+          if (reach <= 1.45) {
+            this.targetDestination = null
+            this.clickMarker.visible = false
+            return { kind: 'open', id: 'cushion' }
+          }
+          this.targetDestination = new THREE.Vector3(slot.worldX, FOOT_OFFSET, slot.worldZ)
+          this.pendingStationId = 'cushion'
+          this.clickMarker.position.set(slot.worldX, 0.35, slot.worldZ)
+          this.clickMarker.visible = true
+          return {
+            kind: 'far',
+            point: {
+              id: 'cushion',
+              title: '觀音拜墊・跪拜祈福',
+              subtitle: '前往空拜墊跪下拜拜',
+              radius: 1.45,
+              position: new THREE.Vector3(slot.worldX, 0.35, slot.worldZ),
+            },
+          }
+        } else if (slot.state === 'praying') {
+          this.targetDestination = new THREE.Vector3(slot.worldX, FOOT_OFFSET, slot.worldZ + 0.8)
+          this.pendingStationId = null
+          this.clickMarker.position.set(slot.worldX, 0.35, slot.worldZ + 0.8)
+          this.clickMarker.visible = true
+          this.audio.play('ui')
+          window.dispatchEvent(new CustomEvent('temple:toast', {
+            detail: '此拜墊正有信眾虔誠參拜，約 5~20 秒後禮成離開，請稍候或至旁邊空拜墊。',
+          }))
+          return null
+        }
+      }
+    }
+
     // 1. Check if clicked on or near a shrine interactive station
     let best: ShrinePoint | null = null
     let bestD = 2.4
@@ -315,7 +375,6 @@ export class TempleGame {
       if (d < bestD) { bestD = d; best = point; targetApproach = [tx, tz] }
     })
     const point = best as ShrinePoint | null
-    const p = this.body.translation()
 
     if (point) {
       const reach = Math.hypot(point.position.x - p.x, point.position.z - p.z)

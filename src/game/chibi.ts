@@ -297,7 +297,7 @@ export class Chibi {
     this.head.rotation.z = Math.sin(this.phase * 0.5) * 0.06 * this.walk * motion
     this.body.scale.set(1, 1 + breathe, 1)
 
-    // 合十朝拜 / 鞠躬 (Palms-together Bow)
+    // 合十朝拜 / 跪拜鞠躬 (Palms-together Kneel & Bow)
     this.bowBlend = THREE.MathUtils.damp(this.bowBlend, bow > 0 ? 1 : 0, 8, dt)
     const k = this.bowBlend
     if (k > 0.001) {
@@ -310,6 +310,10 @@ export class Chibi {
       const amount = (reducedMotion ? 0.2 : 0.42) * dip * k
       this.body.rotation.x = amount * 0.35
       this.head.rotation.x = amount
+      // 屈膝跪坐與身形自然微下沉貼合拜墊
+      this.body.position.y = hop - 0.16 * k
+      this.legL.rotation.x = THREE.MathUtils.lerp(this.legL.rotation.x, 0.85, k)
+      this.legR.rotation.x = THREE.MathUtils.lerp(this.legR.rotation.x, 0.85, k)
     } else {
       this.armL.rotation.z = this.armR.rotation.z = 0
       this.body.rotation.x = 0

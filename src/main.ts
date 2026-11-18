@@ -197,16 +197,62 @@ async function boot(): Promise<void> {
     else { ui.toast(`前往「${result.point.title}」...`); g.setGuide(result.point.id) }
   }
   // Click anywhere on canvas immediately ensures explore mode is active
+  const triggerCushionPrayer = () => {
+    if (!g || g.worshipping || Date.now() < interactBlockedUntil) return
+    const emptyCushion = g.world.getNearestEmptyCushion(g.feet, 2.5)
+    if (!emptyCushion) {
+      ui.toast('請靠近觀音菩薩前空著的紅色拜墊，按 E 跪下拜拜。')
+      return
+    }
+    interactBlockedUntil = Date.now() + 5200
+    ui.closePanel()
+    g.closePanel()
+    syncMode()
+
+    // 鎖定該拜墊為玩家正在參拜，避免 NPC 重疊
+    g.world.setPlayerOnCushion(emptyCushion.index, true)
+
+    // 角色精準對齊至拜墊位置
+    g.teleportTo(emptyCushion.worldX, emptyCushion.worldZ)
+
+    // 播放引罄清脆聲響與香爐裊裊香煙
+    audio.play('chime')
+    g.world.perform('incense')
+    ui.toast('於觀世音菩薩前跪下虔誠祈福...', 2200)
+
+    // 面向大殿正中央觀音聖像方向 ({ x: 0, z: -12.5 }) 虔誠合十跪拜 4.2 秒
+    g.worship({ x: 0, z: -12.5 }, 4.2, () => {
+      store.offerIncense()
+      audio.play('bell')
+      ui.toast('跪拜祈福圓滿：心香一瓣，願觀音菩薩慈悲庇佑，福慧增長、平安吉祥。', 4500)
+      g.world.setPlayerOnCushion(emptyCushion.index, false)
+    })
+  }
+
   canvas.addEventListener('pointerdown', () => {
     if (game && game.mode === 'browse' && !game.worshipping && Date.now() >= interactBlockedUntil) startExplore()
   })
   window.addEventListener('temple:interact', e => {
     if (Date.now() < interactBlockedUntil || g.worshipping) return
-    ui.open((e as CustomEvent<ShrinePointId>).detail)
+    const id = (e as CustomEvent<ShrinePointId>).detail
+    if (id === 'cushion') {
+      triggerCushionPrayer()
+      return
+    }
+    ui.open(id)
   })
   window.addEventListener('temple:interact-touch', () => {
     if (Date.now() < interactBlockedUntil || g.worshipping) return
-    if (g.active && (g.mode === 'explore' || g.mode === 'browse')) ui.open(g.active.id)
+    if (g.active && (g.mode === 'explore' || g.mode === 'browse')) {
+      if (g.active.id === 'cushion') {
+        triggerCushionPrayer()
+        return
+      }
+      ui.open(g.active.id)
+    }
+  })
+  window.addEventListener('temple:toast', e => {
+    ui.toast((e as CustomEvent<string>).detail, 3200)
   })
 
   if (import.meta.env.DEV) {
