@@ -1,14 +1,25 @@
 import { execSync } from 'node:child_process'
 import { join } from 'node:path'
-import { rmSync, copyFileSync, writeFileSync } from 'node:fs'
+import { rmSync, copyFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
 
-const distDir = join(process.cwd(), 'dist')
+const rootDir = process.cwd()
+const distDir = join(rootDir, 'dist')
+const rootAssetsDir = join(rootDir, 'assets')
+
 console.log('[deploy] Building project with Vite...')
 execSync('node ./node_modules/vite/bin/vite.js build', { stdio: 'inherit' })
 
+console.log('[deploy] Syncing compiled assets to root assets/ for GitHub Pages main branch support...')
+mkdirSync(rootAssetsDir, { recursive: true })
+for (const file of readdirSync(join(distDir, 'assets'))) {
+  copyFileSync(join(distDir, 'assets', file), join(rootAssetsDir, file))
+}
+
 console.log('[deploy] Preparing .nojekyll and 404.html...')
 writeFileSync(join(distDir, '.nojekyll'), '')
+writeFileSync(join(rootDir, '.nojekyll'), '')
 copyFileSync(join(distDir, 'index.html'), join(distDir, '404.html'))
+copyFileSync(join(rootDir, 'index.html'), join(rootDir, '404.html'))
 
 console.log('[deploy] Pushing to gh-pages branch...')
 const commands = [

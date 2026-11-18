@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1f1814" />
+    <title>玉皇宮｜線上 3D 宮廟祈福</title>
+    <meta name="description" content="走進可自由漫遊的 3D 玉皇宮：上香祈願、每日抽籤、象棋卜卦、點燈、供奉、敲木魚、鳴鐘與許願池。" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <link rel="stylesheet" href="./assets/index.css" />
+  </head>
+  <body>
+    <div class="app-version-badge" id="app-version">VER 3.44.0</div>
+    <canvas id="game"></canvas>
+    <div id="ui"></div>
+    <script type="module">
+      const isLocalDev = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+      if (isLocalDev) {
+        import('/src/main.ts').catch(() => {
+          const s = document.createElement('script');
+          s.type = 'module';
+          s.src = './assets/index.js';
+          document.head.appendChild(s);
+        });
+      } else {
+        const s = document.createElement('script');
+        s.type = 'module';
+        s.src = './assets/index.js';
+        document.head.appendChild(s);
+      }
+    </script>
+  </body>
+</html>
