@@ -356,16 +356,21 @@ export class TempleGame {
     toTarget.divideScalar(dist)
     // Start a little behind the lens so meshes that enclose the camera are caught too.
     const origin = this.camera.position.clone().addScaledVector(toTarget, -0.6)
+    this.raycaster.camera = this.camera
     this.raycaster.set(origin, toTarget)
     this.raycaster.near = 0
     this.raycaster.far = dist + 0.6 - 0.45
     const ignore = new Set(this.world.pickIgnore)
-    for (const hit of this.raycaster.intersectObjects(this.world.scene.children, true)) {
-      let skip = false
-      for (let n: THREE.Object3D | null = hit.object; n; n = n.parent) { if (ignore.has(n) || !n.visible) { skip = true; break } }
-      if (skip || !(hit.object instanceof THREE.Mesh)) continue
-      hit.object.visible = false
-      this.occluders.push(hit.object)
+    try {
+      for (const hit of this.raycaster.intersectObjects(this.world.scene.children, true)) {
+        let skip = false
+        for (let n: THREE.Object3D | null = hit.object; n; n = n.parent) { if (ignore.has(n) || !n.visible) { skip = true; break } }
+        if (skip || !(hit.object instanceof THREE.Mesh)) continue
+        hit.object.visible = false
+        this.occluders.push(hit.object)
+      }
+    } catch {
+      // Gracefully prevent any raycast error on non-mesh objects from interrupting render
     }
     this.raycaster.far = Infinity
   }

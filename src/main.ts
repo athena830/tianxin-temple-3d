@@ -5,7 +5,9 @@ import { Input } from './engine/input'
 import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
-import type { TempleGame } from './game/temple-game'
+import { TempleGame } from './game/temple-game'
+import { Renderer, suggestQuality } from './engine/renderer'
+import { initPhysics } from './engine/physics'
 import { LOTUS_POND, WISH_POOL } from './game/temple-courtyard'
 import { DRAGON_GUANYIN_POS, type ShrinePointId } from './game/temple-world'
 import { TempleUi } from './ui/temple-ui'
@@ -153,16 +155,11 @@ async function boot(): Promise<void> {
   audio.onTrackChange = (track, title, reason) => ui.onMusicTrackTransition(track, title, reason)
   ;(window as any).__templeAudio__ = audio
 
-  let loaded = 0
-  const track = <T>(p: Promise<T>): Promise<T> => p.then(v => (ui.setBootProgress(0.1 + (++loaded / 4) * 0.6), v))
-  ui.setBootProgress(0.1)
-  const [{ TempleGame }, { Renderer, suggestQuality }, physics] = await Promise.all([
-    track(import('./game/temple-game')),
-    track(import('./engine/renderer')),
-    track(import('./engine/physics')),
-    track(document.fonts.ready),
-  ])
-  await physics.initPhysics()
+  ui.setBootProgress(0.2)
+  await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 400))])
+  ui.setBootProgress(0.4)
+  await initPhysics()
+  ui.setBootProgress(0.6)
   if (firstRun) save.update({ quality: suggestQuality() })
   const renderer = new Renderer(canvas, save.data.quality)
   const g = new TempleGame(renderer, input, audio)

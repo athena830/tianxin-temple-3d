@@ -10,18 +10,9 @@
     <link rel="stylesheet" href="./assets/index.css" />
   </head>
   <body>
-    <div class="app-version-badge" id="app-version">VER 3.39.0</div>
+    <div class="app-version-badge" id="app-version">VER 3.40.0</div>
     <canvas id="game"></canvas>
     <div id="ui"></div>
     <script type="module" src="/src/main.ts"></script>
-    <script>
-      // GitHub Pages main 分支靜態託管載入編譯生產 bundle
-      if (!window.__TEMPLE_LOADED__ && location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') {
-        var s = document.createElement('script');
-        s.type = 'module';
-        s.src = './assets/index.js';
-        document.head.appendChild(s);
-      }
-    </script>
   </body>
 </html>

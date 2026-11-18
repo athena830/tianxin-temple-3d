@@ -433,7 +433,7 @@ export class FrontCourtyard {
 
   private addTianxinFairy(cx: number, cz: number): void {
     const loader = new THREE.TextureLoader()
-    loader.load('./assets/tianxin-fairy.png', tex => {
+    const applyFairy = (tex: THREE.Texture) => {
       tex.colorSpace = THREE.SRGBColorSpace
       // Height 1.45m, preserving aspect ratio of (290 / 511)
       const aspect = 290 / 511
@@ -456,6 +456,9 @@ export class FrontCourtyard {
       mesh.receiveShadow = true
       this.fairyMesh = mesh
       this.c.scene.add(mesh)
+    }
+    loader.load('./assets/tianxin-fairy.webp', applyFairy, undefined, () => {
+      loader.load('./assets/tianxin-fairy.png', applyFairy)
     })
   }
 

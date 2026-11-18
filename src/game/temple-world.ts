@@ -1274,9 +1274,9 @@ export class TempleWorld {
       statueMat.map = tex
       statueMat.needsUpdate = true
     }
-    yuhuangLoader.load('./assets/yuhuang.png', applyYuhuangTex, undefined, () => {
-      yuhuangLoader.load('/assets/yuhuang.png', applyYuhuangTex, undefined, () => {
-        yuhuangLoader.load('./yuhuang.png', applyYuhuangTex)
+    yuhuangLoader.load('./assets/yuhuang.webp', applyYuhuangTex, undefined, () => {
+      yuhuangLoader.load('./assets/yuhuang.png', applyYuhuangTex, undefined, () => {
+        yuhuangLoader.load('/assets/yuhuang.png', applyYuhuangTex)
       })
     })
 
@@ -1740,9 +1740,9 @@ export class TempleWorld {
         roughness: 0.42,
         metalness: 0.12,
       })
-      const primaryUrl = god === 'qin' ? './assets/menshen-qin.png' : './assets/menshen-yuchi.png'
-      const fallbackUrl1 = god === 'qin' ? '/assets/menshen-qin.png' : '/assets/menshen-yuchi.png'
-      const fallbackUrl2 = god === 'qin' ? './menshen-qin.png' : './menshen-yuchi.png'
+      const primaryUrl = god === 'qin' ? './assets/menshen-qin.webp' : './assets/menshen-yuchi.webp'
+      const fallbackUrl1 = god === 'qin' ? './assets/menshen-qin.png' : './assets/menshen-yuchi.png'
+      const fallbackUrl2 = god === 'qin' ? '/assets/menshen-qin.png' : '/assets/menshen-yuchi.png'
       const loader = new THREE.TextureLoader()
       const applyTex = (tex: THREE.Texture) => {
         tex.colorSpace = THREE.SRGBColorSpace
@@ -2300,12 +2300,20 @@ export class TempleWorld {
     if (!root || this.guanyinModelPlaced) return
     const statueH = 3.2
     const statueW = statueH * (376 / 537)
-    new THREE.TextureLoader().load('./assets/guanyin-golden.png', tex => {
+    new THREE.TextureLoader().load('./assets/guanyin-golden.webp', tex => {
       tex.colorSpace = THREE.SRGBColorSpace
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide })
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), mat)
       mesh.position.set(0, 0.32 + statueH / 2, 0)
       root.add(mesh)
+    }, undefined, () => {
+      new THREE.TextureLoader().load('./assets/guanyin-golden.png', tex => {
+        tex.colorSpace = THREE.SRGBColorSpace
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide })
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), mat)
+        mesh.position.set(0, 0.32 + statueH / 2, 0)
+        root.add(mesh)
+      })
     })
   }
 
@@ -2460,8 +2468,10 @@ export class TempleWorld {
     }
 
     const loader = new THREE.TextureLoader()
-    loader.load('./guanyin.png', applyTexture, undefined, () => {
-      loader.load('/guanyin.png', applyTexture)
+    loader.load('./guanyin.webp', applyTexture, undefined, () => {
+      loader.load('./guanyin.png', applyTexture, undefined, () => {
+        loader.load('/guanyin.png', applyTexture)
+      })
     })
 
     // Soft oval contact shadow, horizontally aligned to the platform. It lives in
@@ -3003,6 +3013,7 @@ export class TempleWorld {
     const list: THREE.Object3D[] = [this.avatarStand, this.guideArrow, this.guideBeacon]
     if (this.dragonGuanyinBillboard) list.push(this.dragonGuanyinBillboard)
     if (this.auraParticles) list.push(this.auraParticles)
+    if (this.celestialGroup) list.push(this.celestialGroup)
     return list
   }
   /** Point a guide arrow from the visitor toward a station; null hides it. */

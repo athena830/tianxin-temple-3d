@@ -19,7 +19,7 @@ export class Audio {
   private music: GainNode
   private sfx: GainNode
   private musicOn = false
-  private currentTrack: MusicTrack = Math.random() < 0.5 ? 'green_tara' : 'heart_sutra'
+  private currentTrack: MusicTrack = 'green_tara'
   private taraChantCount = 0
   private taraLoopCount = 0
   private lastTTime = 0
@@ -146,16 +146,11 @@ export class Audio {
           if (curTime >= off) inLoopCount++
         }
         const totalChants = this.taraLoopCount * TARA_OFFSETS.length + inLoopCount
-        const displayCount = Math.min(TARGET_TARA_CHANTS, Math.max(1, totalChants))
+        const displayCount = Math.max(1, ((totalChants - 1) % TARGET_TARA_CHANTS) + 1)
 
         if (displayCount !== this.taraChantCount) {
           this.taraChantCount = displayCount
           this.onChantProgress?.(this.taraChantCount, TARGET_TARA_CHANTS)
-        }
-
-        // When 12 chants complete (chant 12 starts at 172.5s and finishes at 186.0s before chant 13)
-        if (totalChants >= TARGET_TARA_CHANTS && curTime >= 186.0) {
-          this.switchToTrack('heart_sutra', 'auto_complete')
         }
       })
 

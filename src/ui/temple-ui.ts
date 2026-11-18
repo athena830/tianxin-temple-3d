@@ -58,7 +58,7 @@ export class TempleUi {
     this.currentEffectiveTime = initReal
     const initialTimeLabel = `⏰ 現實 (${getEffectiveTimeLabel(initReal)})`
     const initMusic = this.actions.getCurrentMusicState?.()
-    const initialMusicLabel = initMusic?.track === 'heart_sutra' ? '🎵 般若心經' : `🎵 綠度母 (${initMusic?.chantCount || 1}/12)`
+    const initialMusicLabel = `🎵 綠度母 (${initMusic?.chantCount || 1}/12)`
 
     this.root = document.getElementById('ui')!
     this.root.innerHTML = `
@@ -415,12 +415,9 @@ export class TempleUi {
       if (!state.playing) {
         t.textContent = '🔇 音樂：關'
         this.toast('已將背景音樂靜音。')
-      } else if (state.track === 'green_tara') {
-        t.textContent = `🎵 綠度母 (${state.chantCount || 1}/12)`
-        this.toast(`已開啟綠度母梵唱（第 ${state.chantCount || 1}/12 遍），持誦圓滿 12 遍後將轉入《般若波羅蜜多心經》。`)
       } else {
-        t.textContent = '🎵 般若心經'
-        this.toast('正在播放《般若波羅蜜多心經》，空靈甘甜，除障生慧。')
+        t.textContent = `🎵 綠度母 (${state.chantCount || 1}/12)`
+        this.toast(`已開啟綠度母梵唱（第 ${state.chantCount || 1}/12 遍），梵音悠揚，心靈安寧。`)
       }
     }
     else if (act === 'time') {
@@ -535,14 +532,12 @@ export class TempleUi {
     }
   }
 
-  onMusicTrackTransition(track: MusicTrack, title: string, reason?: 'auto_complete' | 'manual' | 'init'): void {
+  onMusicTrackTransition(_track: MusicTrack, title: string, reason?: 'auto_complete' | 'manual' | 'init'): void {
     const btn = this.root.querySelector<HTMLElement>('[data-act="music"]')
     if (btn && this.actions.isMusicPlaying()) {
-      btn.textContent = track === 'heart_sutra' ? '🎵 般若心經' : '🎵 綠度母 (1/12)'
+      btn.textContent = '🎵 綠度母 (1/12)'
     }
-    if (reason === 'auto_complete' && track === 'heart_sutra') {
-      this.toast('🌸 綠度母心咒已圓滿持誦 12 遍，現轉入《般若波羅蜜多心經》，願智慧圓滿、吉祥安康。', 5200)
-    } else if (reason === 'manual' || reason === 'init') {
+    if (reason === 'manual' || reason === 'init') {
       this.toast(`🌸 正在播放《${title}》，梵音悠揚，心靈安寧。`, 3800)
     }
   }
