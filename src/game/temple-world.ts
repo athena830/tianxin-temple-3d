@@ -972,14 +972,14 @@ export class TempleWorld {
     statue.position.set(0, 1.82, -5.68)
     hall.add(statue)
 
-    // 2. 龍邊陪祀（面對神桌右側）：Q 版啞光黏土財神爺 (Chibi Clay Cai Shen at x = +2.48)
+    // 2. 龍邊陪祀（面對神桌右側）：Q 版啞光黏土財神爺 (Chibi Clay Cai Shen at x = +1.98)
     const caiShenStatue = this.createCaiShenStatue()
-    caiShenStatue.position.set(2.48, 1.82, -5.64)
+    caiShenStatue.position.set(1.98, 1.82, -5.64)
     hall.add(caiShenStatue)
 
-    // 3. 虎邊陪祀（面對神桌左側）：Q 版啞光黏土月下老人 (Chibi Clay Yue Lao at x = -2.48)
+    // 3. 虎邊陪祀（面對神桌左側）：Q 版啞光黏土月下老人 (Chibi Clay Yue Lao at x = -1.98)
     const yueLaoStatue = this.createYueLaoStatue()
-    yueLaoStatue.position.set(-2.48, 1.82, -5.64)
+    yueLaoStatue.position.set(-1.98, 1.82, -5.64)
     hall.add(yueLaoStatue)
 
     // 4. 大殿內部 Q 版啞光黏土微縮場景（奶油白地坪、蜜桃暖金雕花背屏、案上供品、三足香爐、發光圓燈籠、6 座整齊紅拜墊與 1 對 1 跪拜持香信眾）
@@ -2598,17 +2598,17 @@ export class TempleWorld {
 
     // 溫潤深褐黏土髮罩與前額中分柔順髮髻
     const hairBack = new THREE.Mesh(
-      new THREE.SphereGeometry(0.505, 26, 20, 0, Math.PI * 2, 0, Math.PI * 0.62),
+      new THREE.SphereGeometry(0.505, 26, 20, 0, Math.PI * 2, 0, Math.PI * 0.56),
       clayHair
     )
-    hairBack.rotation.x = -0.24
-    hairBack.position.set(0, 0.04, -0.03)
+    hairBack.rotation.x = 0.36
+    hairBack.position.set(0, 0.04, -0.04)
     head.add(hairBack)
 
     for (const side of [-1, 1]) {
       const templeHair = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), clayHair)
       templeHair.scale.set(1.15, 0.62, 0.85)
-      templeHair.position.set(side * 0.22, 0.3, 0.33)
+      templeHair.position.set(side * 0.22, 0.3, 0.31)
       templeHair.rotation.set(0.25, side * 0.3, side * 0.28)
       head.add(templeHair)
     }
@@ -2628,10 +2628,10 @@ export class TempleWorld {
 
     // 奶油白觀音披紗（自寶冠後方柔順垂落雙肩）
     const veilTop = new THREE.Mesh(
-      new THREE.SphereGeometry(0.535, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      new THREE.SphereGeometry(0.535, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.52),
       clayCream
     )
-    veilTop.rotation.x = -0.45
+    veilTop.rotation.x = 0.48
     veilTop.position.set(0, 0.08, -0.08)
     head.add(veilTop)
     for (const side of [-1, 1]) {
@@ -2642,41 +2642,41 @@ export class TempleWorld {
     }
 
     // 慈祥閉目彎彎眼睫、蜜桃粉腮紅、眉心吉祥紅痣與溫柔微笑
-    const browDot = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), makeMat('#d94b3d', 0.8))
-    browDot.position.set(0, 0.14, 0.46)
+    const browDot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), makeMat('#d94b3d', 0.8))
+    browDot.position.set(0, 0.14, 0.472)
     head.add(browDot)
 
     for (const side of [-1, 1]) {
       // 溫柔閉目弧線
       const closedEye = new THREE.Mesh(
-        new THREE.TorusGeometry(0.075, 0.014, 8, 16, Math.PI * 0.85),
+        new THREE.TorusGeometry(0.075, 0.015, 8, 16, Math.PI * 0.85),
         clayHair
       )
       closedEye.rotation.set(0.15, side * 0.22, Math.PI + side * 0.08)
-      closedEye.position.set(side * 0.17, 0.02, 0.445)
+      closedEye.position.set(side * 0.16, 0.02, 0.465)
       // 柔和彎眉
       const eyebrow = new THREE.Mesh(
-        new THREE.TorusGeometry(0.08, 0.01, 6, 14, Math.PI * 0.75),
+        new THREE.TorusGeometry(0.08, 0.011, 6, 14, Math.PI * 0.75),
         clayHair
       )
       eyebrow.rotation.set(-0.1, side * 0.22, side * 0.05)
-      eyebrow.position.set(side * 0.17, 0.11, 0.44)
+      eyebrow.position.set(side * 0.16, 0.11, 0.46)
       // 粉嫩蜜桃腮紅
       const blush = new THREE.Mesh(
         new THREE.CircleGeometry(0.075, 16),
-        new THREE.MeshBasicMaterial({ color: '#f6a69b', transparent: true, opacity: 0.75 })
+        new THREE.MeshBasicMaterial({ color: '#f6a69b', transparent: true, opacity: 0.78 })
       )
-      blush.position.set(side * 0.27, -0.09, 0.42)
-      blush.rotation.y = side * 0.48
+      blush.position.set(side * 0.25, -0.08, 0.435)
+      blush.rotation.y = side * 0.42
       head.add(closedEye, eyebrow, blush)
     }
 
     const smile = new THREE.Mesh(
-      new THREE.TorusGeometry(0.048, 0.01, 8, 14, Math.PI * 0.85),
+      new THREE.TorusGeometry(0.048, 0.011, 8, 14, Math.PI * 0.85),
       makeMat('#c86d61', 0.85)
     )
     smile.rotation.z = Math.PI * 1.07
-    smile.position.set(0, -0.11, 0.46)
+    smile.position.set(0, -0.11, 0.472)
     head.add(smile)
 
     root.add(head)
@@ -2772,18 +2772,18 @@ export class TempleWorld {
     // 喜氣彎彎笑眼與蜜桃腮紅
     for (const side of [-1, 1]) {
       const eye = new THREE.Mesh(
-        new THREE.TorusGeometry(0.065, 0.014, 8, 14, Math.PI * 0.85),
+        new THREE.TorusGeometry(0.065, 0.015, 8, 14, Math.PI * 0.85),
         clayDark
       )
       eye.rotation.set(-0.1, side * 0.2, 0)
-      eye.position.set(side * 0.15, 0.04, 0.39)
+      eye.position.set(side * 0.14, 0.04, 0.415)
 
       const blush = new THREE.Mesh(
         new THREE.CircleGeometry(0.068, 14),
         new THREE.MeshBasicMaterial({ color: '#f59c8e', transparent: true, opacity: 0.78 })
       )
-      blush.position.set(side * 0.25, -0.06, 0.37)
-      blush.rotation.y = side * 0.45
+      blush.position.set(side * 0.23, -0.05, 0.39)
+      blush.rotation.y = side * 0.42
       head.add(eye, blush)
     }
 
@@ -2791,14 +2791,14 @@ export class TempleWorld {
     for (const side of [-1, 1]) {
       const mustache = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), clayDark)
       mustache.scale.set(1.4, 0.52, 0.6)
-      mustache.position.set(side * 0.09, -0.08, 0.41)
+      mustache.position.set(side * 0.09, -0.08, 0.42)
       mustache.rotation.z = side * 0.28
       head.add(mustache)
     }
     const chinBeard = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.22, 10), clayDark)
     chinBeard.rotation.x = Math.PI
     chinBeard.scale.set(1, 1, 0.55)
-    chinBeard.position.set(0, -0.24, 0.39)
+    chinBeard.position.set(0, -0.24, 0.41)
     head.add(chinBeard)
 
     // 展翅宰相財神官帽 (Winged Cai Shen Official Hat)
@@ -2943,11 +2943,11 @@ export class TempleWorld {
 
     // 雪白髮罩、道髻與暖金紅玉逍遙冠
     const hairCap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.44, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      new THREE.SphereGeometry(0.44, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.55),
       clayWhiteHair
     )
-    hairCap.rotation.x = -0.25
-    hairCap.position.set(0, 0.03, -0.02)
+    hairCap.rotation.x = 0.35
+    hairCap.position.set(0, 0.03, -0.03)
     const topBun = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), clayWhiteHair)
     topBun.position.set(0, 0.46, -0.03)
     const crownRing = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.21, 0.12, 16), clayGold)
@@ -2960,33 +2960,33 @@ export class TempleWorld {
     for (const side of [-1, 1]) {
       const whiteBrow = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 10), clayWhiteHair)
       whiteBrow.scale.set(1.6, 0.52, 0.65)
-      whiteBrow.position.set(side * 0.16, 0.13, 0.39)
+      whiteBrow.position.set(side * 0.15, 0.14, 0.415)
       whiteBrow.rotation.z = -side * 0.22
 
       const eye = new THREE.Mesh(
-        new THREE.TorusGeometry(0.062, 0.013, 8, 14, Math.PI * 0.85),
+        new THREE.TorusGeometry(0.062, 0.015, 8, 14, Math.PI * 0.85),
         clayDark
       )
       eye.rotation.set(-0.1, side * 0.2, 0)
-      eye.position.set(side * 0.15, 0.03, 0.39)
+      eye.position.set(side * 0.14, 0.03, 0.415)
 
       const blush = new THREE.Mesh(
         new THREE.CircleGeometry(0.072, 14),
         new THREE.MeshBasicMaterial({ color: '#f69e92', transparent: true, opacity: 0.8 })
       )
-      blush.position.set(side * 0.25, -0.06, 0.37)
-      blush.rotation.y = side * 0.45
+      blush.position.set(side * 0.23, -0.05, 0.39)
+      blush.rotation.y = side * 0.42
       head.add(whiteBrow, eye, blush)
     }
 
     // 圓滾滾蓬鬆雪白長仙鬚
     const beardUpper = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), clayWhiteHair)
     beardUpper.scale.set(1.3, 0.85, 0.65)
-    beardUpper.position.set(0, -0.18, 0.38)
+    beardUpper.position.set(0, -0.18, 0.4)
     const beardLower = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.34, 14), clayWhiteHair)
     beardLower.rotation.x = Math.PI
     beardLower.scale.set(1.1, 1, 0.62)
-    beardLower.position.set(0, -0.35, 0.37)
+    beardLower.position.set(0, -0.35, 0.39)
     head.add(beardUpper, beardLower)
 
     root.add(head)
@@ -3058,7 +3058,7 @@ export class TempleWorld {
     hall.add(screenBacking)
 
     // 四根暖金雕花神龕界柱（將背屏劃分為：左月老龕、中觀音龕、右財神龕）
-    for (const sx of [-3.85, -1.35, 1.35, 3.85]) {
+    for (const sx of [-3.35, -1.18, 1.18, 3.35]) {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 4.75, 12), clayGold)
       post.position.set(sx, 2.65, -5.96)
       hall.add(post)
@@ -3066,9 +3066,9 @@ export class TempleWorld {
 
     // 神龕上方三面內殿匾額（奶油底深褐金字／朱紅金字）
     const innerPlaques: { x: number; y: number; w: number; h: number; text: string; fg: string; bg: string }[] = [
-      { x: 0, y: 4.58, w: 2.35, h: 0.68, text: '觀 音 殿', fg: '#5a3a22', bg: '#f6ebd8' },
-      { x: 2.55, y: 4.45, w: 2.1, h: 0.56, text: '天 官 武 財 神', fg: '#fce29c', bg: '#9e3326' },
-      { x: -2.55, y: 4.45, w: 2.1, h: 0.56, text: '月 下 老 人', fg: '#fff0eb', bg: '#c95b58' },
+      { x: 0, y: 4.58, w: 2.15, h: 0.66, text: '觀 音 殿', fg: '#5a3a22', bg: '#f6ebd8' },
+      { x: 2.25, y: 4.45, w: 1.95, h: 0.56, text: '天 官 武 財 神', fg: '#fce29c', bg: '#9e3326' },
+      { x: -2.25, y: 4.45, w: 1.95, h: 0.56, text: '月 下 老 人', fg: '#fff0eb', bg: '#c95b58' },
     ]
     for (const p of innerPlaques) {
       const frame = new THREE.Mesh(new THREE.BoxGeometry(p.w + 0.16, p.h + 0.14, 0.1), clayGold)
@@ -3357,17 +3357,17 @@ export class TempleWorld {
 
       // 蓬鬆黏土後髮罩與立體瀏海
       const hairCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.338, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.6),
+        new THREE.SphereGeometry(0.338, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.56),
         hairMat
       )
-      hairCap.rotation.x = -0.24
+      hairCap.rotation.x = 0.34
       hairCap.position.set(0, 0.02, -0.02)
       headGroup.add(hairCap)
 
       for (const bx of [-0.14, 0, 0.14]) {
         const bang = new THREE.Mesh(new THREE.SphereGeometry(0.105, 12, 10), hairMat)
         bang.scale.set(1.05, 0.65, 0.78)
-        bang.position.set(bx, 0.16, 0.26)
+        bang.position.set(bx, 0.17, 0.25)
         bang.rotation.x = 0.32
         headGroup.add(bang)
       }
@@ -3400,34 +3400,34 @@ export class TempleWorld {
       // 溫柔閉目祈禱眼睫、蜜桃腮紅與安詳小嘴
       for (const side of [-1, 1]) {
         const closedEye = new THREE.Mesh(
-          new THREE.TorusGeometry(0.048, 0.009, 6, 14, Math.PI * 0.85),
+          new THREE.TorusGeometry(0.048, 0.01, 6, 14, Math.PI * 0.85),
           hairMat
         )
         closedEye.rotation.set(0.15, side * 0.2, Math.PI + side * 0.06)
-        closedEye.position.set(side * 0.11, 0.01, 0.295)
+        closedEye.position.set(side * 0.105, 0.01, 0.312)
 
         const brow = new THREE.Mesh(
-          new THREE.TorusGeometry(0.052, 0.007, 6, 12, Math.PI * 0.7),
+          new THREE.TorusGeometry(0.052, 0.008, 6, 12, Math.PI * 0.7),
           hairMat
         )
         brow.rotation.set(-0.1, side * 0.2, side * 0.08)
-        brow.position.set(side * 0.11, 0.085, 0.29)
+        brow.position.set(side * 0.105, 0.085, 0.308)
 
         const blush = new THREE.Mesh(
           new THREE.CircleGeometry(0.052, 14),
           new THREE.MeshBasicMaterial({ color: '#f7a69a', transparent: true, opacity: 0.78 })
         )
-        blush.position.set(side * 0.19, -0.06, 0.275)
-        blush.rotation.y = side * 0.48
+        blush.position.set(side * 0.18, -0.055, 0.288)
+        blush.rotation.y = side * 0.42
         headGroup.add(closedEye, brow, blush)
       }
 
       const smile = new THREE.Mesh(
-        new THREE.TorusGeometry(0.028, 0.006, 6, 12, Math.PI * 0.85),
+        new THREE.TorusGeometry(0.028, 0.007, 6, 12, Math.PI * 0.85),
         makeMat('#c46a5e', 0.85)
       )
       smile.rotation.z = Math.PI * 1.07
-      smile.position.set(0, -0.085, 0.305)
+      smile.position.set(0, -0.085, 0.315)
       headGroup.add(smile)
 
       torsoGroup.add(headGroup)
