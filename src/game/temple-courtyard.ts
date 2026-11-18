@@ -461,12 +461,28 @@ export class FrontCourtyard {
       stool.position.set(cx + Math.cos(a) * 1.3, 0.4, cz + Math.sin(a) * 1.3)
       this.add(stool)
     }
-    const light = new THREE.PointLight('#f5c87b', 0.55, 8, 2)
-    light.position.set(cx, postH - 0.3, cz)
+
+    // 亭內多層次仙氣暖光照明系統 (Tianxin Pavilion Multi-tier Illumination - Plan A)
+    // 1. 亭頂中央核心琉璃暖金主燈 (Main Overhead Glow: 1.65 強度，半徑 11m，全面照亮亭內)
+    const light = new THREE.PointLight('#ffe6b0', 1.65, 11, 2)
+    light.position.set(cx, postH - 0.25, cz)
     this.c.scene.add(light)
+
+    // 2. 棋盤與石桌專屬暖光聚焦照明 (Chessboard Table Focus Light)
+    const tableLight = new THREE.PointLight('#fff2d1', 0.95, 4.2, 2)
+    tableLight.position.set(cx, 1.65, cz)
+    this.c.scene.add(tableLight)
+
     this.addTianxinFairy(cx, cz)
-    // Lanterns at the two open-side outer corners (high under the eave), and lotus pots by the entry.
-    for (const a of [30, 90, 330]) { const p = corner(a * deg, r + 0.9); this.lantern(p.x, postH - 0.25, p.z, 0.24) }
+
+    // 3. 簷角靈氣長明宮燈與專屬暖光漫射 (Eaves Lanterns & Soft Warm Radiance)
+    for (const a of [30, 90, 330]) {
+      const p = corner(a * deg, r + 0.9)
+      this.lantern(p.x, postH - 0.25, p.z, 0.24)
+      const lanternGlow = new THREE.PointLight('#ff9e4a', 0.72, 5.0, 2)
+      lanternGlow.position.set(p.x, postH - 0.45, p.z)
+      this.c.scene.add(lanternGlow)
+    }
     for (const dz of [-2.6, 2.6]) this.lotusPot(cx + r + 1.45, cz + dz)
     // Signboard near the road so the pavilion is identifiable on entry.
     const sign = new THREE.Group()
@@ -501,10 +517,14 @@ export class FrontCourtyard {
         map: tex,
         transparent: true,
         alphaTest: 0.05,
-        roughness: 0.65,
+        roughness: 0.45,
         metalness: 0.05,
         side: THREE.DoubleSide,
       })
+      // 天心仙姑仙氣溫潤自發光補光，消除陰影死角，神韻清透端莊明亮
+      mat.emissive.set('#ffe8cc')
+      mat.emissiveIntensity = 0.42
+
       const mesh = new THREE.Mesh(geo, mat)
       // Placed behind the chessboard facing visitors entering the pavilion from the road (+X / +Z)
       mesh.position.set(cx - 0.95, 0.4 + fairyH / 2, cz)
@@ -513,6 +533,11 @@ export class FrontCourtyard {
       mesh.receiveShadow = true
       this.fairyMesh = mesh
       this.c.scene.add(mesh)
+
+      // 仙姑正面專屬柔和面光補光（Fairy Portrait Fill Light）
+      const fairyFrontLight = new THREE.PointLight('#fff5e4', 0.88, 4.2, 2)
+      fairyFrontLight.position.set(cx - 0.25, 1.4, cz)
+      this.c.scene.add(fairyFrontLight)
     }
     loader.load('./assets/tianxin-fairy.webp', applyFairy)
   }
