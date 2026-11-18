@@ -2607,9 +2607,9 @@ export class TempleWorld {
 
     for (const side of [-1, 1]) {
       const templeHair = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), clayHair)
-      templeHair.scale.set(1.15, 0.62, 0.85)
-      templeHair.position.set(side * 0.22, 0.3, 0.31)
-      templeHair.rotation.set(0.25, side * 0.3, side * 0.28)
+      templeHair.scale.set(1.2, 0.55, 0.78)
+      templeHair.position.set(side * 0.25, 0.34, 0.24)
+      templeHair.rotation.set(0.18, side * 0.35, -side * 0.35)
       head.add(templeHair)
     }
 
@@ -2617,8 +2617,8 @@ export class TempleWorld {
     const topBun = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 14), clayHair)
     topBun.scale.set(1, 1.25, 1)
     topBun.position.set(0, 0.56, -0.04)
-    const crownBase = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.28, 0.14, 18), clayGold)
-    crownBase.position.set(0, 0.44, 0.04)
+    const crownBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.14, 18), clayGold)
+    crownBase.position.set(0, 0.43, 0.06)
     const crownFlame = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.32, 12), clayGold)
     crownFlame.scale.set(1.1, 1, 0.45)
     crownFlame.position.set(0, 0.62, 0.22)
