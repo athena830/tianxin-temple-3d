@@ -365,6 +365,43 @@ export class TempleGame {
       }
     }
 
+    // 0.5. Check if clicked directly on or near the player sky lantern stand
+    let clickedSkyLantern = false
+    let lObj: THREE.Object3D | null = hit.object
+    while (lObj) {
+      if (lObj.userData && lObj.userData.skyLantern) {
+        clickedSkyLantern = true
+        break
+      }
+      lObj = lObj.parent
+    }
+
+    if (clickedSkyLantern) {
+      const stand = this.world.getPlayerLanternStand()
+      if (stand) {
+        const reach = Math.hypot(stand.x - p.x, stand.z - p.z)
+        if (reach <= 2.2) {
+          this.targetDestination = null
+          this.clickMarker.visible = false
+          return { kind: 'open', id: 'sky-lantern' }
+        }
+        this.targetDestination = new THREE.Vector3(stand.x, FOOT_OFFSET, stand.z + 1.1)
+        this.pendingStationId = 'sky-lantern'
+        this.clickMarker.position.set(stand.x, 0.2, stand.z)
+        this.clickMarker.visible = true
+        return {
+          kind: 'far',
+          point: {
+            id: 'sky-lantern',
+            title: '天燈祈福・祈願升空',
+            subtitle: '前往天燈台點燃祈福天燈',
+            radius: 2.2,
+            position: new THREE.Vector3(stand.x, 0.2, stand.z),
+          },
+        }
+      }
+    }
+
     // 1. Check if clicked on or near a shrine interactive station
     let best: ShrinePoint | null = null
     let bestD = 2.4

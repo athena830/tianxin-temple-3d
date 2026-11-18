@@ -10,7 +10,7 @@ export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
 export type ShrinePointId =
   | 'incense' | 'prayer' | 'offerings' | 'daily-lot' | 'chess'
   | 'lamps' | 'woodfish' | 'bell' | 'wishing-pool' | 'prayer-wall' | 'records' | 'tiangong'
-  | 'drum' | 'yuhuang' | 'gold-furnace' | 'guanyin-dragon' | 'cushion'
+  | 'drum' | 'yuhuang' | 'gold-furnace' | 'guanyin-dragon' | 'cushion' | 'sky-lantern'
 
 export interface CushionWorshipper {
   group: THREE.Group
@@ -273,12 +273,14 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'yuhuang', title: '後殿凌霄寶殿', subtitle: '朝拜玉皇上帝，蒙沐浩恩', radius: 3.2 },
   { id: 'gold-furnace', title: '八角金亭', subtitle: '化金祈福，添香油聚善緣', radius: 3.0 },
   { id: 'guanyin-dragon', title: '參拜昇龍觀音', subtitle: '仰望五層樓高乘龍觀音金身', radius: 4.8 },
+  { id: 'sky-lantern', title: '天燈祈福', subtitle: '於天心仙姑旁點燃祈福天燈', radius: 2.4 },
 ]
 const pointPositions: [number, number][] = [
   [0, 0.4], [3.2, -3.4], [-2.25, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [LOTUS_POND.x - 5.8, LOTUS_POND.z], [14.6, 4.3], [15, 0.2],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x + 4.8, DRAGON_GUANYIN_POS.z],
+  [-6.8, 29.8],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
@@ -287,6 +289,7 @@ export const POINT_TARGETS: [number, number][] = [
   [12.5, -1.6], [8.5, -8.5], [15.2, -8], [LOTUS_POND.x, LOTUS_POND.z], [17.5, 4.3], [17.2, 0.2],
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
+  [-6.8, 29.8],
 ]
 
 const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStandardMaterial =>
@@ -1848,7 +1851,7 @@ export class TempleWorld {
       incense: '#e8bb71', prayer: '#e8bb71', offerings: '#d8a45e', 'daily-lot': '#d8a45e', chess: '#a9c2a9',
       lamps: '#edba61', woodfish: '#d68c63', bell: '#e8c77d', 'wishing-pool': '#a8d2c6', 'prayer-wall': '#e8c77d',
       records: '#e8c77d', tiangong: '#f0c070', drum: '#d68c63', yuhuang: '#f5d77f', 'gold-furnace': '#e27b4e',
-      'guanyin-dragon': '#ffea70', cushion: '#e5b968',
+      'guanyin-dragon': '#ffea70', cushion: '#e5b968', 'sky-lantern': '#ff9b3d',
     }
     for (const point of this.points) {
       const mat = new THREE.MeshBasicMaterial({ color: colors[point.id], transparent: true, opacity: 0.42, depthWrite: false })
@@ -4279,6 +4282,18 @@ export class TempleWorld {
     }
   }
 
+  getPlayerLanternStand(): THREE.Vector3 {
+    return this.courtyard.getPlayerLanternStand()
+  }
+
+  triggerPlayerSkyLantern(): boolean {
+    return this.courtyard.triggerPlayerSkyLantern()
+  }
+
+  isPlayerLanternReady(): boolean {
+    return this.courtyard.isPlayerLanternReady()
+  }
+
   nearestPoint(position: THREE.Vector3): ShrinePoint | null {
     // 優先檢查是否靠近觀音殿前空著的紅色拜墊（跪拜祈福）
     const emptyCushion = this.getNearestEmptyCushion(position, 1.45)
@@ -4289,6 +4304,18 @@ export class TempleWorld {
         subtitle: '按 E 跪下向觀世音菩薩祈福',
         radius: 1.45,
         position: new THREE.Vector3(emptyCushion.worldX, 0.35, emptyCushion.worldZ),
+      }
+    }
+
+    // 檢查是否靠近天心仙姑旁的祈福天燈台
+    const lanternStand = this.courtyard.getPlayerLanternStand()
+    if (lanternStand && Math.hypot(position.x - lanternStand.x, position.z - lanternStand.z) <= 2.2) {
+      return {
+        id: 'sky-lantern',
+        title: '天燈祈福・祈願升空',
+        subtitle: this.courtyard.isPlayerLanternReady() ? '按 E 點燃天燈，祈願天心指路' : '祈福天燈冉冉升空中...',
+        radius: 2.2,
+        position: new THREE.Vector3(lanternStand.x, 0.2, lanternStand.z),
       }
     }
 
@@ -4353,7 +4380,7 @@ export class TempleWorld {
     const insideRear = playerPosition.z < -16.5 && playerPosition.z > -33.5 && Math.abs(playerPosition.x) < 12.0
     this.rearRoof.visible = !insideRear
     this.incenseGlow.intensity = THREE.MathUtils.damp(this.incenseGlow.intensity, 0.22, 1.4, dt)
-    this.courtyard.update(time)
+    this.courtyard.update(dt, time)
     this.npcs.update(dt, time, playerPosition, camera)
 
     // Real-world time auto synchronization check every 5 seconds

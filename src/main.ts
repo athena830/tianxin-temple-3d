@@ -229,6 +229,41 @@ async function boot(): Promise<void> {
     })
   }
 
+  const triggerSkyLantern = () => {
+    if (!g || g.worshipping || Date.now() < interactBlockedUntil) return
+    const standPos = g.world.getPlayerLanternStand()
+    if (!standPos) return
+    const dist = Math.hypot(g.feet.x - standPos.x, g.feet.z - standPos.z)
+    if (dist > 3.0) {
+      ui.toast('請靠近天心仙姑旁的祈福天燈台，按 E 點燃天燈。')
+      return
+    }
+    const launched = g.world.triggerPlayerSkyLantern()
+    if (!launched) {
+      ui.toast('祈福天燈正在冉冉升空中，稍候片刻再放一盞祈願天燈。')
+      return
+    }
+
+    interactBlockedUntil = Date.now() + 5200
+    ui.closePanel()
+    g.closePanel()
+    syncMode()
+
+    // 角色對齊至天燈台前方
+    g.teleportTo(standPos.x, standPos.z + 1.1)
+
+    // 播放引罄清脆聲響
+    audio.play('chime')
+    ui.toast('點燃祈福天燈：心願隨燈火冉冉升空...', 2500)
+
+    // 面向天燈台方向虔誠合十祈福 4.2 秒
+    g.worship({ x: standPos.x, z: standPos.z }, 4.2, () => {
+      store.addRecord('天燈祈福', '於天心仙姑問事亭前點燃祈福天燈，祈願天心指路、福慧圓滿')
+      audio.play('bell')
+      ui.toast('天燈祈福圓滿：燈耀天心、心願通達，願天心仙姑指點迷津，所求如願、福壽安康！', 4500)
+    })
+  }
+
   canvas.addEventListener('pointerdown', () => {
     if (game && game.mode === 'browse' && !game.worshipping && Date.now() >= interactBlockedUntil) startExplore()
   })
@@ -239,6 +274,10 @@ async function boot(): Promise<void> {
       triggerCushionPrayer()
       return
     }
+    if (id === 'sky-lantern') {
+      triggerSkyLantern()
+      return
+    }
     ui.open(id)
   })
   window.addEventListener('temple:interact-touch', () => {
@@ -246,6 +285,10 @@ async function boot(): Promise<void> {
     if (g.active && (g.mode === 'explore' || g.mode === 'browse')) {
       if (g.active.id === 'cushion') {
         triggerCushionPrayer()
+        return
+      }
+      if (g.active.id === 'sky-lantern') {
+        triggerSkyLantern()
         return
       }
       ui.open(g.active.id)

@@ -32,9 +32,40 @@ const PAL = {
 const yAxis = new THREE.Vector3(0, 1, 0)
 const rotY = (a: number) => new THREE.Quaternion().setFromAxisAngle(yAxis, a)
 
+export interface CourtyardChibiActor {
+  group: THREE.Group
+  torso: THREE.Group
+  head: THREE.Group
+  arms: THREE.Group
+  hands: THREE.Group
+}
+
+export interface CourtyardSkyLanternGroup {
+  id: string
+  originPos: THREE.Vector3
+  lanternGroup: THREE.Group
+  lanternMesh: THREE.Mesh
+  paperMat: THREE.MeshStandardMaterial
+  flameMesh: THREE.Mesh
+  pointLight: THREE.PointLight
+  groundGlow: THREE.Mesh
+  groundGlowMat: THREE.MeshBasicMaterial
+  actors: CourtyardChibiActor[]
+  state: 'holding' | 'igniting' | 'ascending' | 'cooldown'
+  timer: number
+  lanternY: number
+  lanternOriginY: number
+  targetY: number
+  drift: { x: number; z: number }
+  isPlayerStand?: boolean
+}
+
 export class FrontCourtyard {
   private readonly lanternMats: THREE.MeshStandardMaterial[] = []
   private fairyMesh?: THREE.Mesh
+  private readonly skyLanternGroups: CourtyardSkyLanternGroup[] = []
+  private readonly playerLanternStandPos = new THREE.Vector3(-6.8, 0, 29.8)
+  private playerLanternGroup?: CourtyardSkyLanternGroup
 
   constructor(private readonly c: BuildContext) {
     this.addGround()
@@ -48,6 +79,7 @@ export class FrontCourtyard {
     this.addGoldFurnace()
     this.addPlanting()
     this.addSacredTrailAndPlatform()
+    this.addSkyLanterns()
   }
 
   private add(mesh: THREE.Object3D, shadow = true): THREE.Object3D {
@@ -1578,10 +1610,536 @@ export class FrontCourtyard {
     this.add(platGroup)
   }
 
-  update(time: number): void {
+  private skyLanternTexture(frontText: string, backText: string): THREE.CanvasTexture {
+    const cv = document.createElement('canvas')
+    cv.width = 512
+    cv.height = 512
+    const ctx = cv.getContext('2d')!
+
+    // Auspicious glowing gradient for Chinese sky lantern envelope
+    const grad = ctx.createLinearGradient(0, 0, 0, 512)
+    grad.addColorStop(0, '#e54326')   // Auspicious cinnabar red at top
+    grad.addColorStop(0.3, '#ff7d38')  // Vibrant glowing warm coral
+    grad.addColorStop(0.7, '#ffad54')  // Radiant amber
+    grad.addColorStop(1, '#ffc778')    // Bright golden rice paper base
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, 512, 512)
+
+    // Paper fiber texture / subtle noise
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'
+    for (let i = 0; i < 300; i++) {
+      const rx = Math.random() * 512
+      const ry = Math.random() * 512
+      ctx.fillRect(rx, ry, Math.random() * 4 + 1, 2)
+    }
+
+    // Golden border frames for each of the 4 quadrants
+    ctx.strokeStyle = 'rgba(255, 235, 160, 0.65)'
+    ctx.lineWidth = 3
+    for (let k = 0; k < 4; k++) {
+      const x0 = k * 128 + 6
+      ctx.strokeRect(x0, 24, 116, 464)
+    }
+
+    // Draw 4 vertical calligraphy columns
+    const texts = [frontText, '風調雨順', backText, '國泰民安']
+    ctx.fillStyle = '#3a1005'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.font = 'bold 34px "Noto Serif TC", "KaiTi", "Songti TC", "PingFang TC", serif'
+
+    texts.forEach((txt, col) => {
+      const cx = col * 128 + 64
+      const chars = txt.split('')
+      const startY = 256 - (chars.length - 1) * 36
+      chars.forEach((char, idx) => {
+        ctx.fillText(char, cx, startY + idx * 72)
+      })
+    })
+
+    const tex = new THREE.CanvasTexture(cv)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.wrapS = THREE.RepeatWrapping
+    tex.wrapT = THREE.ClampToEdgeWrapping
+    return tex
+  }
+
+  private radialGlowTexture(): THREE.CanvasTexture {
+    const cv = document.createElement('canvas')
+    cv.width = 128
+    cv.height = 128
+    const ctx = cv.getContext('2d')!
+    const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+    grad.addColorStop(0, 'rgba(255, 165, 60, 0.95)')
+    grad.addColorStop(0.35, 'rgba(255, 120, 30, 0.6)')
+    grad.addColorStop(0.7, 'rgba(220, 70, 15, 0.2)')
+    grad.addColorStop(1, 'rgba(200, 50, 10, 0)')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, 128, 128)
+    const tex = new THREE.CanvasTexture(cv)
+    return tex
+  }
+
+  private createSkyLanternModel(frontText: string, backText: string): {
+    group: THREE.Group
+    paperMesh: THREE.Mesh
+    paperMat: THREE.MeshStandardMaterial
+    flameMesh: THREE.Mesh
+    pointLight: THREE.PointLight
+  } {
+    const group = new THREE.Group()
+
+    // 1. Eight-sided octagonal envelope
+    const geom = new THREE.CylinderGeometry(0.32, 0.22, 0.74, 8, 1, false)
+    const tex = this.skyLanternTexture(frontText, backText)
+    const paperMat = new THREE.MeshStandardMaterial({
+      map: tex,
+      emissive: '#ff7324',
+      emissiveMap: tex,
+      emissiveIntensity: 0.35,
+      roughness: 0.88,
+      metalness: 0.02,
+      side: THREE.DoubleSide,
+    })
+    const paperMesh = new THREE.Mesh(geom, paperMat)
+    paperMesh.castShadow = true
+    group.add(paperMesh)
+
+    // 2. Domed roof cap with golden pinnacle bead
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.32, 0.12, 8), this.c.mat('#b83a2a', 0.82))
+    cap.position.y = 0.42
+    const goldFinial = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), this.c.mat(PAL.gold, 0.4, 0.3))
+    goldFinial.position.y = 0.50
+    group.add(cap, goldFinial)
+
+    // 3. Bamboo base ring & cross-wire brace
+    const bambooMat = this.c.mat('#68472c', 0.8)
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.016, 6, 16), bambooMat)
+    rim.rotation.x = Math.PI / 2
+    rim.position.y = -0.37
+    const wire1 = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.44, 4), bambooMat)
+    wire1.rotation.z = Math.PI / 2
+    wire1.position.y = -0.37
+    const wire2 = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.44, 4), bambooMat)
+    wire2.rotation.x = Math.PI / 2
+    wire2.position.y = -0.37
+    group.add(rim, wire1, wire2)
+
+    // 4. Central fuel cake & glowing flame
+    const fuel = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.025, 8), this.c.mat('#e2d3be', 0.8))
+    fuel.position.y = -0.35
+    const flameMat = new THREE.MeshBasicMaterial({ color: '#fffb9e' })
+    const flameMesh = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.15, 8), flameMat)
+    flameMesh.position.y = -0.28
+    group.add(fuel, flameMesh)
+
+    // 5. Dynamic PointLight inside the lantern
+    const pointLight = new THREE.PointLight('#ff9436', 0.2, 8.5, 2.0)
+    pointLight.position.set(0, -0.15, 0)
+    group.add(pointLight)
+
+    return { group, paperMesh, paperMat, flameMesh, pointLight }
+  }
+
+  private createCourtyardChibi(spec: {
+    x: number
+    z: number
+    heading: number
+    robe: string
+    sash: string
+    hair: string
+    hairStyle: 'bun' | 'braids' | 'topknot'
+  }): CourtyardChibiActor {
+    const skinMat = this.c.mat('#fde6d4', 0.92, 0.01)
+    const robeMat = this.c.mat(spec.robe, 0.92, 0.01)
+    const sashMat = this.c.mat(spec.sash, 0.9, 0.01)
+    const hairMat = this.c.mat(spec.hair, 0.92, 0.01)
+    const shoeMat = this.c.mat('#4b3427', 0.9, 0.01)
+    const blushMat = this.c.mat('#fca5a5', 0.95, 0.01)
+    const eyeMat = this.c.mat('#241611', 0.8, 0.05)
+
+    const group = new THREE.Group()
+    group.position.set(spec.x, 0, spec.z)
+    group.rotation.y = spec.heading
+
+    // Standing legs & cute rounded shoes
+    for (const side of [-1, 1]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.22, 10), sashMat)
+      leg.position.set(side * 0.09, 0.11, 0)
+      const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.078, 10, 8), shoeMat)
+      shoe.scale.set(0.95, 0.8, 1.25)
+      shoe.position.set(side * 0.09, 0.06, 0.03)
+      group.add(leg, shoe)
+    }
+
+    // Torso
+    const torso = new THREE.Group()
+    torso.position.set(0, 0.22, 0)
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.27, 0.42, 14), robeMat)
+    body.position.y = 0.21
+    const sashRing = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.03, 6, 16), sashMat)
+    sashRing.rotation.x = Math.PI / 2
+    sashRing.position.y = 0.18
+    torso.add(body, sashRing)
+
+    // Head
+    const head = new THREE.Group()
+    head.position.set(0, 0.42, 0)
+    const face = new THREE.Mesh(new THREE.SphereGeometry(0.20, 14, 12), skinMat)
+    face.position.y = 0.16
+    head.add(face)
+
+    // Cute blushing cheeks & eyes
+    for (const side of [-1, 1]) {
+      const blush = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), blushMat)
+      blush.position.set(side * 0.11, 0.13, 0.15)
+      head.add(blush)
+
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 6), eyeMat)
+      eye.scale.set(0.7, 1.1, 0.7)
+      eye.position.set(side * 0.065, 0.18, 0.175)
+      head.add(eye)
+    }
+
+    // Hair & hairstyle
+    const hairBase = new THREE.Mesh(new THREE.SphereGeometry(0.212, 14, 12), hairMat)
+    hairBase.position.y = 0.17
+    head.add(hairBase)
+
+    if (spec.hairStyle === 'bun') {
+      for (const side of [-1, 1]) {
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.082, 10, 8), hairMat)
+        bun.position.set(side * 0.14, 0.35, -0.02)
+        const ribbon = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.018, 6, 12), sashMat)
+        ribbon.rotation.x = Math.PI / 2
+        ribbon.position.set(side * 0.14, 0.29, -0.02)
+        head.add(bun, ribbon)
+      }
+    } else if (spec.hairStyle === 'topknot') {
+      const topknot = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), hairMat)
+      topknot.position.set(0, 0.38, -0.02)
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28, 6), this.c.mat(PAL.gold, 0.4, 0.3))
+      pin.rotation.z = Math.PI / 2
+      pin.position.set(0, 0.37, -0.02)
+      head.add(topknot, pin)
+    } else {
+      for (const side of [-1, 1]) {
+        const braid = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.025, 0.26, 8), hairMat)
+        braid.position.set(side * 0.17, 0.10, -0.04)
+        braid.rotation.z = side * 0.2
+        head.add(braid)
+      }
+    }
+    torso.add(head)
+
+    // Arms and hands
+    const arms = new THREE.Group()
+    arms.position.set(0, 0.34, 0)
+    const hands = new THREE.Group()
+
+    for (const side of [-1, 1]) {
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.095, 0.24, 10), robeMat)
+      sleeve.position.set(side * 0.16, 0.02, 0.08)
+      sleeve.rotation.set(0.85, 0, -side * 0.45)
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), skinMat)
+      hand.position.set(side * 0.08, 0.10, 0.22)
+      arms.add(sleeve)
+      hands.add(hand)
+    }
+    arms.add(hands)
+    torso.add(arms)
+    group.add(torso)
+
+    this.add(group)
+    return { group, torso, head, arms, hands }
+  }
+
+  private addSkyLanterns(): void {
+    const glowTex = this.radialGlowTexture()
+
+    // 1. Group 1: NPC Couple holding lantern at (-9.2, 0, 26.8)
+    {
+      const origin = new THREE.Vector3(-9.2, 0, 26.8)
+      const model = this.createSkyLanternModel('天心賜福', '所求如願')
+      model.group.position.set(origin.x, 0.95, origin.z)
+      this.add(model.group)
+
+      const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false })
+      const groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4), glowMat)
+      groundGlow.rotation.x = -Math.PI / 2
+      groundGlow.position.set(origin.x, 0.035, origin.z)
+      this.c.scene.add(groundGlow)
+
+      const actor1 = this.createCourtyardChibi({
+        x: origin.x - 0.42,
+        z: origin.z,
+        heading: 0.35,
+        robe: '#f09d88',
+        sash: '#fbf5ec',
+        hair: '#3e281e',
+        hairStyle: 'bun',
+      })
+      const actor2 = this.createCourtyardChibi({
+        x: origin.x + 0.42,
+        z: origin.z,
+        heading: -0.35,
+        robe: '#7ea894',
+        sash: '#486a58',
+        hair: '#2a1d17',
+        hairStyle: 'topknot',
+      })
+
+      this.skyLanternGroups.push({
+        id: 'npc-couple',
+        originPos: origin,
+        lanternGroup: model.group,
+        lanternMesh: model.paperMesh,
+        paperMat: model.paperMat,
+        flameMesh: model.flameMesh,
+        pointLight: model.pointLight,
+        groundGlow,
+        groundGlowMat: glowMat,
+        actors: [actor1, actor2],
+        state: 'holding',
+        timer: 5.0,
+        lanternY: 0.95,
+        lanternOriginY: 0.95,
+        targetY: 36.0,
+        drift: { x: 0.16, z: -0.14 },
+      })
+    }
+
+    // 2. Group 2: NPC Devotee holding lantern at (-8.2, 0, 33.2)
+    {
+      const origin = new THREE.Vector3(-8.2, 0, 33.2)
+      const model = this.createSkyLanternModel('萬事如意', '平安喜樂')
+      model.group.position.set(origin.x, 0.95, origin.z)
+      this.add(model.group)
+
+      const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false })
+      const groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 5.2), glowMat)
+      groundGlow.rotation.x = -Math.PI / 2
+      groundGlow.position.set(origin.x, 0.035, origin.z)
+      this.c.scene.add(groundGlow)
+
+      const actor3 = this.createCourtyardChibi({
+        x: origin.x,
+        z: origin.z - 0.40,
+        heading: 0,
+        robe: '#f5bf76',
+        sash: '#8e3d4d',
+        hair: '#2b1b16',
+        hairStyle: 'braids',
+      })
+
+      this.skyLanternGroups.push({
+        id: 'npc-devotee',
+        originPos: origin,
+        lanternGroup: model.group,
+        lanternMesh: model.paperMesh,
+        paperMat: model.paperMat,
+        flameMesh: model.flameMesh,
+        pointLight: model.pointLight,
+        groundGlow,
+        groundGlowMat: glowMat,
+        actors: [actor3],
+        state: 'ascending',
+        timer: 14.0,
+        lanternY: 6.5,
+        lanternOriginY: 0.95,
+        targetY: 36.0,
+        drift: { x: 0.12, z: 0.18 },
+      })
+    }
+
+    // 3. Group 3: Player Interactive Sky Lantern Stand at (-6.8, 0, 29.8)
+    {
+      const origin = this.playerLanternStandPos.clone()
+
+      const standGroup = new THREE.Group()
+      standGroup.position.set(origin.x, 0, origin.z)
+      standGroup.userData = { skyLantern: true }
+
+      const woodMat = this.c.mat(PAL.wood, 0.8)
+      const redMat = this.c.mat(PAL.red, 0.75)
+      const goldMat = this.c.mat(PAL.gold, 0.4, 0.3)
+
+      const basePlinth = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.50, 0.16, 8), woodMat)
+      basePlinth.position.y = 0.08
+      const column = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.22, 0.54, 8), redMat)
+      column.position.y = 0.43
+      const goldCollar = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.024, 6, 16), goldMat)
+      goldCollar.rotation.x = Math.PI / 2
+      goldCollar.position.y = 0.43
+      const platter = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.42, 0.12, 8), woodMat)
+      platter.position.y = 0.74
+      const platterRim = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.022, 6, 16), goldMat)
+      platterRim.rotation.x = Math.PI / 2
+      platterRim.position.y = 0.78
+      const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.40, 0.40, 0.02, 8), redMat)
+      cloth.position.y = 0.80
+
+      standGroup.add(basePlinth, column, goldCollar, platter, platterRim, cloth)
+      standGroup.traverse(o => { o.userData = { skyLantern: true } })
+      this.add(standGroup)
+      this.c.physics.addStaticCylinder(new THREE.Vector3(origin.x, 0.4, origin.z), 0.46, 0.82)
+
+      const ringMat = new THREE.MeshBasicMaterial({ color: '#ffb244', transparent: true, opacity: 0.65, depthWrite: false })
+      const markerRing = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.035, 6, 28), ringMat)
+      markerRing.rotation.x = Math.PI / 2
+      markerRing.position.set(origin.x, 0.04, origin.z)
+      this.c.scene.add(markerRing)
+
+      const model = this.createSkyLanternModel('天心指路', '福慧雙增')
+      model.group.position.set(origin.x, 1.22, origin.z)
+      model.group.userData = { skyLantern: true }
+      model.paperMesh.userData = { skyLantern: true }
+      this.add(model.group)
+
+      const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false })
+      const groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 5.6), glowMat)
+      groundGlow.rotation.x = -Math.PI / 2
+      groundGlow.position.set(origin.x, 0.035, origin.z)
+      this.c.scene.add(groundGlow)
+
+      const playerGroup: CourtyardSkyLanternGroup = {
+        id: 'player-stand',
+        originPos: origin,
+        lanternGroup: model.group,
+        lanternMesh: model.paperMesh,
+        paperMat: model.paperMat,
+        flameMesh: model.flameMesh,
+        pointLight: model.pointLight,
+        groundGlow,
+        groundGlowMat: glowMat,
+        actors: [],
+        state: 'holding',
+        timer: 0,
+        lanternY: 1.22,
+        lanternOriginY: 1.22,
+        targetY: 36.0,
+        drift: { x: 0.14, z: -0.18 },
+        isPlayerStand: true,
+      }
+      this.skyLanternGroups.push(playerGroup)
+      this.playerLanternGroup = playerGroup
+    }
+  }
+
+  getPlayerLanternStand(): THREE.Vector3 {
+    return this.playerLanternStandPos.clone()
+  }
+
+  triggerPlayerSkyLantern(): boolean {
+    if (!this.playerLanternGroup) return false
+    if (this.playerLanternGroup.state !== 'holding') return false
+    this.playerLanternGroup.state = 'igniting'
+    this.playerLanternGroup.timer = 3.5
+    return true
+  }
+
+  isPlayerLanternReady(): boolean {
+    return this.playerLanternGroup ? this.playerLanternGroup.state === 'holding' : false
+  }
+
+  update(dt: number, time: number): void {
     for (const m of this.lanternMats) m.emissiveIntensity = 0.5 + Math.sin(time * 1.7) * 0.05
     if (this.fairyMesh) {
       this.fairyMesh.position.y = 0.4 + 1.45 / 2 + Math.sin(time * 1.8) * 0.02
+    }
+
+    // Sky Lanterns dynamic lifecycle and illumination
+    for (const g of this.skyLanternGroups) {
+      g.flameMesh.scale.y = 1.0 + Math.sin(time * 24.0 + (g.isPlayerStand ? 1.5 : 0.8)) * 0.22
+
+      if (g.state === 'holding') {
+        if (!g.isPlayerStand) {
+          g.timer -= dt
+          g.pointLight.intensity = THREE.MathUtils.damp(g.pointLight.intensity, 0.2, 3.0, dt)
+          g.groundGlowMat.opacity = THREE.MathUtils.damp(g.groundGlowMat.opacity, 0.0, 3.0, dt)
+          g.paperMat.emissiveIntensity = THREE.MathUtils.damp(g.paperMat.emissiveIntensity, 0.35, 3.0, dt)
+          for (const a of g.actors) {
+            a.head.rotation.x = THREE.MathUtils.damp(a.head.rotation.x, 0.06, 2.0, dt)
+            a.torso.rotation.z = Math.sin(time * 2.0) * 0.015
+          }
+          if (g.timer <= 0) {
+            g.state = 'igniting'
+            g.timer = 3.5
+          }
+        } else {
+          // Player stand waiting for interaction
+          g.pointLight.intensity = THREE.MathUtils.damp(g.pointLight.intensity, 0.25, 3.0, dt)
+          g.groundGlowMat.opacity = THREE.MathUtils.damp(g.groundGlowMat.opacity, 0.15 + Math.sin(time * 3.0) * 0.06, 3.0, dt)
+          g.paperMat.emissiveIntensity = THREE.MathUtils.damp(g.paperMat.emissiveIntensity, 0.5, 3.0, dt)
+        }
+      } else if (g.state === 'igniting') {
+        g.timer -= dt
+        const flare = Math.sin(time * 20.0) * 0.25
+        g.pointLight.intensity = (g.isPlayerStand ? 2.1 : 1.85) + flare
+        g.groundGlowMat.opacity = 0.65 + Math.sin(time * 18.0) * 0.08
+        g.paperMat.emissiveIntensity = 1.15 + Math.sin(time * 15.0) * 0.12
+        g.lanternGroup.position.y = g.lanternOriginY + Math.sin(time * 7.0) * 0.018
+
+        for (const a of g.actors) {
+          a.head.rotation.x = THREE.MathUtils.damp(a.head.rotation.x, -0.08, 3.0, dt)
+        }
+
+        if (g.timer <= 0) {
+          g.state = 'ascending'
+          g.timer = 22.0
+          g.lanternY = g.lanternOriginY
+        }
+      } else if (g.state === 'ascending') {
+        g.timer -= dt
+        g.lanternY += dt * (1.1 + g.lanternY * 0.028)
+        const lift = g.lanternY - g.lanternOriginY
+
+        g.lanternGroup.position.y = g.lanternY
+        g.lanternGroup.position.x = g.originPos.x + g.drift.x * lift * 0.25 + Math.sin(time * 0.8 + (g.isPlayerStand ? 2.5 : 0)) * 0.35
+        g.lanternGroup.position.z = g.originPos.z + g.drift.z * lift * 0.25 + Math.cos(time * 0.6 + (g.isPlayerStand ? 2.5 : 0)) * 0.25
+        g.lanternGroup.rotation.y = time * 0.32
+        g.lanternGroup.rotation.z = Math.sin(time * 0.8) * 0.04
+
+        // Actors clasp hands in prayer and gaze up at rising lantern
+        for (const a of g.actors) {
+          a.arms.rotation.x = THREE.MathUtils.damp(a.arms.rotation.x, -0.45, 3.0, dt)
+          const lookUp = Math.min(0.55, lift * 0.08)
+          a.head.rotation.x = THREE.MathUtils.damp(a.head.rotation.x, -lookUp, 2.5, dt)
+        }
+
+        // Surrounding illumination dynamics
+        if (g.lanternY < 5.8) {
+          const falloff = Math.max(0, 1.0 - lift / 4.8)
+          g.groundGlowMat.opacity = falloff * 0.65
+          g.pointLight.intensity = (g.isPlayerStand ? 2.1 : 1.85) * falloff
+        } else {
+          g.groundGlowMat.opacity = 0
+          const skyFalloff = Math.max(0.1, 1.2 * (1.0 - (g.lanternY - 5.8) / 25.0))
+          g.pointLight.intensity = skyFalloff
+        }
+
+        if (g.lanternY >= g.targetY || g.timer <= 0) {
+          g.state = 'cooldown'
+          g.timer = g.isPlayerStand ? 10.0 : (8.0 + Math.random() * 8.0)
+          g.lanternGroup.visible = false
+          g.pointLight.intensity = 0
+          g.groundGlowMat.opacity = 0
+        }
+      } else if (g.state === 'cooldown') {
+        g.timer -= dt
+        for (const a of g.actors) {
+          a.arms.rotation.x = THREE.MathUtils.damp(a.arms.rotation.x, 0, 2.0, dt)
+          a.head.rotation.x = THREE.MathUtils.damp(a.head.rotation.x, 0, 2.0, dt)
+        }
+        if (g.timer <= 0) {
+          g.lanternGroup.position.set(g.originPos.x, g.lanternOriginY, g.originPos.z)
+          g.lanternGroup.rotation.set(0, 0, 0)
+          g.lanternGroup.visible = true
+          g.lanternY = g.lanternOriginY
+          g.state = 'holding'
+          g.timer = g.isPlayerStand ? 0 : (5.0 + Math.random() * 6.0)
+        }
+      }
     }
   }
 }

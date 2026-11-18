@@ -96,7 +96,7 @@ export class TempleUi {
         </header>
         <nav class="map" hidden>
           <p>選擇目的地，跟著金色箭頭前往</p>
-          <button data-go="guanyin-dragon">參拜昇龍觀音</button><button data-go="gold-furnace">八角金亭（化金）</button><button data-go="chess">天心仙姑問事亭</button>
+          <button data-go="guanyin-dragon">參拜昇龍觀音</button><button data-go="gold-furnace">八角金亭（化金）</button><button data-go="chess">天心仙姑問事亭</button><button data-go="sky-lantern">天燈祈福</button>
           <button data-go="incense">上香祈福</button><button data-go="yuhuang">後殿凌霄寶殿</button><button data-go="prayer">寫下心願</button>
           <button data-go="offerings">虛擬供奉</button><button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
           <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="drum">鼓樓擊鼓</button>
@@ -474,6 +474,9 @@ export class TempleUi {
       case 'cushion':
         return `<p class="eyebrow">觀世音菩薩主殿</p><h2>觀音拜墊・跪拜祈福</h2><p>於觀世音菩薩前虔誠跪拜，靜心默念心願，願菩薩慈悲護佑，平安吉祥，福慧圓滿。</p>${note}
           <div class="row"><button class="btn primary" data-act="cushion-pray">立即跪拜祈福</button></div>`
+      case 'sky-lantern':
+        return `<p class="eyebrow">天心仙姑問事亭旁・祈福天燈坪</p><h2>天燈祈福・祈願升空</h2><p>相傳孔明燈乘風而上，上達天聽。於天心仙姑旁點燃祈福天燈，讓微光照亮心願，隨風冉冉升入星空，祈願天心指引迷津，平安順遂、萬事如意。</p>${note}
+          <div class="row"><button class="btn primary" data-act="sky-lantern-pray">立即點燃天燈</button></div>`
       case 'records': {
         const rows = d.records.map(r => `<li><b>${esc(r.action)}</b><span>${esc(r.detail)}</span><small>${formatRecordDate(r.at)}</small></li>`).join('')
         return `<p class="eyebrow">祈福紀錄</p><h2>參拜足跡</h2><p>共 ${d.records.length} 筆紀錄，保存在此瀏覽器中。</p>${note}
@@ -511,6 +514,7 @@ export class TempleUi {
     else if (act === 'wish-close') { e.preventDefault(); this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'cushion-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'cushion' })) }
+    else if (act === 'sky-lantern-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'sky-lantern' })) }
     else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
     else if (act === 'music') {
