@@ -1,3 +1,5 @@
+import { drawCrossSlots, evaluateCrossGua, type CrossGuaResult, type ChessPos } from '../divination'
+
 export const TEMPLE_STORAGE_KEY = 'yuhuang.temple.v1'
 
 export type CharacterId = 'jade' | 'vermillion' | 'moon'
@@ -220,6 +222,31 @@ export class TempleStore {
     this.data.dailyLot = lot
     this.addRecord('每日抽籤', `${lot.title}（第 ${lot.number} 籤）`, now.getTime())
     return { lot, fresh: true }
+  }
+
+  currentCrossGua?: CrossGuaResult
+
+  startCrossGua(): CrossGuaResult {
+    const slots = drawCrossSlots()
+    this.currentCrossGua = evaluateCrossGua(slots)
+    return this.currentCrossGua!
+  }
+
+  revealCrossPiece(pos: ChessPos): CrossGuaResult {
+    if (!this.currentCrossGua) {
+      this.startCrossGua()
+    }
+    const current = this.currentCrossGua!
+    if (current.slots[pos] && !current.slots[pos].revealed) {
+      current.slots[pos].revealed = true
+      this.currentCrossGua = evaluateCrossGua(current.slots)
+      if (this.currentCrossGua.allRevealed) {
+        const c = this.currentCrossGua
+        const summaryRecord = `【${c.patternName}】${c.level}｜中[${c.slots.center.piece.name}] 上[${c.slots.top.piece.name}] 下[${c.slots.bottom.piece.name}] 左[${c.slots.left.piece.name}] 右[${c.slots.right.piece.name}]`
+        this.addRecord('象棋神卦', summaryRecord)
+      }
+    }
+    return this.currentCrossGua!
   }
 
   divineChess(piece: string, direction: string): string {

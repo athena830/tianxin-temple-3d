@@ -1,5 +1,6 @@
 import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId, type WishCategory, type WishBlessing } from '../game/temple-data'
 import { getLunarPhaseInfo, getRealWorldTimeOfDay, type ShrinePoint, type ShrinePointId, type TimeOfDay, type TimeSetting } from '../game/temple-world'
+import { POS_META, type ChessPos } from '../divination'
 import type { MusicTrack } from '../engine/audio'
 import { APP_VERSION } from '../version'
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
@@ -314,11 +315,110 @@ export class TempleUi {
           <p>天心仙姑問事亭位於前庭左側，是天心仙姑專屬的象棋卜卦與問事服務空間。</p>
           <ul class="info"><li>象棋卜卦：點擊亭內桌上的棋盤即可開始。</li><li>正式問事：採預約方式進行。</li><li>隱私：個人問事內容與卜卦紀錄僅保存在你自己的瀏覽器，不會顯示在公開場景。</li></ul>
           <div class="row"><button class="btn primary" data-open="chess">返回象棋卜卦</button><button class="btn" data-act="contact">正式問事聯絡入口</button></div>`
-      case 'chess':
-        return `<p class="eyebrow">天心仙姑問事亭・象棋卜卦</p><h2>選一枚棋子</h2><p>心中默想一件事，再選擇棋子與落子方向。</p>${note}
-          <div class="chess">${['帥', '仕', '相', '馬', '車', '炮', '兵'].map((p, i) => `<button class="piece ${i % 2 ? 'black' : ''}" data-piece="${p}">${p}</button>`).join('')}</div>
-          <div class="row dir">${['向前', '守中', '轉向'].map(x => `<button class="btn" data-dir="${x}">${x}</button>`).join('')}</div>
-          <div class="row"><button class="btn" data-open="consult">問事服務介紹</button><button class="btn" data-act="contact">正式問事聯絡入口</button></div>`
+      case 'chess': {
+        const gua = this.store.currentCrossGua ?? this.store.startCrossGua()
+        const renderSlot = (pos: ChessPos) => {
+          const slot = gua.slots[pos]
+          const meta = POS_META[pos]
+          if (slot.revealed) {
+            return `
+              <div class="chess-slot-cell ${pos}">
+                <span class="slot-pos-label">${meta.label}</span>
+                <div class="piece revealed ${slot.piece.color}" title="${meta.label}：${slot.piece.name}">${slot.piece.name}</div>
+                <span class="slot-aspect-tag">${meta.aspect}</span>
+              </div>
+            `
+          }
+          return `
+            <div class="chess-slot-cell ${pos}">
+              <span class="slot-pos-label">${meta.label}</span>
+              <button type="button" class="piece unrevealed pulse" data-flip-pos="${pos}" title="點擊翻開 ${meta.label}">
+                <span class="piece-back-inner">仙</span>
+              </button>
+              <span class="slot-aspect-tag flip-hint">點擊翻開</span>
+            </div>
+          `
+        }
+
+        const levelBadgeClass: Record<string, string> = {
+          大吉: 'badge-grand-luck',
+          吉: 'badge-luck',
+          平: 'badge-fair',
+          守中: 'badge-guard',
+          需慎: 'badge-caution',
+        }
+        const badgeClass = levelBadgeClass[gua.level] || 'badge-luck'
+
+        const resultCard = gua.allRevealed ? `
+          <div class="chess-result-box">
+            <div class="result-head">
+              <span class="result-level-badge ${badgeClass}">${gua.level}</span>
+              <h3 class="result-pattern-name">${esc(gua.patternName)}</h3>
+            </div>
+            <div class="result-summary-section">
+              <div class="summary-line"><b>仙姑總評：</b>${esc(gua.summary)}</div>
+              <div class="advice-line"><b>指點心法：</b>${esc(gua.advice)}</div>
+            </div>
+            <div class="result-pos-grid">
+              <div class="pos-item center-item">
+                <span class="pos-badge">中宮・本質</span>
+                <p>${esc(gua.posInterpretations.center)}</p>
+              </div>
+              <div class="pos-item">
+                <span class="pos-badge">上方・天時</span>
+                <p>${esc(gua.posInterpretations.top)}</p>
+              </div>
+              <div class="pos-item">
+                <span class="pos-badge">下方・地利</span>
+                <p>${esc(gua.posInterpretations.bottom)}</p>
+              </div>
+              <div class="pos-item">
+                <span class="pos-badge">左方・客方</span>
+                <p>${esc(gua.posInterpretations.left)}</p>
+              </div>
+              <div class="pos-item">
+                <span class="pos-badge">右方・主方</span>
+                <p>${esc(gua.posInterpretations.right)}</p>
+              </div>
+            </div>
+            <div class="result-save-hint">✨ 卦象與評語已完整存入個人「祈福紀錄」</div>
+          </div>
+        ` : `
+          <div class="chess-prompt-box">
+            <p class="chess-prompt-text">
+              心中默想所求之事（工作、感情、健康、轉職或當前抉擇），<br>請以誠敬之心，依序親手<b>點擊翻開</b>上方十字星位中的五枚棋子。
+            </p>
+            <div class="chess-flip-counter">
+              當前進度：已翻開 <b>${gua.revealedCount}</b> / 5 顆
+            </div>
+          </div>
+        `
+
+        return `
+          <p class="eyebrow">天心仙姑問事亭・象棋神卦</p>
+          <h2>十字五星排卦</h2>
+          ${note}
+          <div class="chess-cross-board">
+            <div class="cross-row top-row">
+              ${renderSlot('top')}
+            </div>
+            <div class="cross-row mid-row">
+              ${renderSlot('left')}
+              ${renderSlot('center')}
+              ${renderSlot('right')}
+            </div>
+            <div class="cross-row bottom-row">
+              ${renderSlot('bottom')}
+            </div>
+          </div>
+          ${resultCard}
+          <div class="row">
+            <button type="button" class="btn primary" data-chess-act="restart">重新洗牌排卦</button>
+            <button type="button" class="btn" data-open="consult">問事服務介紹</button>
+            <button type="button" class="btn" data-act="contact">正式問事聯絡入口</button>
+          </div>
+        `
+      }
       case 'woodfish':
         return `<p class="eyebrow">靜心</p><h2>敲木魚</h2><p>隨著節奏，一聲一念，讓心慢慢安定下來。</p>${note}<button class="btn primary big" data-ritual="woodfish">叩・敲一下</button>`
       case 'bell':
@@ -383,7 +483,6 @@ export class TempleUi {
     return `<div class="lot"><span class="lot-no">第 ${lot.number} 籤</span><h3>${esc(lot.title)}</h3><p>${esc(lot.text)}</p><p class="advice">${esc(lot.advice)}</p><small>今日已求籤，明日可再抽。</small></div>`
   }
 
-  private chessPiece = ''
 
   private onClick(e: MouseEvent): void {
     const t = (e.target as HTMLElement).closest<HTMLElement>('button')
@@ -497,16 +596,22 @@ export class TempleUi {
       }
       this.actions.ritual(t.dataset.ritual)
     }
-    if (t.dataset.piece) {
-      this.chessPiece = t.dataset.piece
-      for (const p of this.root.querySelectorAll<HTMLElement>('[data-piece]')) p.classList.toggle('on', p === t)
-    }
-    if (t.dataset.dir) {
-      if (!this.chessPiece) { this.toast('請先選擇一枚棋子'); return }
-      const result = this.store.divineChess(this.chessPiece, t.dataset.dir)
+    if (t.dataset.flipPos) {
+      e.preventDefault()
+      const pos = t.dataset.flipPos as ChessPos
+      const updated = this.store.revealCrossPiece(pos)
       this.actions.ritual('chess')
-      this.open('chess', `「${this.chessPiece}」${t.dataset.dir}：${result}`)
-      this.chessPiece = ''
+      if (updated.allRevealed) {
+        this.open('chess', `✨ 五方星位已顯！卦象【${updated.patternName}】圓滿生成。`)
+      } else {
+        this.open('chess')
+      }
+    }
+    if (t.dataset.chessAct === 'restart') {
+      e.preventDefault()
+      this.store.startCrossGua()
+      this.actions.ritual('chess')
+      this.open('chess', '已重新洗牌排卦，請在心中默念所求後親自翻牌。')
     }
   }
 

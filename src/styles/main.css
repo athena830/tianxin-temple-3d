@@ -198,10 +198,266 @@ textarea:focus { outline: 2px solid var(--gold); }
 .bobei-cup.yin { border-radius: 30px 30px 4px 4px; background: linear-gradient(180deg, #c74b35, #882b1b); color: #ffe6e0; box-shadow: 0 4px 8px rgba(100,20,10,0.35); }
 .bobei-title { font: 700 24px var(--serif); color: var(--vermilion); margin: 6px 0; }
 .bobei-desc { font-size: 15px; color: #5d4a3a; line-height: 1.6; margin: 0; }
-.chess { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 12px; }
-.piece { width: 52px; height: 52px; border-radius: 50%; border: 3px solid #b88c55; background: #f3dcae; color: var(--vermilion); font: 700 22px var(--serif); box-shadow: 0 3px 0 #9c7442; }
-.piece.black { color: #2b1f18; }
-.piece.on { transform: translateY(-4px); border-color: var(--vermilion); box-shadow: 0 6px 12px rgba(166,60,44,.35); }
+/* Chinese Chess Cross Divination UI */
+.chess-cross-board {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 16px;
+  background: radial-gradient(circle, rgba(255, 250, 240, 0.95), rgba(247, 235, 215, 0.7));
+  border: 1px solid rgba(184, 140, 85, 0.35);
+  border-radius: 16px;
+  padding: 16px 12px;
+  box-shadow: inset 0 0 20px rgba(180, 140, 90, 0.1);
+}
+
+.cross-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+
+.chess-slot-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 76px;
+  text-align: center;
+}
+
+.slot-pos-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7d5e3c;
+  letter-spacing: 0.5px;
+}
+
+.slot-aspect-tag {
+  font-size: 10px;
+  color: #8c735d;
+  background: rgba(184, 140, 85, 0.14);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.slot-aspect-tag.flip-hint {
+  color: var(--vermilion);
+  font-weight: 700;
+  background: rgba(182, 67, 50, 0.14);
+  animation: pulseHint 1.6s infinite ease-in-out;
+}
+
+@keyframes pulseHint {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+.piece {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  cursor: default;
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Revealed Chess Piece (Front) */
+.piece.revealed {
+  border: 3px solid #b88c55;
+  background: radial-gradient(circle at 35% 35%, #fff1d6, #e7c792);
+  font: 700 25px var(--serif);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.85);
+  animation: chessPieceFlip 0.38s ease-out;
+}
+
+.piece.revealed.red {
+  color: #c02b1d;
+  border-color: #b88c55;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.7);
+}
+
+.piece.revealed.black {
+  color: #1e1915;
+  border-color: #8e7354;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
+}
+
+/* Unrevealed Chess Piece (Back) */
+.piece.unrevealed {
+  border: 3px solid #94693a;
+  background: radial-gradient(circle at 35% 35%, #7e4d26, #4f2a11);
+  color: #edd7af;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.28);
+  font: 700 18px var(--serif);
+}
+
+.piece.unrevealed:hover {
+  transform: translateY(-3px) scale(1.08);
+  border-color: #e5a855;
+  box-shadow: 0 8px 16px rgba(182, 67, 50, 0.35);
+}
+
+.piece.unrevealed .piece-back-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px dashed rgba(237, 215, 175, 0.6);
+  font-size: 16px;
+  letter-spacing: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes chessPieceFlip {
+  0% { transform: scale(0.8) rotateY(90deg); opacity: 0.5; }
+  100% { transform: scale(1) rotateY(0deg); opacity: 1; }
+}
+
+/* Prompt Box */
+.chess-prompt-box {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px dashed rgba(184, 140, 85, 0.5);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 10px 0 14px;
+  text-align: center;
+}
+
+.chess-prompt-text {
+  font-size: 13.5px;
+  color: #5d4734;
+  line-height: 1.6;
+  margin: 0 0 6px;
+}
+
+.chess-flip-counter {
+  font-size: 13px;
+  color: #7c6853;
+  font-weight: 600;
+}
+
+.chess-flip-counter b {
+  color: var(--vermilion);
+  font-size: 16px;
+}
+
+/* Result Box */
+.chess-result-box {
+  background: #fffcf5;
+  border: 1.5px solid #d4af37;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin: 12px 0 16px;
+  box-shadow: 0 6px 18px rgba(180, 140, 60, 0.12);
+  text-align: left;
+}
+
+.result-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+  padding-bottom: 8px;
+}
+
+.result-level-badge {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 6px;
+  letter-spacing: 1px;
+}
+
+.result-level-badge.badge-grand-luck { background: #b64332; color: #fff; }
+.result-level-badge.badge-luck { background: #d48806; color: #fff; }
+.result-level-badge.badge-fair { background: #389e0d; color: #fff; }
+.result-level-badge.badge-guard { background: #096dd9; color: #fff; }
+.result-level-badge.badge-caution { background: #d46b08; color: #fff; }
+
+.result-pattern-name {
+  font: 700 20px var(--serif);
+  color: var(--vermilion);
+  margin: 0;
+}
+
+.result-summary-section {
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-left: 3px solid var(--vermilion);
+}
+
+.summary-line, .advice-line {
+  font-size: 13.5px;
+  color: #4a3b2c;
+  line-height: 1.6;
+  margin: 4px 0;
+}
+
+.advice-line {
+  color: #2b542c;
+}
+
+.result-pos-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.pos-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #554433;
+}
+
+.pos-item.center-item {
+  background: #fff8eb;
+  border-color: rgba(212, 175, 55, 0.45);
+}
+
+.pos-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8c5d2b;
+  background: rgba(212, 175, 55, 0.18);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.pos-item p {
+  margin: 0;
+}
+
+.result-save-hint {
+  font-size: 12px;
+  color: #826e57;
+  text-align: right;
+  margin-top: 6px;
+}
+
 .stat { font-size: 16px; } .stat b { font-size: 26px; color: var(--vermilion); }
 
 /* Wishing Pool Interactive UI */
@@ -464,8 +720,14 @@ body.has-touch .npc-dialogue-bar { display: none !important; }
   .lot .advice { font-size: 12px; }
 
   /* Chess on Mobile */
-  .chess { gap: 5px; margin: 4px 0 8px; justify-content: center; }
-  .piece { width: 38px; height: 38px; font-size: 16px; }
+  .chess-cross-board { gap: 5px; padding: 10px 6px; }
+  .cross-row { gap: 8px; }
+  .chess-slot-cell { width: 62px; }
+  .piece { width: 44px; height: 44px; font-size: 20px; }
+  .piece.unrevealed { font-size: 15px; }
+  .piece.unrevealed .piece-back-inner { width: 30px; height: 30px; font-size: 13px; }
+  .result-pattern-name { font-size: 17px; }
+  .pos-item { flex-direction: column; gap: 3px; }
 
   /* Records and Prayer Wall on Mobile */
   .wall { grid-template-columns: 1fr; gap: 6px; margin-bottom: 8px; }
