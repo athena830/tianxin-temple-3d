@@ -494,27 +494,68 @@ export class FrontCourtyard {
       this.add(stool)
     }
 
-    // 亭內多層次仙氣暖光照明系統 (Tianxin Pavilion Multi-tier Illumination - Plan A)
-    // 1. 亭頂中央核心琉璃暖金主燈 (Main Overhead Glow: 1.65 強度，半徑 11m，全面照亮亭內)
-    const light = new THREE.PointLight('#ffe6b0', 1.65, 11, 2)
-    light.position.set(cx, postH - 0.25, cz)
+    // =========================================================================
+    // 問事亭專屬盛景・璀璨通明仙境照明系統 (Tianxin Pavilion Luminous Illumination)
+    // =========================================================================
+
+    // 1. 亭心天花琉璃大宮燈實體模型（懸掛於亭頂正中）
+    const chandelier = new THREE.Group()
+    chandelier.position.set(cx, postH - 0.1, cz)
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.55, 6), this.c.mat(PAL.gold, 0.4, 0.3))
+    cord.position.y = -0.15
+    const chanRoof = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.48, 0.14, 8), this.c.mat(PAL.red, 0.7))
+    chanRoof.position.y = -0.42
+    const chanSilkMat = this.c.mat('#fff1c2', 0.25)
+    chanSilkMat.emissive.set('#ffb84d')
+    chanSilkMat.emissiveIntensity = 1.4
+    this.lanternMats.push(chanSilkMat)
+    const chanBody = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.35, 0.52, 8), chanSilkMat)
+    chanBody.position.y = -0.72
+    const chanRim = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.02, 6, 16), this.c.mat(PAL.gold, 0.4, 0.3))
+    chanRim.rotation.x = Math.PI / 2
+    chanRim.position.y = -0.45
+    const chanBot = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.38, 6), this.c.mat(PAL.red, 0.7))
+    chanBot.rotation.x = Math.PI
+    chanBot.position.y = -1.15
+    chandelier.add(cord, chanRoof, chanBody, chanRim, chanBot)
+    this.add(chandelier)
+
+    // 2. 亭頂中央核心大宮燈主光（強度 3.6，半徑 15m，全面照亮問事亭內部每一個角落）
+    const light = new THREE.PointLight('#fff2d1', 3.6, 15, 1.5)
+    light.position.set(cx, postH - 0.7, cz)
     this.c.scene.add(light)
 
-    // 2. 棋盤與石桌專屬暖光聚焦照明 (Chessboard Table Focus Light)
-    const tableLight = new THREE.PointLight('#fff2d1', 0.95, 4.2, 2)
-    tableLight.position.set(cx, 1.65, cz)
+    // 3. 頂棚樑架與飛簷金光漫射（朝上照射六角錐頂與斗拱樑架，掃除深色陰影）
+    const roofUplight = new THREE.PointLight('#ffd17d', 2.4, 8.5, 1.5)
+    roofUplight.position.set(cx, postH + 0.45, cz)
+    this.c.scene.add(roofUplight)
+
+    // 4. 棋盤與石桌專屬潔白明亮聚光
+    const tableLight = new THREE.PointLight('#ffffff', 1.8, 5.2, 1.8)
+    tableLight.position.set(cx, 1.75, cz)
     this.c.scene.add(tableLight)
+
+    // 5. 亭底御台基座金輝地光（在石桌下漫射，照亮六角石地坪、石凳與石階）
+    const floorLight = new THREE.PointLight('#ffe4a0', 2.8, 9.0, 1.6)
+    floorLight.position.set(cx, 0.38, cz)
+    this.c.scene.add(floorLight)
 
     this.addTianxinFairy(cx, cz)
 
-    // 3. 簷角靈氣長明宮燈與專屬暖光漫射 (Eaves Lanterns & Soft Warm Radiance)
-    for (const a of [30, 90, 330]) {
-      const p = corner(a * deg, r + 0.9)
-      this.lantern(p.x, postH - 0.25, p.z, 0.24)
-      const lanternGlow = new THREE.PointLight('#ff9e4a', 0.72, 5.0, 2)
+    // 6. 六角飛簷全周長明宮燈（全部 6 個簷角皆懸掛紅綢宮燈並散發暖金光輝）
+    for (let k = 0; k < 6; k += 1) {
+      const a = (30 + k * 60) * deg
+      const p = corner(a, r + 0.9)
+      this.lantern(p.x, postH - 0.25, p.z, 0.28)
+      const lanternGlow = new THREE.PointLight('#ff9b40', 1.25, 6.0, 1.8)
       lanternGlow.position.set(p.x, postH - 0.45, p.z)
       this.c.scene.add(lanternGlow)
     }
+
+    // 7. 亭額金匾「天心仙姑」專屬迎賓明光
+    const plaqueGlow = new THREE.PointLight('#ffeaa8', 1.6, 5.0, 1.8)
+    plaqueGlow.position.set(px + 0.8, postH - 0.2, cz)
+    this.c.scene.add(plaqueGlow)
     for (const dz of [-2.6, 2.6]) this.lotusPot(cx + r + 1.45, cz + dz)
     // Signboard near the road so the pavilion is identifiable on entry.
     const sign = new THREE.Group()
@@ -534,6 +575,11 @@ export class FrontCourtyard {
     sign.rotation.y = -0.35
     this.add(sign)
     this.c.physics.addStaticBox(new THREE.Vector3(-4.0, 1, 35.5), new THREE.Vector3(0.3, 2, 0.3))
+
+    // 8. 步道入口立地告示木牌專屬明光
+    const signGlow = new THREE.PointLight('#ffea9f', 1.5, 5.5, 2.0)
+    signGlow.position.set(-4.0, 2.2, 35.8)
+    this.c.scene.add(signGlow)
   }
 
   private addTianxinFairy(cx: number, cz: number): void {
@@ -549,13 +595,13 @@ export class FrontCourtyard {
         map: tex,
         transparent: true,
         alphaTest: 0.05,
-        roughness: 0.45,
-        metalness: 0.05,
+        roughness: 0.85,
+        metalness: 0.02,
         side: THREE.DoubleSide,
       })
-      // 天心仙姑仙氣溫潤自發光補光，消除陰影死角，神韻清透端莊明亮
-      mat.emissive.set('#ffe8cc')
-      mat.emissiveIntensity = 0.42
+      // 天心仙姑立牌自然素雅材質，不自發光（由問事亭內宮燈光芒自然映照）
+      mat.emissive.set(0x000000)
+      mat.emissiveIntensity = 0.0
 
       const mesh = new THREE.Mesh(geo, mat)
       // Placed behind the chessboard facing visitors entering the pavilion from the road (+X / +Z)
@@ -565,11 +611,6 @@ export class FrontCourtyard {
       mesh.receiveShadow = true
       this.fairyMesh = mesh
       this.c.scene.add(mesh)
-
-      // 仙姑正面專屬柔和面光補光（Fairy Portrait Fill Light）
-      const fairyFrontLight = new THREE.PointLight('#fff5e4', 0.88, 4.2, 2)
-      fairyFrontLight.position.set(cx - 0.25, 1.4, cz)
-      this.c.scene.add(fairyFrontLight)
     }
     loader.load('./assets/tianxin-fairy.webp', applyFairy)
   }
