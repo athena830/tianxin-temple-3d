@@ -329,38 +329,26 @@ export class TempleGame {
 
     if (clickedCushionIndex !== undefined) {
       const slot = this.world.getCushionByIndex(clickedCushionIndex)
-      if (slot) {
-        if (slot.state === 'empty') {
-          const reach = Math.hypot(slot.worldX - p.x, slot.worldZ - p.z)
-          if (reach <= 1.45) {
-            this.targetDestination = null
-            this.clickMarker.visible = false
-            return { kind: 'open', id: 'cushion' }
-          }
-          this.targetDestination = new THREE.Vector3(slot.worldX, FOOT_OFFSET, slot.worldZ)
-          this.pendingStationId = 'cushion'
-          this.clickMarker.position.set(slot.worldX, 0.35, slot.worldZ)
-          this.clickMarker.visible = true
-          return {
-            kind: 'far',
-            point: {
-              id: 'cushion',
-              title: '觀音拜墊・跪拜祈福',
-              subtitle: '前往空拜墊跪下拜拜',
-              radius: 1.45,
-              position: new THREE.Vector3(slot.worldX, 0.35, slot.worldZ),
-            },
-          }
-        } else if (slot.state === 'praying') {
-          this.targetDestination = new THREE.Vector3(slot.worldX, FOOT_OFFSET, slot.worldZ + 0.8)
-          this.pendingStationId = null
-          this.clickMarker.position.set(slot.worldX, 0.35, slot.worldZ + 0.8)
-          this.clickMarker.visible = true
-          this.audio.play('ui')
-          window.dispatchEvent(new CustomEvent('temple:toast', {
-            detail: '此拜墊正有信眾虔誠參拜，約 5~20 秒後禮成離開，請稍候或至旁邊空拜墊。',
-          }))
-          return null
+      if (slot && slot.state !== 'player') {
+        const reach = Math.hypot(slot.worldX - p.x, slot.worldZ - p.z)
+        if (reach <= 1.45) {
+          this.targetDestination = null
+          this.clickMarker.visible = false
+          return { kind: 'open', id: 'cushion' }
+        }
+        this.targetDestination = new THREE.Vector3(slot.worldX, FOOT_OFFSET, slot.worldZ)
+        this.pendingStationId = 'cushion'
+        this.clickMarker.position.set(slot.worldX, 0.35, slot.worldZ)
+        this.clickMarker.visible = true
+        return {
+          kind: 'far',
+          point: {
+            id: 'cushion',
+            title: '觀音拜墊・跪拜祈福',
+            subtitle: '前往拜墊跪下拜拜',
+            radius: 1.45,
+            position: new THREE.Vector3(slot.worldX, 0.35, slot.worldZ),
+          },
         }
       }
     }

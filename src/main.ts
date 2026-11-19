@@ -201,7 +201,7 @@ async function boot(): Promise<void> {
     if (!g || g.worshipping || Date.now() < interactBlockedUntil) return
     const emptyCushion = g.world.getNearestEmptyCushion(g.feet, 2.5)
     if (!emptyCushion) {
-      ui.toast('請靠近觀音菩薩前空著的紅色拜墊，按 E 跪下拜拜。')
+      ui.toast('請靠近觀音菩薩前的紅色拜墊，按 E 跪下拜拜。')
       return
     }
     interactBlockedUntil = Date.now() + 5200
