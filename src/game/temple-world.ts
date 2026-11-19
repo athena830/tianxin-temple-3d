@@ -257,9 +257,11 @@ const C = {
   roof: '#34433c', roofLight: '#465b50', jade: '#678276', ivory: '#e5dcc8', water: '#4e7771',
 }
 
+export const COURTYARD_PRAYER_WALL_POS = new THREE.Vector3(8.8, 0, 8.2)
+
 const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'incense', title: '上香祈福', subtitle: '於香爐前敬香祈願', radius: 3.2 },
-  { id: 'prayer', title: '寫下心願', subtitle: '將一念善願留在祈願牆', radius: 3.2 },
+  { id: 'prayer', title: '大殿外廣場・祈願牆', subtitle: '書寫心願，祈求平安吉祥', radius: 3.4 },
   { id: 'offerings', title: '虛擬供奉', subtitle: '供花、供果、供茶', radius: 3.0 },
   { id: 'daily-lot', title: '每日抽籤', subtitle: '靜心抽取今日籤詩', radius: 3.0 },
   { id: 'chess', title: '天心仙姑問事亭', subtitle: '象棋卜卦・問事服務', radius: 2.6 },
@@ -267,7 +269,7 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'woodfish', title: '木魚', subtitle: '敲擊木魚，收攝心念', radius: 2.5 },
   { id: 'bell', title: '祈福鐘', subtitle: '鳴鐘祈願，祝福相隨', radius: 2.8 },
   { id: 'wishing-pool', title: '前庭東側・蓮花許願池', subtitle: '投入一枚祈福銅錢', radius: 4.8 },
-  { id: 'prayer-wall', title: '祈願牆', subtitle: '閱讀此裝置上的祝願', radius: 3.0 },
+  { id: 'prayer-wall', title: '大殿外廣場・祈願牆', subtitle: '閱讀祝願，寫下心願', radius: 3.4 },
   { id: 'records', title: '祈福紀錄', subtitle: '回看本機保存的參拜足跡', radius: 3.0 },
   { id: 'drum', title: '鼓樓擊鼓', subtitle: '擊鼓鳴志，收攝心念', radius: 2.8 },
   { id: 'yuhuang', title: '後殿凌霄寶殿', subtitle: '朝拜玉皇上帝，蒙沐浩恩', radius: 3.2 },
@@ -276,8 +278,8 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'sky-lantern', title: '天燈祈福', subtitle: '於天心仙姑旁點燃祈福天燈', radius: 2.4 },
 ]
 const pointPositions: [number, number][] = [
-  [0, 0.4], [3.2, -3.4], [-2.25, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
-  [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [LOTUS_POND.x - 5.8, LOTUS_POND.z], [14.6, 4.3], [15, 0.2],
+  [0, 0.4], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z + 1.4], [-2.25, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
+  [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [LOTUS_POND.x - 5.8, LOTUS_POND.z], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z + 1.4], [15, 0.2],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x + 4.8, DRAGON_GUANYIN_POS.z],
   [-6.8, 29.8],
@@ -285,8 +287,8 @@ const pointPositions: [number, number][] = [
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
 export const POINT_TARGETS: [number, number][] = [
-  [0, -2.55], [0, -12.2], [-2.25, -4.55], [-12, 1.2], [PAVILION.x, PAVILION.z],
-  [12.5, -1.6], [8.5, -8.5], [15.2, -8], [LOTUS_POND.x, LOTUS_POND.z], [17.5, 4.3], [17.2, 0.2],
+  [0, -2.55], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z], [-2.25, -4.55], [-12, 1.2], [PAVILION.x, PAVILION.z],
+  [12.5, -1.6], [8.5, -8.5], [15.2, -8], [LOTUS_POND.x, LOTUS_POND.z], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z], [17.2, 0.2],
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
   [-6.8, 29.8],
@@ -520,6 +522,7 @@ export class TempleWorld {
     this.addDrumTower()
     this.addSideArchitecture()
     this.addRitualProps()
+    this.addCourtyardPrayerWall()
     this.addMarkers()
     this.setMainHallScale(this.mainHallScale)
     this.addGiantDragonGuanyin()
@@ -1829,18 +1832,6 @@ export class TempleWorld {
     bellRoof.position.set(15.2, 0, -8)
     this.rightSideGroup.add(bellRoof)
 
-    // Prayer wall panel.
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(5.1, 3.6, 0.42), makeMat(C.darkWood))
-    panel.position.set(17.5, 2.3, 4.3)
-    panel.rotation.y = -Math.PI / 2
-    panel.castShadow = true
-    this.scene.add(panel)
-    const panelFace = new THREE.Mesh(new THREE.PlaneGeometry(4.45, 2.9), this.textMaterial('祈 願 牆', '#e4c17a', '#3b251b'))
-    panelFace.position.set(17.25, 2.4, 4.3)
-    panelFace.rotation.y = -Math.PI / 2
-    this.scene.add(panelFace)
-    this.physics.addStaticBox(new THREE.Vector3(17.5, 2.2, 4.3), new THREE.Vector3(0.45, 3.7, 5.2))
-
     // Small memory kiosk for local prayer records.
     const recordStand = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.65, 0.36), makeMat('#684636'))
     recordStand.position.set(17.2, 0.96, 0.2)
@@ -1858,6 +1849,209 @@ export class TempleWorld {
     for (const lamp of this.lamps) this.physics.addStaticBox(new THREE.Vector3(lamp.position.x, 1, lamp.position.z), new THREE.Vector3(1.3, 2, 1.3))
   }
 
+  /**
+   * Courtyard Plaza Prayer Wall Pavilion (大殿外廣場・祈願亭 / 祈願牆):
+   * 移至大殿外東側前庭廣場 (x = 8.8, z = 8.2)，徹底釋放大殿內走道空間與視覺動線。
+   * 包含青石須彌座、四根朱漆立柱與額枋雀替木構、歇山琉璃瓦亭頂、懸掛式實木繪馬祈願牌架、
+   * 燙金匾額「祈 願 牆」、挑簷八角長明宮燈與溫潤暖金光暈。
+   */
+  private addCourtyardPrayerWall(): void {
+    const px = COURTYARD_PRAYER_WALL_POS.x
+    const pz = COURTYARD_PRAYER_WALL_POS.z
+    const wallGroup = new THREE.Group()
+
+    const stone = makeMat(C.stone, 0.92)
+    const stoneTrim = makeMat(C.stoneLight, 0.85)
+    const vermilion = makeMat(C.vermilion, 0.72)
+    const vermilionLight = makeMat(C.vermilionLight, 0.68)
+    const darkWood = makeMat(C.darkWood, 0.88)
+    const wood = makeMat(C.wood, 0.82)
+    const gold = makeMat(C.gold, 0.42, 0.38)
+    const roofMat = makeMat(C.roof, 0.82)
+    const ribbonMat = makeMat('#c0352b', 0.6)
+
+    // 1. Carved Stone Plinth Base (須彌座青石臺基)
+    const baseWidth = 4.4
+    const baseDepth = 1.8
+    const base = new THREE.Mesh(new THREE.BoxGeometry(baseWidth, 0.24, baseDepth), stone)
+    base.position.set(px, 0.12, pz)
+    base.receiveShadow = true
+    base.castShadow = true
+    wallGroup.add(base)
+
+    const baseCap = new THREE.Mesh(new THREE.BoxGeometry(baseWidth + 0.16, 0.08, baseDepth + 0.16), stoneTrim)
+    baseCap.position.set(px, 0.26, pz)
+    baseCap.receiveShadow = true
+    wallGroup.add(baseCap)
+
+    // 2. Vermilion Pillars & Plinths (四根朱漆立柱與雕花柱礎)
+    const pillarPositions: [number, number][] = [
+      [px - 1.8, pz + 0.6],
+      [px + 1.8, pz + 0.6],
+      [px - 1.8, pz - 0.6],
+      [px + 1.8, pz - 0.6],
+    ]
+    const pillarH = 2.5
+    const pillarGeo = new THREE.CylinderGeometry(0.1, 0.11, pillarH, 12)
+    const plinthGeo = new THREE.CylinderGeometry(0.16, 0.18, 0.16, 12)
+
+    for (const [colX, colZ] of pillarPositions) {
+      const plinth = new THREE.Mesh(plinthGeo, stoneTrim)
+      plinth.position.set(colX, 0.38, colZ)
+      plinth.castShadow = true
+      plinth.receiveShadow = true
+      wallGroup.add(plinth)
+
+      const col = new THREE.Mesh(pillarGeo, vermilion)
+      col.position.set(colX, 0.46 + pillarH / 2, colZ)
+      col.castShadow = true
+      wallGroup.add(col)
+
+      // Gold collar rings
+      const colRing = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.02, 8, 16), gold)
+      colRing.rotation.x = Math.PI / 2
+      colRing.position.set(colX, 0.52, colZ)
+      wallGroup.add(colRing)
+    }
+
+    // 3. Beams and Architraves (穿斗額枋與木構)
+    const frontBeam = new THREE.Mesh(new THREE.BoxGeometry(baseWidth - 0.5, 0.18, 0.14), vermilionLight)
+    frontBeam.position.set(px, 0.46 + pillarH - 0.09, pz + 0.6)
+    frontBeam.castShadow = true
+    wallGroup.add(frontBeam)
+
+    const backBeam = new THREE.Mesh(new THREE.BoxGeometry(baseWidth - 0.5, 0.18, 0.14), vermilionLight)
+    backBeam.position.set(px, 0.46 + pillarH - 0.09, pz - 0.6)
+    backBeam.castShadow = true
+    wallGroup.add(backBeam)
+
+    for (const sideX of [px - 1.8, px + 1.8]) {
+      const sideBeam = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 1.2), vermilionLight)
+      sideBeam.position.set(sideX, 0.46 + pillarH - 0.09, pz)
+      sideBeam.castShadow = true
+      wallGroup.add(sideBeam)
+    }
+
+    // 4. Central Wooden Prayer Board (實木祈願主掛板)
+    const boardFrame = new THREE.Mesh(new THREE.BoxGeometry(3.3, 2.0, 0.14), darkWood)
+    boardFrame.position.set(px, 1.62, pz)
+    boardFrame.castShadow = true
+    boardFrame.receiveShadow = true
+    wallGroup.add(boardFrame)
+
+    const boardFace = new THREE.Mesh(new THREE.BoxGeometry(3.14, 1.84, 0.08), wood)
+    boardFace.position.set(px, 1.62, pz + 0.04)
+    boardFace.castShadow = true
+    boardFace.receiveShadow = true
+    wallGroup.add(boardFace)
+
+    // Horizontal rails for hanging prayer plaques
+    const railGeo = new THREE.CylinderGeometry(0.02, 0.02, 3.0, 8)
+    const railYOffsets = [-0.55, 0.0, 0.55]
+    for (const yOff of railYOffsets) {
+      const rail = new THREE.Mesh(railGeo, gold)
+      rail.rotation.z = Math.PI / 2
+      rail.position.set(px, 1.62 + yOff, pz + 0.1)
+      wallGroup.add(rail)
+    }
+
+    // 5. Hanging Wish Plaques (精雕木質繪馬祈願牌)
+    const plaqueGeo = new THREE.BoxGeometry(0.24, 0.16, 0.02)
+    const ribbonGeo = new THREE.BoxGeometry(0.015, 0.1, 0.005)
+    const tasselGeo = new THREE.CylinderGeometry(0.015, 0.025, 0.08, 6)
+    const plaqueMat = makeMat('#8c593b', 0.78)
+
+    const plaqueOffsets: [number, number, number][] = [
+      [-1.15, 0.55, -0.05], [-0.7, 0.55, 0.04], [-0.25, 0.55, -0.02], [0.2, 0.55, 0.06], [0.65, 0.55, -0.04], [1.1, 0.55, 0.03],
+      [-1.0, 0.0, 0.03], [-0.5, 0.0, -0.06], [0.0, 0.0, 0.04], [0.5, 0.0, -0.03], [1.0, 0.0, 0.05],
+      [-1.1, -0.55, -0.03], [-0.65, -0.55, 0.05], [-0.15, -0.55, -0.04], [0.35, -0.55, 0.03], [0.85, -0.55, -0.05],
+    ]
+
+    for (const [xOff, yOff, rotZ] of plaqueOffsets) {
+      const plaqueGroup = new THREE.Group()
+      plaqueGroup.position.set(px + xOff, 1.62 + yOff - 0.06, pz + 0.13)
+      plaqueGroup.rotation.z = rotZ
+
+      const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat)
+      ribbon.position.set(0, 0.08, 0)
+      plaqueGroup.add(ribbon)
+
+      const plaque = new THREE.Mesh(plaqueGeo, plaqueMat)
+      plaque.castShadow = true
+      plaqueGroup.add(plaque)
+
+      const tassel = new THREE.Mesh(tasselGeo, gold)
+      tassel.position.set(0, -0.11, 0)
+      plaqueGroup.add(tassel)
+
+      wallGroup.add(plaqueGroup)
+    }
+
+    // 6. Signboard Plaque 「祈 願 牆」 (金字朱底雕花額匾)
+    const signBoard = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.58, 0.08), vermilion)
+    signBoard.position.set(px, 0.46 + pillarH + 0.16, pz + 0.64)
+    signBoard.castShadow = true
+    wallGroup.add(signBoard)
+
+    const signBoardGoldRim = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.5, 0.09), gold)
+    signBoardGoldRim.position.set(px, 0.46 + pillarH + 0.16, pz + 0.64)
+    wallGroup.add(signBoardGoldRim)
+
+    const signFace = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.42), this.textMaterial('祈 願 牆', '#ffd700', '#631410'))
+    signFace.position.set(px, 0.46 + pillarH + 0.16, pz + 0.69)
+    wallGroup.add(signFace)
+
+    // 7. Traditional Roof (歇山青瓦屋頂)
+    const roof = this.createRoof(4.8, 2.5, 2.85, 3.85)
+    roof.position.set(px, 0, pz)
+    wallGroup.add(roof)
+
+    // 8. Hanging Palace Lanterns (挑簷六角長明祈願宮燈)
+    const lanternMat = new THREE.MeshStandardMaterial({
+      color: '#ffe099',
+      emissive: '#ffaa33',
+      emissiveIntensity: 0.95,
+      roughness: 0.3,
+    })
+
+    for (const lx of [px - 1.8, px + 1.8]) {
+      const lanternGroup = new THREE.Group()
+      lanternGroup.position.set(lx, 2.45, pz + 0.65)
+
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.3, 4), gold)
+      cord.position.y = 0.2
+      lanternGroup.add(cord)
+
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.12, 6), roofMat)
+      cap.position.y = 0.06
+      lanternGroup.add(cap)
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.15, 0.28, 6), lanternMat)
+      body.castShadow = true
+      lanternGroup.add(body)
+
+      const baseRing = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.06, 6), gold)
+      baseRing.position.y = -0.16
+      lanternGroup.add(baseRing)
+
+      const lanternTassel = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.025, 0.15, 6), ribbonMat)
+      lanternTassel.position.y = -0.26
+      lanternGroup.add(lanternTassel)
+
+      wallGroup.add(lanternGroup)
+    }
+
+    // 9. Warm Welcoming Point Light (溫潤暖光映照祈願牆)
+    const wallLight = new THREE.PointLight('#ffbb66', 0.9, 6.5, 1.8)
+    wallLight.position.set(px, 2.3, pz + 0.8)
+    wallGroup.add(wallLight)
+
+    this.scene.add(wallGroup)
+
+    // 10. Physical static box collider (防止穿越，保留前庭充足走動空間)
+    this.physics.addStaticBox(new THREE.Vector3(px, 1.6, pz), new THREE.Vector3(4.4, 3.2, 1.8))
+  }
+
   private addMarkers(): void {
     const colors: Record<ShrinePointId, string> = {
       incense: '#e8bb71', prayer: '#e8bb71', offerings: '#d8a45e', 'daily-lot': '#d8a45e', chess: '#a9c2a9',
@@ -1866,6 +2060,7 @@ export class TempleWorld {
       'guanyin-dragon': '#ffea70', cushion: '#e5b968', 'sky-lantern': '#ff9b3d',
     }
     for (const point of this.points) {
+      if (point.id === 'prayer') continue // Consolidated with prayer-wall at the courtyard plaza
       const mat = new THREE.MeshBasicMaterial({ color: colors[point.id], transparent: true, opacity: 0.42, depthWrite: false })
       const marker = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.038, 6, 30), mat)
       marker.rotation.x = Math.PI / 2
@@ -4104,6 +4299,7 @@ export class TempleWorld {
     let nearest: ShrinePoint | null = null
     let best = Infinity
     for (const point of this.points) {
+      if (point.id === 'prayer') continue // Consolidated with prayer-wall at the courtyard plaza
       const d = Math.hypot(point.position.x - position.x, point.position.z - position.z)
       if (d <= point.radius && d < best) { nearest = point; best = d }
     }

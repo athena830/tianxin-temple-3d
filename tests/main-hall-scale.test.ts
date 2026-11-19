@@ -87,4 +87,31 @@ describe('main hall scale & collision avoidance', () => {
     // Incense point should be in front of the steps (Z > 4.0)
     expect(incensePoint!.position.z).toBeGreaterThan(4.0)
   })
+
+  it('moves wishing wall completely outside the main hall to front courtyard plaza', () => {
+    const physics = new Physics()
+    const world = new TempleWorld(physics)
+
+    const prayerPoint = world.points.find(p => p.id === 'prayer')
+    const prayerWallPoint = world.points.find(p => p.id === 'prayer-wall')
+
+    expect(prayerPoint).toBeDefined()
+    expect(prayerWallPoint).toBeDefined()
+
+    // Both points are outside in the courtyard plaza (z > 7, x > 6)
+    expect(prayerPoint!.position.z).toBeGreaterThan(7.0)
+    expect(prayerPoint!.position.x).toBeCloseTo(8.8, 1)
+    expect(prayerWallPoint!.position.z).toBeGreaterThan(7.0)
+    expect(prayerWallPoint!.position.x).toBeCloseTo(8.8, 1)
+
+    // Approaching [8.8, 9.6] in the courtyard plaza triggers prayer-wall interaction
+    const activeAtPlaza = world.nearestPoint(new (world.points[0].position.constructor as any)(8.8, 0, 9.6))
+    expect(activeAtPlaza).toBeDefined()
+    expect(activeAtPlaza!.id).toBe('prayer-wall')
+
+    // At previous inside location [3.2, -3.4], prayer prompt is no longer active
+    const activeAtOldInsideLoc = world.nearestPoint(new (world.points[0].position.constructor as any)(3.2, 0, -3.4))
+    expect(activeAtOldInsideLoc?.id).not.toBe('prayer')
+    expect(activeAtOldInsideLoc?.id).not.toBe('prayer-wall')
+  })
 })

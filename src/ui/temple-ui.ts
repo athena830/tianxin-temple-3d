@@ -100,10 +100,10 @@ export class TempleUi {
         <nav class="map" hidden>
           <p>選擇目的地，跟著金色箭頭前往</p>
           <button data-go="guanyin-dragon">參拜昇龍觀音</button><button data-go="gold-furnace">八角金亭（化金）</button><button data-go="chess">天心仙姑問事亭</button><button data-go="sky-lantern">天燈祈福</button>
-          <button data-go="incense">上香祈福</button><button data-go="yuhuang">後殿凌霄寶殿</button><button data-go="prayer">寫下心願</button>
+          <button data-go="incense">上香祈福</button><button data-go="yuhuang">後殿凌霄寶殿</button><button data-go="prayer">大殿外廣場・寫下心願</button>
           <button data-go="offerings">虛擬供奉</button><button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
           <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="drum">鼓樓擊鼓</button>
-          <button data-go="wishing-pool">蓮花許願池</button><button data-go="prayer-wall">祈願牆</button><button data-go="records">祈福紀錄</button>
+          <button data-go="wishing-pool">蓮花許願池</button><button data-go="prayer-wall">大殿外廣場・祈願牆</button><button data-go="records">祈福紀錄</button>
         </nav>
         <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact">互動</button></div>
         <div class="guide" hidden><span>前往</span><b data-guide-name></b><small data-guide-dist></small><button class="guide-x" data-act="guide-cancel" aria-label="取消指引">×</button></div>
@@ -269,7 +269,7 @@ export class TempleUi {
         return `<p class="eyebrow">觀世音菩薩主殿</p><h2>上香祈福</h2><p>雙手合十，靜心三息。點燃清香，向觀世音菩薩說出心中的祝願。</p>${note}
           <div class="row"><button class="btn primary" data-ritual="incense">敬上三炷清香</button><button class="btn" data-open="prayer">寫下心願</button></div>`
       case 'prayer':
-        return `<p class="eyebrow">線上祈福</p><h2>寫下心願</h2><p>心願將留在本機的祈願牆，也會記入你的祈福紀錄。</p>${note}
+        return `<p class="eyebrow">大殿外前庭廣場・祈願牆</p><h2>寫下心願</h2><p>心願將懸掛於大殿外前庭廣場祈願牆，也會記入你的祈福紀錄。</p>${note}
           <form class="wish-form"><textarea name="wish" maxlength="120" rows="4" placeholder="例如：願家人平安健康，萬事順心。"></textarea><button class="btn primary" type="submit">送出祈願</button></form>`
       case 'offerings':
         return `<p class="eyebrow">虛擬供奉</p><h2>供花・供果・供茶</h2><p>選擇一份心意，供品會出現在主殿供桌上。</p>${note}
@@ -540,7 +540,7 @@ export class TempleUi {
       case 'prayer-wall': {
         const mine = d.wishes.map(w => `<li class="mine"><p>${esc(w.text)}</p><small>${formatRecordDate(w.at)}・我的祈願</small></li>`).join('')
         const sample = SAMPLE_WISHES.map(w => `<li><p>${w}</p><small>示例祈願</small></li>`).join('')
-        return `<p class="eyebrow">祈願牆</p><h2>一念善願</h2><p>此牆展示你在此裝置寫下的心願，以及數則示例祈願。</p>${note}
+        return `<p class="eyebrow">大殿外前庭廣場・祈願牆</p><h2>一念善願</h2><p>此牆坐落於大殿外前庭廣場東側，展示善信在此留駐的真誠祝願。</p>${note}
           <ul class="wall">${mine}${sample}</ul><button class="btn primary" data-open="prayer">寫下新的心願</button>`
       }
       case 'cushion':
