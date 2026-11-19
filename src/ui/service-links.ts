@@ -85,3 +85,37 @@ export function renderServiceModal(): string {
     </div>
   `
 }
+
+/** 卜卦頁與問事頁底部免責與條款簡潔入口 */
+export function renderDisclaimerStrip(): string {
+  return `
+    <div class="legal-strip">
+      <p>象棋卜卦與籤詩屬民俗文化與自我探索參考，不構成且不應取代醫療、法律或財務專業判斷。</p>
+      <button type="button" class="legal-link-btn" data-act="open-legal">服務說明、免責聲明與隱私權政策</button>
+    </div>
+  `
+}
+
+/** 服務說明、免責聲明與隱私權政策彈窗 HTML */
+export function renderLegalModal(): string {
+  return `
+    <div class="legal-modal" data-legal-modal hidden role="dialog" aria-modal="true" aria-label="服務說明、免責聲明與隱私權政策">
+      <div class="legal-modal-card">
+        <button type="button" class="close" data-act="legal-close" aria-label="關閉">×</button>
+        <p class="eyebrow">天心仙姑・玉皇宮線上 3D 宮廟</p>
+        <h3>服務說明、使用條款與隱私權政策</h3>
+        <div class="legal-body">
+          <h4>一、民俗文化與專業免責聲明</h4>
+          <p>本網站提供之象棋卜卦、格局解析、每日抽籤、擲筊請示與互動祈福體驗，皆屬於傳統民俗文化與自我探索之參考內容，<strong>不構成且不應取代醫療診斷、心理諮商、法律意見、財務規劃或投資決策等專業判斷</strong>。如遇身心健康、法律糾紛或重大財務決策，請務必尋求合格專業人員協助。</p>
+          <h4>二、隱私權政策與資料保存方式</h4>
+          <p>本網站無須註冊或登入，不主動蒐集您的真實姓名、生日、聯絡方式或身分證字號，亦不會將您的祈願文字或卜卦紀錄傳送至遠端伺服器。所有個人互動與卜卦摘要紀錄皆僅儲存在您目前裝置瀏覽器的本機儲存空間（<code>localStorage</code>），<strong>清除瀏覽器快取／資料、使用無痕模式或更換瀏覽器／裝置將無法保留</strong>；「祈福紀錄」最多保留 100 筆（超過將自動移除最舊紀錄），重要卦象建議隨時透過頁面上的複製或匯出功能自行備份。</p>
+          <h4>三、使用條款與外部服務（LINE 預約・隨喜支持）</h4>
+          <p>透過本網站前往「天心仙姑 LINE 官方好友」預約人工解卦，或透過永豐銀行收款 QR Code 進行「自由隨喜支持」，皆完全出於您的自由意願，本站不設最低金額、不強制付款，亦不會自動確認收款；隨喜與否均不影響本網站之任何免費卜卦與參拜功能。當您點擊前往 LINE 或銀行支付頁面時，將適用各該第三方平台之服務條款與隱私權政策。</p>
+        </div>
+        <div class="legal-footer">
+          <button type="button" class="btn primary small" data-act="legal-close">我已了解</button>
+        </div>
+      </div>
+    </div>
+  `
+}

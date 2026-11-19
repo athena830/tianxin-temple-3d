@@ -25,8 +25,8 @@ for (const file of distFiles) {
 console.log('[deploy] Preparing .nojekyll and 404.html...')
 writeFileSync(join(distDir, '.nojekyll'), '')
 writeFileSync(join(rootDir, '.nojekyll'), '')
-copyFileSync(join(distDir, 'index.html'), join(distDir, '404.html'))
-copyFileSync(join(rootDir, 'index.html'), join(rootDir, '404.html'))
+copyFileSync(join(rootDir, 'public', '404.html'), join(distDir, '404.html'))
+copyFileSync(join(rootDir, 'public', '404.html'), join(rootDir, '404.html'))
 
 console.log('[deploy] Pushing to gh-pages branch...')
 const commands = [

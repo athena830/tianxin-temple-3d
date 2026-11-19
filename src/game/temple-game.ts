@@ -30,6 +30,75 @@ const CLICK_REACH = 1.4
 
 export type ClickResult = { kind: 'open'; id: ShrinePointId } | { kind: 'far'; point: ShrinePoint } | null
 
+/**
+ * 規劃指引自動行走路徑：跨區自動經由山門、月亮門松林小徑與前後殿過水迴廊，避免被建築牆面阻擋。
+ */
+export function planGuidePath(start: THREE.Vector3, dest: THREE.Vector3): THREE.Vector3[] {
+  const waypoints: THREE.Vector3[] = []
+  const push = (x: number, y: number, z: number) => waypoints.push(new THREE.Vector3(x, y, z))
+
+  const startInSanctuary = start.x < -50
+  const destInSanctuary = dest.x < -50
+  const startInRearHall = start.z < -14 && start.x > -24
+  const destInRearHall = dest.z < -14 && dest.x > -24
+
+  // 1. 若起點在山門外，先穿過山門進入前庭
+  if (start.z > 48) {
+    push(0, 0, 48.0)
+    push(0, 0, 44.0)
+  }
+
+  // 2. 若起點在後殿凌霄寶殿且目的地不在後殿，先經左右過水迴廊回到正殿前
+  if (startInRearHall && !destInRearHall) {
+    const side = start.x >= 0 ? 1 : -1
+    push(0, 0.28, -17.5)
+    push(side * 5.85, 0.28, -14.55)
+    push(side * 5.85, 0.28, -8.5)
+    push(0, 0.28, -2.2)
+    push(0, 0, 1.8)
+  }
+
+  // 3. 若起點在昇龍觀音聖境大平台且目的地在主廟區，先下階穿過松林小徑與月亮門
+  if (startInSanctuary && !destInSanctuary) {
+    push(-55.5, 0.36, 31.0)
+    push(-53.5, 0.18, 31.0)
+    push(-42.0, 0, 31.0)
+    push(-29.6, 0, 31.0)
+    push(-24.0, 0, 31.0)
+  }
+
+  // 4. 若目的地在昇龍觀音聖境大平台且起點不在聖境，經月亮門與松林小徑登階上台
+  if (!startInSanctuary && destInSanctuary) {
+    if (start.z < 12) push(0, 0, 18.0)
+    push(-24.0, 0, 31.0)
+    push(-29.6, 0, 31.0)
+    push(-42.0, 0, 31.0)
+    push(-53.5, 0.18, 31.0)
+    push(-55.5, 0.36, 31.0)
+  }
+
+  // 5. 若目的地在後殿凌霄寶殿且起點不在後殿，經正殿與過水迴廊前往後殿
+  if (!startInRearHall && destInRearHall) {
+    const side = start.x >= 0 ? 1 : -1
+    if (start.z > 2.5 || startInSanctuary) push(0, 0, 1.8)
+    push(0, 0.28, -2.2)
+    push(side * 5.85, 0.28, -8.5)
+    push(side * 5.85, 0.28, -14.55)
+    push(0, 0.28, -17.5)
+  }
+
+  // 6. 同一大區內若跨過中庭前後，加一個前庭中軸樞紐點避開涼亭或水池邊緣
+  if (!startInSanctuary && !destInSanctuary && !startInRearHall && !destInRearHall) {
+    const crossCourtyard = (start.z > 22 && dest.z < 6) || (start.z < 6 && dest.z > 22)
+    if (crossCourtyard && Math.abs(start.x - dest.x) > 8) {
+      push(0, 0, 18.0)
+    }
+  }
+
+  waypoints.push(dest.clone())
+  return waypoints
+}
+
 export class TempleGame {
   mode: TempleMode = 'loading'
   /** Mode to return to when a panel closes. */
@@ -63,6 +132,7 @@ export class TempleGame {
   active: ShrinePoint | null = null
   /** Station the guide arrow currently points to. */
   guide: ShrinePoint | null = null
+  private navQueue: THREE.Vector3[] = []
   private targetDestination: THREE.Vector3 | null = null
   private pendingStationId: ShrinePointId | null = null
   private readonly clickMarker: THREE.Mesh
@@ -198,6 +268,7 @@ export class TempleGame {
     const p = this.body.translation()
     this.body.setTranslation({ x, y: p.y, z }, true)
     this.body.setNextKinematicTranslation({ x, y: p.y, z })
+    this.navQueue = []
     this.targetDestination = null
     this.clickMarker.visible = false
   }
@@ -228,6 +299,7 @@ export class TempleGame {
     const moving = (this.mode === 'explore' || this.mode === 'browse') && this.ritualLeft <= 0
     const hasKeyMove = Math.hypot(this.input.move.x, this.input.move.y) > 0.05
     if (hasKeyMove) {
+      this.navQueue = []
       this.targetDestination = null
       this.pendingStationId = null
       this.clickMarker.visible = false
@@ -254,12 +326,25 @@ export class TempleGame {
           this.targetDestination.z - t.z
         )
         const dist = toTarget.length()
-        if (dist < 0.45) {
-          this.targetDestination = null
-          this.clickMarker.visible = false
-          if (this.pendingStationId) {
-            window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.pendingStationId }))
-            this.pendingStationId = null
+        const isIntermediate = this.navQueue.length > 0
+        if (dist < (isIntermediate ? 0.85 : 0.45)) {
+          if (isIntermediate) {
+            this.targetDestination = this.navQueue.shift() ?? null
+          } else {
+            this.targetDestination = null
+            this.clickMarker.visible = false
+            if (this.guide) {
+              const idx = this.world.points.findIndex(pt => pt.id === this.guide!.id)
+              if (idx >= 0) {
+                const [tx, tz] = POINT_TARGETS[idx]
+                this.heading = Math.atan2(tx - t.x, tz - t.z)
+              }
+              this.setGuide(null)
+            }
+            if (this.pendingStationId) {
+              window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.pendingStationId }))
+              this.pendingStationId = null
+            }
           }
         } else {
           wish.copy(toTarget.normalize())
@@ -292,8 +377,16 @@ export class TempleGame {
     if (near?.id !== this.active?.id) { this.active = near; this.onNear(near) }
     if (this.guide) {
       const d = Math.hypot(this.guide.position.x - next.x, this.guide.position.z - next.z)
-      if (near?.id === this.guide.id) this.setGuide(null)
-      else this.onGuide(this.guide, d)
+      if (near?.id === this.guide.id && this.navQueue.length === 0 && d < Math.min(this.guide.radius * 0.75, 2.2)) {
+        const idx = this.world.points.findIndex(pt => pt.id === this.guide!.id)
+        if (idx >= 0) {
+          const [tx, tz] = POINT_TARGETS[idx]
+          this.heading = Math.atan2(tx - next.x, tz - next.z)
+        }
+        this.setGuide(null)
+      } else {
+        this.onGuide(this.guide, d)
+      }
     }
     if (free && this.ritualLeft <= 0 && this.input.consume('interact') && this.active) window.dispatchEvent(new CustomEvent('temple:interact', { detail: this.active.id }))
     else this.input.consume('interact')
@@ -411,6 +504,7 @@ export class TempleGame {
       // Clicked a station farther away: auto-walk to it with click marker!
       const destX = targetApproach ? targetApproach[0] : point.position.x
       const destZ = targetApproach ? targetApproach[1] : point.position.z
+      this.navQueue = []
       this.targetDestination = new THREE.Vector3(destX, hit.point.y, destZ)
       this.pendingStationId = point.id
       this.clickMarker.position.set(destX, hit.point.y + 0.04, destZ)
@@ -420,6 +514,7 @@ export class TempleGame {
 
     // 2. Clicked on ground / road / courtyard / steps: walk to clicked position!
     if (hit.point.y < 2.5 && (!hit.face || hit.face.normal.y > 0.4)) {
+      this.navQueue = []
       this.targetDestination = new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z)
       this.pendingStationId = null
       this.clickMarker.position.set(hit.point.x, hit.point.y + 0.04, hit.point.z)
@@ -470,9 +565,39 @@ export class TempleGame {
   }
 
   setGuide(id: ShrinePointId | null): void {
-    this.guide = id ? this.world.points.find(p => p.id === id) ?? null : null
+    const point = id ? this.world.points.find(p => p.id === id) ?? null : null
+    this.guide = point
+    if (!point) {
+      this.navQueue = []
+      this.targetDestination = null
+      this.pendingStationId = null
+      this.clickMarker.visible = false
+      this.onGuide(null, 0)
+      return
+    }
     const p = this.body.translation()
-    this.onGuide(this.guide, this.guide ? Math.hypot(this.guide.position.x - p.x, this.guide.position.z - p.z) : 0)
+    const dist = Math.hypot(point.position.x - p.x, point.position.z - p.z)
+    if (dist < 1.2) {
+      const idx = this.world.points.findIndex(pt => pt.id === point.id)
+      if (idx >= 0) {
+        const [tx, tz] = POINT_TARGETS[idx]
+        this.heading = Math.atan2(tx - p.x, tz - p.z)
+      }
+      this.guide = null
+      this.navQueue = []
+      this.targetDestination = null
+      this.clickMarker.visible = false
+      this.onGuide(null, 0)
+      return
+    }
+    const curFeet = new THREE.Vector3(p.x, p.y - FOOT_OFFSET, p.z)
+    const path = planGuidePath(curFeet, point.position)
+    this.targetDestination = path.shift() ?? null
+    this.navQueue = path
+    this.pendingStationId = null
+    this.clickMarker.position.set(point.position.x, point.position.y + 0.04, point.position.z)
+    this.clickMarker.visible = true
+    this.onGuide(this.guide, dist)
   }
 
   render(_alpha: number, frameSeconds: number): void {

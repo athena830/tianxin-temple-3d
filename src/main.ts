@@ -54,7 +54,18 @@ async function boot(): Promise<void> {
       loop.resetAccumulator()
       syncMode()
     },
-    travel: id => { game?.setGuide(id); audio.play('ui'); ui.toast('跟著地上的金色箭頭前往') },
+    travel: id => {
+      if (!game) return
+      if (game.mode === 'panel') {
+        ui.closePanel()
+        game.closePanel()
+        syncMode()
+      }
+      if (game.mode !== 'explore') startExplore()
+      game.setGuide(id)
+      audio.play('ui')
+      ui.toast('正在自動前往目的地（按方向鍵或點 × 可取消）')
+    },
     explore: startExplore,
     exitExplore,
     cancelGuide: () => game?.setGuide(null),

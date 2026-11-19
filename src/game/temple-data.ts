@@ -1,6 +1,8 @@
 import { drawCrossSlots, evaluateCrossGua, type CrossGuaResult, type ChessPos } from '../divination'
 
 export const TEMPLE_STORAGE_KEY = 'yuhuang.temple.v1'
+export const MAX_RECORDS = 100
+export const MAX_RECORD_DETAIL_LENGTH = 600
 
 export type CharacterId = 'jade' | 'vermillion' | 'moon'
 export type LampId = 'peace' | 'wealth' | 'study'
@@ -119,8 +121,8 @@ function decode(raw: string | null): TempleData {
       if (!isRecord(record) || typeof record.at !== 'number' || !Number.isFinite(record.at)) return []
       const action = safeText(record.action, 40)
       if (!action) return []
-      return [{ id: safeText(record.id, 80) || `record-${record.at}`, action, detail: safeText(record.detail), at: record.at }]
-    }).slice(0, 100) : []
+      return [{ id: safeText(record.id, 80) || `record-${record.at}`, action, detail: safeText(record.detail, MAX_RECORD_DETAIL_LENGTH), at: record.at }]
+    }).slice(0, MAX_RECORDS) : []
     const lamps = isRecord(value.lamps) ? value.lamps : {}
     const offerings = isRecord(value.offerings) ? value.offerings : {}
     const lot = isRecord(value.dailyLot) && typeof value.dailyLot.day === 'string'
@@ -182,8 +184,8 @@ export class TempleStore {
   }
 
   addRecord(action: string, detail = '', at = Date.now()): TempleRecord {
-    const record = { id: `${at}-${Math.random().toString(36).slice(2, 8)}`, action: safeText(action, 40), detail: safeText(detail), at }
-    this.data.records = [record, ...this.data.records].slice(0, 100)
+    const record = { id: `${at}-${Math.random().toString(36).slice(2, 8)}`, action: safeText(action, 40), detail: safeText(detail, MAX_RECORD_DETAIL_LENGTH), at }
+    this.data.records = [record, ...this.data.records].slice(0, MAX_RECORDS)
     this.persist()
     return record
   }
@@ -242,8 +244,9 @@ export class TempleStore {
       this.currentCrossGua = evaluateCrossGua(current.slots)
       if (this.currentCrossGua.allRevealed) {
         const c = this.currentCrossGua
+        const fmt = (p: ChessPos) => `${c.slots[p].piece.isRed ? '紅' : '黑'}${c.slots[p].piece.character}`
         const formationsText = c.analysis.formations.length > 0 ? c.analysis.formations.map(f => f.name).join('、') : c.patternName
-        const summaryRecord = `【${formationsText}】${c.level}｜收獲${c.analysis.gains} ${c.analysis.compareSymbol} 付出${c.analysis.losses}｜中[${c.slots.center.piece.name}] 上[${c.slots.top.piece.name}] 下[${c.slots.bottom.piece.name}] 左[${c.slots.left.piece.name}] 右[${c.slots.right.piece.name}]`
+        const summaryRecord = `【${formationsText}】${c.level}｜收獲${c.analysis.gains} ${c.analysis.compareSymbol} 付出${c.analysis.losses}｜中[${fmt('center')}] 上[${fmt('top')}] 下[${fmt('bottom')}] 左[${fmt('left')}] 右[${fmt('right')}]｜心法：${c.advice}`
         this.addRecord('象棋神卦', summaryRecord)
       }
     }
@@ -296,4 +299,69 @@ export class TempleStore {
 
 export function formatRecordDate(at: number): string {
   return new Intl.DateTimeFormat('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(at)
+}
+
+/**
+ * 格式化象棋卜卦摘要文字（方便一鍵複製並貼給天心仙姑 LINE 人工解卦）
+ */
+export function formatCrossGuaShareText(gua: CrossGuaResult): string {
+  const fmt = (pos: ChessPos) => {
+    const p = gua.slots[pos].piece
+    return `${p.isRed ? '紅' : '黑'}${p.character}`
+  }
+  const { analysis } = gua
+  const lines = [
+    '【天心仙姑・象棋卜卦結果】',
+    `上：${fmt('top')}`,
+    `左：${fmt('left')}　中：${fmt('center')}　右：${fmt('right')}`,
+    `下：${fmt('bottom')}`,
+    `收獲：${analysis.gains} 分 ${analysis.compareSymbol} 付出：${analysis.losses} 分`,
+    `評等：${gua.level}`,
+  ]
+  if (analysis.formations.length > 0) {
+    lines.push(`格局：${analysis.formations.map(f => f.name).join('、')}`)
+  } else {
+    lines.push(`格局：${gua.patternName}`)
+  }
+  const notes: string[] = []
+  if (analysis.hasGoodFriends) notes.push('好朋友格・逐筆減半')
+  if (analysis.protectedColor !== null) notes.push(`護身免吃・${analysis.protectedColor ? '紅方' : '黑方'}受庇佑`)
+  if (notes.length > 0) lines.push(`備註：${notes.join('；')}`)
+  return lines.join('\n')
+}
+
+/**
+ * 將祈福紀錄格式化為可讀純文字（供複製或匯出 .txt）
+ */
+export function formatRecordsAsText(records: TempleRecord[], exportedAt = new Date()): string {
+  const stamp = new Intl.DateTimeFormat('zh-TW', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).format(exportedAt)
+  const header = [
+    '【玉皇宮・天心仙姑 祈福與卜卦紀錄備份】',
+    `匯出時間：${stamp}`,
+    `紀錄筆數：${records.length} 筆（本機瀏覽器最多保留 ${MAX_RECORDS} 筆）`,
+    '----------------------------------------',
+  ]
+  if (records.length === 0) {
+    return [...header, '（目前尚無紀錄）'].join('\n')
+  }
+  const body = records.map((r, i) => `${i + 1}. [${formatRecordDate(r.at)}] ${r.action}：${r.detail}`)
+  return [...header, ...body].join('\n')
+}
+
+/**
+ * 匯出完整祈福與卜卦資料 JSON 備份字串
+ */
+export function exportTempleBackupJson(data: TempleData, exportedAt = new Date()): string {
+  return JSON.stringify(
+    {
+      exportedAt: exportedAt.toISOString(),
+      storageKey: TEMPLE_STORAGE_KEY,
+      maxRecords: MAX_RECORDS,
+      data,
+    },
+    null,
+    2
+  )
 }

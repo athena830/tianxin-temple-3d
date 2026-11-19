@@ -5,6 +5,8 @@ import {
   DONATION_QR_SRC,
   LINE_OFFICIAL_URL,
   SERVICE_TEXT,
+  renderDisclaimerStrip,
+  renderLegalModal,
   renderQrLightbox,
   renderServiceModal,
   renderServiceSection,
@@ -49,5 +51,28 @@ describe('天心仙姑服務入口（LINE 預約・隨喜支持）', () => {
     const modal = renderServiceModal()
     expect(modal).toContain('data-service-modal hidden')
     expect(modal).toContain('data-act="services-close"')
+  })
+
+  it('404.html 為獨立輕量導向頁，不含相對路徑 ./assets/ 且具備回首頁導向與連結', () => {
+    const html = readFileSync('public/404.html', 'utf8')
+    expect(html).not.toContain('./assets/')
+    expect(html).toContain('/tianxin-temple-3d/')
+    expect(html).toContain('window.location.replace')
+    expect(html).toContain('返回首頁')
+  })
+
+  it('服務說明與隱私權彈窗包含民俗文化免責、localStorage 保存與自願隨喜條款', () => {
+    const strip = renderDisclaimerStrip()
+    expect(strip).toContain('民俗文化')
+    expect(strip).toContain('data-act="open-legal"')
+
+    const legal = renderLegalModal()
+    expect(legal).toContain('data-legal-modal hidden')
+    expect(legal).toContain('data-act="legal-close"')
+    expect(legal).toContain('不構成且不應取代醫療診斷')
+    expect(legal).toContain('法律')
+    expect(legal).toContain('財務')
+    expect(legal).toContain('localStorage')
+    expect(legal).toContain('不設最低金額')
   })
 })

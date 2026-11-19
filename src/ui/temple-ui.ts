@@ -1,9 +1,30 @@
-import { CHARACTERS, LOTS, TempleStore, formatRecordDate, type CharacterId, type LampId, type OfferingId, type WishCategory, type WishBlessing } from '../game/temple-data'
+import {
+  CHARACTERS,
+  LOTS,
+  MAX_RECORDS,
+  TempleStore,
+  exportTempleBackupJson,
+  formatCrossGuaShareText,
+  formatRecordDate,
+  formatRecordsAsText,
+  type CharacterId,
+  type LampId,
+  type OfferingId,
+  type WishCategory,
+  type WishBlessing,
+} from '../game/temple-data'
 import { getLunarPhaseInfo, getRealWorldTimeOfDay, type ShrinePoint, type ShrinePointId, type TimeOfDay, type TimeSetting } from '../game/temple-world'
 import { POS_META, type ChessPos } from '../divination'
 import type { MusicTrack } from '../engine/audio'
 import { APP_VERSION } from '../version'
-import { LINE_OFFICIAL_URL, renderQrLightbox, renderServiceModal, renderServiceSection } from './service-links'
+import {
+  LINE_OFFICIAL_URL,
+  renderDisclaimerStrip,
+  renderLegalModal,
+  renderQrLightbox,
+  renderServiceModal,
+  renderServiceSection,
+} from './service-links'
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
 const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
@@ -74,8 +95,12 @@ export class TempleUi {
           <h1>玉皇宮</h1>
           <p class="lead">心願有寄，平安相伴。穿過宮門，走進觀世音菩薩主殿，以自己的步伐參拜祈福。</p>
           <button class="btn primary" data-act="begin">入宮祈福</button>
-          <p class="title-service-entry"><button type="button" class="link-btn" data-act="open-services">LINE 預約解卦・隨喜支持</button></p>
-          <p class="note">祈願與紀錄僅保存在此瀏覽器中。</p>
+          <p class="title-service-entry">
+            <button type="button" class="link-btn" data-act="open-services">LINE 預約解卦・隨喜支持</button>
+            <span class="title-entry-sep" aria-hidden="true">｜</span>
+            <button type="button" class="link-btn" data-act="open-legal">服務說明與隱私權</button>
+          </p>
+          <p class="note">祈願與卜卦紀錄僅保存於本機瀏覽器；卜卦內容屬民俗文化參考，不取代醫療、法律或財務專業判斷。</p>
         </div>
       </section>
       <section class="screen select" data-screen="select">
@@ -98,7 +123,7 @@ export class TempleUi {
           </div>
         </header>
         <nav class="map" hidden>
-          <p>選擇目的地，跟著金色箭頭前往</p>
+          <p>選擇目的地，角色將自動前往</p>
           <button data-go="guanyin-dragon">參拜昇龍觀音</button><button data-go="gold-furnace">八角金亭（化金）</button><button data-go="chess">天心仙姑問事亭</button><button data-go="sky-lantern">天燈祈福</button>
           <button data-go="incense">上香祈福</button><button data-go="yuhuang">後殿凌霄寶殿</button><button data-go="prayer">大殿外廣場・寫下心願</button>
           <button data-go="offerings">虛擬供奉</button><button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
@@ -117,6 +142,7 @@ export class TempleUi {
       <section class="screen pause" data-screen="pause"><div class="title-card"><h2>暫歇片刻</h2><p class="lead">點擊下方按鈕繼續參拜。</p><button class="btn primary" data-act="resume">繼續參拜</button></div></section>
       <div class="panel-wrap" hidden><article class="panel"><button class="close" data-act="close" aria-label="關閉">×</button><div class="panel-body"></div></article></div>
       ${renderServiceModal()}
+      ${renderLegalModal()}
       ${renderQrLightbox()}
       <div class="wish-banner" hidden></div>
       <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
@@ -143,7 +169,7 @@ export class TempleUi {
     })
     this.root.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return
-      const overlay = this.root.querySelector<HTMLElement>('[data-qr-lightbox]:not([hidden]), [data-service-modal]:not([hidden])')
+      const overlay = this.root.querySelector<HTMLElement>('[data-qr-lightbox]:not([hidden]), [data-legal-modal]:not([hidden]), [data-service-modal]:not([hidden])')
       if (overlay) { e.stopPropagation(); overlay.hidden = true; return }
       if (!this.panelHidden) { e.stopPropagation(); this.actions.closePanel() }
     })
@@ -452,7 +478,10 @@ export class TempleUi {
                 <p>${esc(gua.posInterpretations.right)}</p>
               </div>
             </div>
-            <div class="result-save-hint">✨ 卦象與仙姑評語已完整存入個人「祈福紀錄」</div>
+            <div class="result-copy-row">
+              <button type="button" class="btn-copy-gua" data-act="copy-gua">📋 一鍵複製卦象摘要（貼給 LINE 解卦）</button>
+            </div>
+            <div class="result-save-hint">✨ 卦象摘要（格局、收獲／付出、五枚棋子與仙姑指點心法）已存入本機「祈福紀錄」（最多保留 ${MAX_RECORDS} 筆，完整格局詳解請複製或匯出備份）</div>
           </div>
         ` : `
           <div class="chess-prompt-box">
@@ -489,6 +518,7 @@ export class TempleUi {
             <button type="button" class="btn" data-act="contact">正式問事聯絡入口</button>
           </div>
           ${renderServiceSection()}
+          ${renderDisclaimerStrip()}
         `
       }
       case 'woodfish':
@@ -551,7 +581,16 @@ export class TempleUi {
           <div class="row"><button class="btn primary" data-act="sky-lantern-pray">立即點燃天燈</button></div>`
       case 'records': {
         const rows = d.records.map(r => `<li><b>${esc(r.action)}</b><span>${esc(r.detail)}</span><small>${formatRecordDate(r.at)}</small></li>`).join('')
-        return `<p class="eyebrow">祈福紀錄</p><h2>參拜足跡</h2><p>共 ${d.records.length} 筆紀錄，保存在此瀏覽器中。</p>${note}
+        const hasRecords = d.records.length > 0
+        return `<p class="eyebrow">祈福紀錄</p><h2>參拜足跡</h2>
+          <p>共 ${d.records.length} / ${MAX_RECORDS} 筆紀錄，保存在此瀏覽器中。</p>
+          <div class="records-storage-notice">⚠️ 清除瀏覽器資料、使用無痕模式或更換裝置將無法保留紀錄，最多保留 ${MAX_RECORDS} 筆（超過將自動移除最舊紀錄）。重要卦象建議隨時複製或匯出備份。</div>
+          <div class="records-export-bar">
+            <button type="button" class="btn small" data-act="records-copy" ${hasRecords ? '' : 'disabled'}>📋 複製全部紀錄</button>
+            <button type="button" class="btn small" data-act="records-export-txt" ${hasRecords ? '' : 'disabled'}>📄 匯出文字 (.txt)</button>
+            <button type="button" class="btn small" data-act="records-export-json">💾 備份 JSON (.json)</button>
+          </div>
+          ${note}
           <ul class="records">${rows || '<li class="empty">尚無紀錄。走到香爐前上香，開始今日的參拜吧。</li>'}</ul>`
       }
     }
@@ -567,11 +606,51 @@ export class TempleUi {
     if (el) el.hidden = !open
   }
 
+  private copyText(text: string, okMsg: string): void {
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        this.toast(ok ? okMsg : '瀏覽器不支援自動複製，請改用匯出功能')
+      } catch {
+        this.toast('瀏覽器不支援自動複製，請改用匯出功能')
+      }
+    }
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(() => this.toast(okMsg), fallback)
+    } else {
+      fallback()
+    }
+  }
+
+  private downloadTextFile(filename: string, content: string, mime: string): void {
+    try {
+      const blob = new Blob([content], { type: mime })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch {
+      this.toast('檔案匯出失敗，請改用「複製全部紀錄」')
+    }
+  }
+
   private onClick(e: MouseEvent): void {
     const t = (e.target as HTMLElement).closest<HTMLElement>('button')
     if (!t) {
       const target = e.target as HTMLElement
-      if (target.matches('[data-qr-lightbox], [data-service-modal]')) {
+      if (target.matches('[data-qr-lightbox], [data-legal-modal], [data-service-modal]')) {
         e.stopPropagation()
         target.hidden = true
         return
@@ -608,8 +687,28 @@ export class TempleUi {
     }
     else if (act === 'open-services') this.setOverlay('[data-service-modal]', true)
     else if (act === 'services-close') this.setOverlay('[data-service-modal]', false)
+    else if (act === 'open-legal') this.setOverlay('[data-legal-modal]', true)
+    else if (act === 'legal-close') this.setOverlay('[data-legal-modal]', false)
     else if (act === 'qr-zoom') this.setOverlay('[data-qr-lightbox]', true)
     else if (act === 'qr-close') this.setOverlay('[data-qr-lightbox]', false)
+    else if (act === 'copy-gua') {
+      const gua = this.store.currentCrossGua
+      if (!gua || !gua.allRevealed) { this.toast('請先翻開全部 5 顆棋子'); return }
+      this.copyText(formatCrossGuaShareText(gua), '已複製卦象摘要，可直接貼給天心仙姑 LINE 解卦')
+    }
+    else if (act === 'records-copy') {
+      this.copyText(formatRecordsAsText(this.store.data.records), '已複製全部祈福與卜卦紀錄')
+    }
+    else if (act === 'records-export-txt') {
+      const day = new Date().toISOString().slice(0, 10)
+      this.downloadTextFile(`天心仙姑-祈福與卜卦紀錄-${day}.txt`, formatRecordsAsText(this.store.data.records), 'text/plain;charset=utf-8')
+      this.toast('已下載文字紀錄檔 (.txt)')
+    }
+    else if (act === 'records-export-json') {
+      const day = new Date().toISOString().slice(0, 10)
+      this.downloadTextFile(`天心仙姑-完整備份-${day}.json`, exportTempleBackupJson(this.store.data), 'application/json;charset=utf-8')
+      this.toast('已下載完整 JSON 備份檔 (.json)')
+    }
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
     else if (act === 'music') {
       const state = this.actions.toggleMusic()
