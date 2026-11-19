@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process'
 import { join } from 'node:path'
-import { rmSync, cpSync, copyFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
+import { rmSync, cpSync, copyFileSync, writeFileSync, readFileSync, readdirSync, mkdirSync } from 'node:fs'
 
 const rootDir = process.cwd()
 const distDir = join(rootDir, 'dist')
@@ -21,6 +21,14 @@ for (const existing of readdirSync(rootAssetsDir)) {
 for (const file of distFiles) {
   cpSync(join(distDir, 'assets', file), join(rootAssetsDir, file), { recursive: true })
 }
+
+// Add cache-busting timestamp/version to dist/index.html
+const distIndexPath = join(distDir, 'index.html')
+const distHtml = readFileSync(distIndexPath, 'utf-8')
+const cacheBustedHtml = distHtml
+  .replace(/\.\/assets\/index\.js(\?v=[^"']*)?/g, `./assets/index.js?v=${Date.now()}`)
+  .replace(/\.\/assets\/index\.css(\?v=[^"']*)?/g, `./assets/index.css?v=${Date.now()}`)
+writeFileSync(distIndexPath, cacheBustedHtml, 'utf-8')
 
 console.log('[deploy] Preparing .nojekyll and 404.html...')
 writeFileSync(join(distDir, '.nojekyll'), '')
