@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Chibi } from './chibi'
-import type { Physics } from '../engine/physics'
+import { RAPIER, type Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
 import { FrontCourtyard, GOLD_FURNACE, LOTUS_POND, PAVILION, STAND, WISH_POOL } from './temple-courtyard'
 import { NpcManager } from './npc-system'
@@ -377,6 +377,15 @@ export class TempleWorld {
   private readonly sparkleMat = new THREE.MeshBasicMaterial({ color: '#ffe785', transparent: true, opacity: 0.95, depthWrite: false })
   private readonly roof = new THREE.Group()
   private readonly rearRoof = new THREE.Group()
+  private mainHallGroup!: THREE.Group
+  private mainHallScale = 1.35
+  private mainHallZ = -7.28
+  private mainHallColliders: RAPIER.Collider[] = []
+  private readonly leftSideGroup = new THREE.Group()
+  private readonly rightSideGroup = new THREE.Group()
+  private readonly sideColliders: { collider: RAPIER.Collider; origX: number; y: number; z: number; isLeft: boolean }[] = []
+  private outdoorUrn!: THREE.Group
+  private outdoorUrnCollider: RAPIER.Collider | null = null
   private readonly bell = new THREE.Group()
   private readonly drum = new THREE.Group()
   private readonly woodfish = new THREE.Group()
@@ -512,6 +521,7 @@ export class TempleWorld {
     this.addSideArchitecture()
     this.addRitualProps()
     this.addMarkers()
+    this.setMainHallScale(this.mainHallScale)
     this.addGiantDragonGuanyin()
     this.npcs = new NpcManager(this.scene)
     this.npcs.onSpeak = (speaker, text) => this.onNpcDialogue?.(speaker, text)
@@ -538,7 +548,9 @@ export class TempleWorld {
 
   private addMainHall(): void {
     const hall = new THREE.Group()
-    hall.position.set(0, 0, -7)
+    this.mainHallGroup = hall
+    hall.position.set(0, 0, this.mainHallZ)
+    hall.scale.set(this.mainHallScale, this.mainHallScale, this.mainHallScale)
     this.scene.add(hall)
     const red = makeMat(C.vermilion)
     const redDark = makeMat('#792a20', 0.85)
@@ -552,7 +564,6 @@ export class TempleWorld {
     podium.position.set(0, 0.14, -0.3)
     podium.receiveShadow = true
     hall.add(podium)
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.14, -7.3), new THREE.Vector3(20.4, 0.28, 14.8))
 
     // Front approach stone steps (龍門入口踏步、中央雲龍陛、虎門出口踏步)
     // 右邊龍門（入口）專屬登殿石階
@@ -621,7 +632,6 @@ export class TempleWorld {
     backCenter.castShadow = true
     backCenter.receiveShadow = true
     hall.add(backCenter)
-    this.physics.addStaticBox(new THREE.Vector3(0, 2.55, -13.4), new THREE.Vector3(8.2, 5.1, 0.6))
 
     // Left & Right Outer Back Walls (左右外側背牆與寬闊連通御門，通道寬達 3.3 公尺、通高 4.25 公尺)
     for (const side of [-1, 1]) {
@@ -630,7 +640,6 @@ export class TempleWorld {
       outerWall.castShadow = true
       outerWall.receiveShadow = true
       hall.add(outerWall)
-      this.physics.addStaticBox(new THREE.Vector3(side * 8.5, 2.55, -13.4), new THREE.Vector3(2.2, 5.1, 0.6))
 
       // Grand arch door lintel spanning 3.3m wide open passageway
       const doorLintel = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.85, 0.6), redDark)
@@ -660,7 +669,6 @@ export class TempleWorld {
       sideWall.castShadow = true
       sideWall.receiveShadow = true
       hall.add(sideWall)
-      this.physics.addStaticBox(new THREE.Vector3(sx, 2.55, -7.4), new THREE.Vector3(0.55, 5.1, 12.6))
     }
 
     // 4. Front Facade: Three Distinct Temple Portals (大廟正殿三川殿三門古制格局)
@@ -752,7 +760,6 @@ export class TempleWorld {
     rightScreenWall.castShadow = true
     rightScreenWall.receiveShadow = true
     hall.add(rightScreenWall)
-    this.physics.addStaticBox(new THREE.Vector3(3.8, 2.4, -1.8), new THREE.Vector3(3.2, 4.8, 0.28))
 
     const rightWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.4, 0.12), makeMat('#2b1c14'))
     rightWindowFrame.position.set(3.8, 2.8, 5.38)
@@ -770,7 +777,6 @@ export class TempleWorld {
     leftScreenWall.castShadow = true
     leftScreenWall.receiveShadow = true
     hall.add(leftScreenWall)
-    this.physics.addStaticBox(new THREE.Vector3(-3.8, 2.4, -1.8), new THREE.Vector3(3.2, 4.8, 0.28))
 
     const leftWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.4, 0.12), makeMat('#2b1c14'))
     leftWindowFrame.position.set(-3.8, 2.8, 5.38)
@@ -787,7 +793,6 @@ export class TempleWorld {
       const outerWall = new THREE.Mesh(new THREE.BoxGeometry(1.5, 4.8, 0.28), redDark)
       outerWall.position.set(side * 8.85, 2.4, 5.2)
       hall.add(outerWall)
-      this.physics.addStaticBox(new THREE.Vector3(side * 8.85, 2.4, -1.8), new THREE.Vector3(1.5, 4.8, 0.28))
     }
 
     // 5. Main Columns, Carved Dragon Pillars & Crossbeams (大木作柱梁系統：金環立柱、前門雙龍柱與鰲魚雀替)
@@ -805,7 +810,6 @@ export class TempleWorld {
           column.position.set(x, 2.65, z)
           column.castShadow = true
           hall.add(column)
-          this.physics.addStaticCylinder(new THREE.Vector3(x, 2.5, z - 7), 0.42, 5.0)
 
           // Spiral dragon body coils winding upward around column (金龍盤身雕花)
           for (let i = 0; i < 5; i += 1) {
@@ -831,7 +835,6 @@ export class TempleWorld {
           column.position.set(x, 2.52, z)
           column.castShadow = true
           hall.add(column)
-          this.physics.addStaticCylinder(new THREE.Vector3(x, 2.5, z - 7), 0.36, 5.0)
           const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.49, 0.49, 0.15, 12), gold)
           ring.position.set(x, 4.65, z)
           hall.add(ring)
@@ -1024,11 +1027,12 @@ export class TempleWorld {
 
     // Grand Hall Roof (大殿重檐歇山式大屋頂)
     const roof = this.createRoof(20.6, 16.2, 5.35, 8.2)
-    roof.position.set(0, 0, -7)
+    roof.position.set(0, 0, -0.3)
     this.roof.add(roof)
-    this.roof.position.y = 0
+    this.roof.position.set(0, 0, this.mainHallZ)
+    this.roof.scale.set(this.mainHallScale, this.mainHallScale, this.mainHallScale)
     this.scene.add(this.roof)
-    this.addRoofFinial(hall, 0, 0)
+    this.addRoofFinial(hall, 0, 8.32)
 
     // Grand Genshin Liyue Octagonal Palace Lanterns (大殿前階璃月御製八角挑簷長明宮燈)
     // No lantern on the central axis so the statue stays fully visible from the courtyard.
@@ -1548,16 +1552,17 @@ export class TempleWorld {
     // 1. Drum Pavilion Stone Base & Pillars (鼓樓石基座與立柱)
     const drumBase = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 2.4), makeMat('#a58d69'))
     drumBase.position.set(dx, 0.2, dz)
-    this.scene.add(drumBase)
+    this.leftSideGroup.add(drumBase)
     for (const x of [-16.15, -14.25]) {
       const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.21, 4.1, 9), red)
       pillar.position.set(x, 2.1, dz)
-      this.scene.add(pillar)
-      this.physics.addStaticCylinder(new THREE.Vector3(x, 2.05, dz), 0.18, 4.1)
+      this.leftSideGroup.add(pillar)
+      const col = this.physics.addStaticCylinder(new THREE.Vector3(x, 2.05, dz), 0.18, 4.1)
+      this.sideColliders.push({ collider: col, origX: x, y: 2.05, z: dz, isLeft: true })
     }
     const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.24, 0.25), wood)
     lintel.position.set(dx, 4.1, dz)
-    this.scene.add(lintel)
+    this.leftSideGroup.add(lintel)
 
     // 2. Ceremonial Great Drum & Stand (大太鼓與雕花鼓架)
     this.drum.position.set(dx, 2.8, dz)
@@ -1603,12 +1608,12 @@ export class TempleWorld {
     stick2.rotation.z = 0.4
     this.drum.add(stick1, stick2)
 
-    this.scene.add(this.drum)
+    this.leftSideGroup.add(this.drum)
 
     // 3. Pavilion Roof (鼓樓飛簷瓦頂)
     const drumRoof = this.createRoof(4.2, 3.5, 4.1, 5.4)
     drumRoof.position.set(dx, 0, dz)
-    this.scene.add(drumRoof)
+    this.leftSideGroup.add(drumRoof)
   }
 
   private addSideArchitecture(): void {
@@ -1616,10 +1621,11 @@ export class TempleWorld {
     const darkWood = makeMat(C.darkWood, 0.88)
     for (const x of [-13.4, 13.4]) {
       const isLeft = x < 0
+      const group = isLeft ? this.leftSideGroup : this.rightSideGroup
       const base = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.22, 16.8), makeMat('#9d8a70'))
       base.position.set(x, 0.12, -2.7)
       base.receiveShadow = true
-      this.scene.add(base)
+      group.add(base)
 
       // Solid outer boundary wall for the side corridors (廂房外側厚實封閉牆，不再鏤空漏光)
       const outerX = isLeft ? x - 2.4 : x + 2.4
@@ -1627,30 +1633,33 @@ export class TempleWorld {
       outerWall.position.set(outerX, 1.9, -2.7)
       outerWall.castShadow = true
       outerWall.receiveShadow = true
-      this.scene.add(outerWall)
-      this.physics.addStaticBox(new THREE.Vector3(outerX, 1.9, -2.7), new THREE.Vector3(0.42, 3.8, 16.8))
+      group.add(outerWall)
+      const wallCol = this.physics.addStaticBox(new THREE.Vector3(outerX, 1.9, -2.7), new THREE.Vector3(0.42, 3.8, 16.8))
+      this.sideColliders.push({ collider: wallCol, origX: outerX, y: 1.9, z: -2.7, isLeft })
 
       for (const z of [-9.3, -4, 1.2]) {
         const column = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 3.35, 10), makeMat(C.wood))
         column.position.set(x, 1.72, z)
         column.castShadow = true
-        this.scene.add(column)
-        this.physics.addStaticCylinder(new THREE.Vector3(x, 1.72, z), 0.27, 3.35)
+        group.add(column)
+        const col = this.physics.addStaticCylinder(new THREE.Vector3(x, 1.72, z), 0.27, 3.35)
+        this.sideColliders.push({ collider: col, origX: x, y: 1.72, z, isLeft })
       }
       const lintel = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.38, 0.45), sideMat)
       lintel.position.set(x, 3.48, -4)
-      this.scene.add(lintel)
+      group.add(lintel)
 
       // Corridor Ceiling (廂房實體吊頂)
       const corridorCeiling = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.12, 16.4), makeMat('#3c271d'))
       corridorCeiling.position.set(x, 3.38, -2.7)
       corridorCeiling.receiveShadow = true
-      this.scene.add(corridorCeiling)
+      group.add(corridorCeiling)
 
       const roof = this.createRoof(5.6, 17.2, 3.3, 5.0)
       roof.position.set(x, 0, -3.7)
-      this.scene.add(roof)
+      group.add(roof)
     }
+    this.scene.add(this.leftSideGroup, this.rightSideGroup)
     for (let x = -6; x <= 6; x += 3) {
       const paving = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.04, 1.15), makeMat('#a59479', 0.93))
       paving.position.set(x, 0.035, -15.8)
@@ -1666,7 +1675,10 @@ export class TempleWorld {
 
     // Main incense urn and three slender sticks.
     const urn = new THREE.Group()
-    urn.position.set(0, 0, -2.55)
+    this.outdoorUrn = urn
+    const stepsFrontEdge = this.mainHallZ + 7.9 * this.mainHallScale
+    const urnZ = Math.max(0.4, stepsFrontEdge + 1.25)
+    urn.position.set(0, 0, urnZ)
     const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.83, 0.65, 0.72, 12), bronze)
     bowl.position.y = 0.6
     const rim = new THREE.Mesh(new THREE.TorusGeometry(0.79, 0.09, 8, 20), gold)
@@ -1684,7 +1696,7 @@ export class TempleWorld {
       urn.add(ember)
     }
     this.scene.add(urn)
-    this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, -2.55), 0.86, 1.1)
+    this.outdoorUrnCollider = this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, urnZ), 0.86, 1.1)
 
     // 原神璃月風格七星蓮華祈願長明神燈（平安燈、財神燈、文昌燈）
     this.lamps.forEach((lamp, i) => {
@@ -1791,16 +1803,17 @@ export class TempleWorld {
     // Bell pavilion.
     const bellBase = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.4, 2.4), makeMat('#a58d69'))
     bellBase.position.set(15.2, 0.2, -8)
-    this.scene.add(bellBase)
+    this.rightSideGroup.add(bellBase)
     for (const x of [14.25, 16.15]) {
       const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.21, 4.1, 9), red)
       pillar.position.set(x, 2.1, -8)
-      this.scene.add(pillar)
-      this.physics.addStaticCylinder(new THREE.Vector3(x, 2.05, -8), 0.18, 4.1)
+      this.rightSideGroup.add(pillar)
+      const col = this.physics.addStaticCylinder(new THREE.Vector3(x, 2.05, -8), 0.18, 4.1)
+      this.sideColliders.push({ collider: col, origX: x, y: 2.05, z: -8, isLeft: false })
     }
     const lintel = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.24, 0.25), wood)
     lintel.position.set(15.2, 4.1, -8)
-    this.scene.add(lintel)
+    this.rightSideGroup.add(lintel)
     const bellBody = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.58, 1.15, 12, 1, true), bronze)
     bellBody.position.set(15.2, 3.25, -8)
     this.bell.add(bellBody)
@@ -1811,10 +1824,10 @@ export class TempleWorld {
     const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), gold)
     clapper.position.set(15.2, 2.5, -8)
     this.bell.add(clapper)
-    this.scene.add(this.bell)
+    this.rightSideGroup.add(this.bell)
     const bellRoof = this.createRoof(4.2, 3.5, 4.1, 5.4)
     bellRoof.position.set(15.2, 0, -8)
-    this.scene.add(bellRoof)
+    this.rightSideGroup.add(bellRoof)
 
     // Prayer wall panel.
     const panel = new THREE.Mesh(new THREE.BoxGeometry(5.1, 3.6, 0.42), makeMat(C.darkWood))
@@ -1839,11 +1852,10 @@ export class TempleWorld {
     this.scene.add(recordFace)
 
     this.physics.addStaticBox(new THREE.Vector3(8.5, 0.5, -8.5), new THREE.Vector3(1.8, 1, 1.35))
-    this.physics.addStaticBox(new THREE.Vector3(15.2, 0.6, -8), new THREE.Vector3(2.4, 1.2, 2.2))
+    const bellBoxCollider = this.physics.addStaticBox(new THREE.Vector3(15.2, 0.6, -8), new THREE.Vector3(2.4, 1.2, 2.2))
+    this.sideColliders.push({ collider: bellBoxCollider, origX: 15.2, y: 0.6, z: -8, isLeft: false })
     this.physics.addStaticBox(new THREE.Vector3(17.2, 0.9, 0.2), new THREE.Vector3(0.4, 1.7, 2.2))
     for (const lamp of this.lamps) this.physics.addStaticBox(new THREE.Vector3(lamp.position.x, 1, lamp.position.z), new THREE.Vector3(1.3, 2, 1.3))
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.9, -11.55), new THREE.Vector3(7.5, 1.8, 2.1))
-    this.physics.addStaticBox(new THREE.Vector3(0, 1, -12.68), new THREE.Vector3(7.85, 2, 2.55))
   }
 
   private addMarkers(): void {
@@ -1904,10 +1916,10 @@ export class TempleWorld {
 
   private addRoofFinial(parent: THREE.Object3D, x: number, y: number): void {
     const ball = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 7), makeMat(C.gold, 0.4, 0.2))
-    ball.position.set(x, y, -7)
+    ball.position.set(x, y, -0.3)
     parent.add(ball)
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.55, 8), makeMat(C.gold, 0.4, 0.2))
-    tip.position.set(x, y + 0.34, -7)
+    tip.position.set(x, y + 0.34, -0.3)
     parent.add(tip)
   }
 
@@ -3310,8 +3322,8 @@ export class TempleWorld {
       glowRing.position.y = 0.02
       unit.add(glowRing)
 
-      const worldX = spec.x
-      const worldZ = spec.z - 7
+      const worldX = spec.x * this.mainHallScale
+      const worldZ = this.mainHallZ + spec.z * this.mainHallScale
 
       this.cushionSlots.push({
         index: idx,
@@ -4145,7 +4157,10 @@ export class TempleWorld {
   }
 
   update(dt: number, time: number, playerPosition: THREE.Vector3, activePoint: ShrinePointId | null, camera?: THREE.Camera): void {
-    const insideHall = playerPosition.z < 0 && playerPosition.z > -13.5 && Math.abs(playerPosition.x) < 9
+    const frontThresholdZ = this.mainHallZ + 5.28 * this.mainHallScale
+    const backWallZ = this.mainHallZ - 6.5 * this.mainHallScale
+    const sideWallX = 9.5 * this.mainHallScale
+    const insideHall = playerPosition.z < frontThresholdZ && playerPosition.z > backWallZ && Math.abs(playerPosition.x) < sideWallX
     this.roof.visible = !insideHall
     const insideRear = playerPosition.z < -16.5 && playerPosition.z > -33.5 && Math.abs(playerPosition.x) < 12.0
     this.rearRoof.visible = !insideRear
@@ -4688,5 +4703,198 @@ export class TempleWorld {
       age: 0,
       life: 1.6 + Math.random() * 0.9,
     })
+  }
+
+  getMainHallScale(): number {
+    return this.mainHallScale
+  }
+
+  getGuanyinStatueWorldPos(): { x: number; z: number } {
+    return { x: 0, z: this.mainHallZ - 5.68 * this.mainHallScale }
+  }
+
+  /**
+   * 等比例縮放大殿規模 (範圍 1.0 ~ 2.0，基準 1.35x)。
+   * 底座精準對齊地面 y = 0，自動微調 Z 軸前後位置，並向外展開偏殿與鐘鼓樓，
+   * 確保大殿與周圍偏殿、香爐、樹木及後殿完全防穿模貼地。
+   */
+  setMainHallScale(scale: number, customZ?: number): void {
+    const s = THREE.MathUtils.clamp(scale, 1.0, 2.0)
+    this.mainHallScale = s
+    this.mainHallZ = customZ ?? (-7.0 - (s - 1.0) * 0.8)
+
+    // 1. Scale and translate Main Hall group and roof
+    if (this.mainHallGroup) {
+      this.mainHallGroup.scale.set(s, s, s)
+      this.mainHallGroup.position.set(0, 0, this.mainHallZ)
+    }
+    if (this.roof) {
+      this.roof.scale.set(s, s, s)
+      this.roof.position.set(0, 0, this.mainHallZ)
+    }
+
+    // 2. Rebuild physics colliders for main hall
+    this.rebuildMainHallColliders(s, this.mainHallZ)
+
+    // 3. Update cushion slots world coordinates
+    for (const slot of this.cushionSlots) {
+      slot.worldX = slot.x * s
+      slot.worldZ = this.mainHallZ + slot.z * s
+    }
+
+    // 4. Update smoke spots inside the hall
+    if (this.mainHallSmokeSpots.length >= 2) {
+      this.mainHallSmokeSpots[0].set(0, 1.55 * s, this.mainHallZ - 2.95 * s)
+      this.mainHallSmokeSpots[1].set(0, 2.15 * s, this.mainHallZ - 4.15 * s)
+    }
+
+    // 5. Update outdoor Tiangong Urn (天公爐) position in front of the grand front steps
+    const stepsFrontEdge = this.mainHallZ + 7.9 * s
+    const urnZ = Math.max(0.4, stepsFrontEdge + 1.25)
+    if (this.outdoorUrn) {
+      this.outdoorUrn.position.set(0, 0, urnZ)
+      if (this.outdoorUrnCollider) {
+        this.physics.removeCollider(this.outdoorUrnCollider)
+      }
+      this.outdoorUrnCollider = this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, urnZ), 0.86, 1.1)
+      if (this.incenseGlow) {
+        this.incenseGlow.position.set(0, 1.8, urnZ - 0.05)
+      }
+      const incensePoint = this.points.find(p => p.id === 'incense')
+      if (incensePoint) {
+        incensePoint.position.set(0, 0, urnZ + 0.95)
+        const marker = this.markers.get('incense')
+        if (marker) marker.position.set(0, 0.09, urnZ + 0.95)
+      }
+      POINT_TARGETS[0] = [0, urnZ]
+    }
+
+    // 6. Update side architecture (偏殿、鐘鼓樓) outward clearance to prevent any overlap
+    const sideOffset = (s - 1.0) * 8.5
+    if (this.leftSideGroup) this.leftSideGroup.position.x = -sideOffset
+    if (this.rightSideGroup) this.rightSideGroup.position.x = sideOffset
+
+    for (const sc of this.sideColliders) {
+      const newX = sc.isLeft ? sc.origX - sideOffset : sc.origX + sideOffset
+      sc.collider.setTranslation({ x: newX, y: sc.y, z: sc.z })
+    }
+
+    // Update shrine points and markers for bell & drum
+    const bellPoint = this.points.find(p => p.id === 'bell')
+    if (bellPoint) {
+      bellPoint.position.set(12.4 + sideOffset, 0, -5.6)
+      const marker = this.markers.get('bell')
+      if (marker) marker.position.set(12.4 + sideOffset, 0.09, -5.6)
+    }
+    const drumPoint = this.points.find(p => p.id === 'drum')
+    if (drumPoint) {
+      drumPoint.position.set(-12.4 - sideOffset, 0, -5.6)
+      const marker = this.markers.get('drum')
+      if (marker) marker.position.set(-12.4 - sideOffset, 0.09, -5.6)
+    }
+    POINT_TARGETS[7] = [15.2 + sideOffset, -8]
+    POINT_TARGETS[11] = [-15.2 - sideOffset, -8.0]
+
+    // Update offerings point inside the hall
+    const offeringsPoint = this.points.find(p => p.id === 'offerings')
+    if (offeringsPoint) {
+      offeringsPoint.position.set(-2.25 * s, 0, this.mainHallZ - 3.05 * s)
+      const marker = this.markers.get('offerings')
+      if (marker) marker.position.set(-2.25 * s, 0.09, this.mainHallZ - 3.05 * s)
+    }
+  }
+
+  private rebuildMainHallColliders(scale: number, hallZ: number): void {
+    for (const collider of this.mainHallColliders) {
+      this.physics.removeCollider(collider)
+    }
+    this.mainHallColliders = []
+
+    // 1. Raised podium
+    this.mainHallColliders.push(
+      this.physics.addStaticBox(
+        new THREE.Vector3(0, 0.14 * scale, hallZ - 0.3 * scale),
+        new THREE.Vector3(20.4 * scale, 0.28 * scale, 14.8 * scale)
+      )
+    )
+
+    // 2. Central shrine back wall
+    this.mainHallColliders.push(
+      this.physics.addStaticBox(
+        new THREE.Vector3(0, 2.55 * scale, hallZ - 6.4 * scale),
+        new THREE.Vector3(8.2 * scale, 5.1 * scale, 0.6 * scale)
+      )
+    )
+
+    // 3. Outer back walls
+    for (const side of [-1, 1]) {
+      this.mainHallColliders.push(
+        this.physics.addStaticBox(
+          new THREE.Vector3(side * 8.5 * scale, 2.55 * scale, hallZ - 6.4 * scale),
+          new THREE.Vector3(2.2 * scale, 5.1 * scale, 0.6 * scale)
+        )
+      )
+    }
+
+    // 4. Solid side walls
+    for (const side of [-1, 1]) {
+      const sx = side * 9.2 * scale
+      this.mainHallColliders.push(
+        this.physics.addStaticBox(
+          new THREE.Vector3(sx, 2.55 * scale, hallZ - 0.4 * scale),
+          new THREE.Vector3(0.55 * scale, 5.1 * scale, 12.6 * scale)
+        )
+      )
+    }
+
+    // 5. Front screen walls (dragon & tiger screens)
+    for (const side of [-1, 1]) {
+      this.mainHallColliders.push(
+        this.physics.addStaticBox(
+          new THREE.Vector3(side * 3.8 * scale, 2.4 * scale, hallZ + 5.2 * scale),
+          new THREE.Vector3(3.2 * scale, 4.8 * scale, 0.28 * scale)
+        )
+      )
+    }
+
+    // 6. Outer front side walls
+    for (const side of [-1, 1]) {
+      this.mainHallColliders.push(
+        this.physics.addStaticBox(
+          new THREE.Vector3(side * 8.85 * scale, 2.4 * scale, hallZ + 5.2 * scale),
+          new THREE.Vector3(1.5 * scale, 4.8 * scale, 0.28 * scale)
+        )
+      )
+    }
+
+    // 7. Columns (vermilion & dragon pillars)
+    for (const z of [-5.8, -0.2, 5.2]) {
+      for (const x of [-8.1, -5.4, 5.4, 8.1]) {
+        const isDragonCol = z === 5.2 && (x === -5.4 || x === 5.4)
+        const rad = (isDragonCol ? 0.42 : 0.36) * scale
+        const h = 5.0 * scale
+        this.mainHallColliders.push(
+          this.physics.addStaticCylinder(
+            new THREE.Vector3(x * scale, h / 2, hallZ + z * scale),
+            rad,
+            h
+          )
+        )
+      }
+    }
+
+    // 8. Altar table & deity statue plinths
+    this.mainHallColliders.push(
+      this.physics.addStaticBox(
+        new THREE.Vector3(0, 0.9 * scale, hallZ - 4.55 * scale),
+        new THREE.Vector3(7.5 * scale, 1.8 * scale, 2.1 * scale)
+      )
+    )
+    this.mainHallColliders.push(
+      this.physics.addStaticBox(
+        new THREE.Vector3(0, 1.0 * scale, hallZ - 5.68 * scale),
+        new THREE.Vector3(7.85 * scale, 2.0 * scale, 2.55 * scale)
+      )
+    )
   }
 }

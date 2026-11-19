@@ -1,4 +1,5 @@
 import './styles/main.css'
+import GUI from 'lil-gui'
 import { Audio } from './engine/audio'
 import { Assets } from './engine/assets'
 import { Input } from './engine/input'
@@ -220,8 +221,8 @@ async function boot(): Promise<void> {
     g.world.perform('incense')
     ui.toast('於觀世音菩薩前跪下虔誠祈福...', 2200)
 
-    // 面向大殿正中央觀音聖像方向 ({ x: 0, z: -12.5 }) 虔誠合十跪拜 4.2 秒
-    g.worship({ x: 0, z: -12.5 }, 4.2, () => {
+    // 面向大殿正中央觀音聖像方向虔誠合十跪拜 4.2 秒
+    g.worship(g.world.getGuanyinStatueWorldPos(), 4.2, () => {
       store.offerIncense()
       audio.play('bell')
       ui.toast('跪拜祈福圓滿：心香一瓣，願觀音菩薩慈悲庇佑，福慧增長、平安吉祥。', 4500)
@@ -297,6 +298,31 @@ async function boot(): Promise<void> {
   window.addEventListener('temple:toast', e => {
     ui.toast((e as CustomEvent<string>).detail, 3200)
   })
+
+  const savedScaleStr = safeGet('temple_main_hall_scale')
+  const initialScale = savedScaleStr ? Math.min(2.0, Math.max(1.0, parseFloat(savedScaleStr) || 1.35)) : 1.35
+  g.setMainHallScale(initialScale)
+
+  // 右上角 lil-gui 控制面板：保留大殿 scale 微調空間 (1.0 ~ 2.0，基準 1.35x)
+  const gui = new GUI({ title: '大殿微調 (Main Hall)' })
+  const guiParams = {
+    mainHallScale: initialScale,
+    reset: () => {
+      guiParams.mainHallScale = 1.35
+      scaleController.setValue(1.35)
+    },
+  }
+  const scaleController = gui.add(guiParams, 'mainHallScale', 1.0, 2.0, 0.01)
+    .name('大殿比例 (Scale)')
+    .onChange((val: number) => {
+      g.setMainHallScale(val)
+      try { localStorage.setItem('temple_main_hall_scale', String(val)) } catch {}
+    })
+  gui.add(guiParams, 'reset').name('重設預設 (1.35x)')
+
+  if (window.innerWidth < 768 || document.body.classList.contains('has-touch')) {
+    gui.close()
+  }
 
   if (import.meta.env.DEV) {
     const [{ registerGameTuning }, { tuning }] = await Promise.all([import('../scripts/manus-tuning/adapter.js'), import('./game/tuning')])

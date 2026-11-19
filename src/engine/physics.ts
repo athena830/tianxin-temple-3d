@@ -72,6 +72,13 @@ export class Physics {
     return this.world.createCollider(RAPIER.ColliderDesc.ball(radius).setTranslation(center.x, center.y, center.z).setSensor(true))
   }
 
+  /** Remove a static collider from the Rapier physics world. */
+  removeCollider(collider: RAPIER.Collider): void {
+    try {
+      this.world.removeCollider(collider, false)
+    } catch {}
+  }
+
   /** Kinematic body driven by gameplay (moving platforms, patrol drones), rendered with interpolation. */
   addKinematic(object: THREE.Object3D, collider: RAPIER.ColliderDesc): RAPIER.RigidBody {
     const body = this.world.createRigidBody(

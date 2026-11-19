@@ -774,3 +774,25 @@ body.has-touch .prompt { left: auto; right: 16px; transform: none; width: auto; 
 body.has-touch .mode-bar { bottom: auto; top: calc(14px + var(--safe-t)); right: auto; left: 50%; transform: translateX(-50%); }
 body.has-touch .mode-bar .exit .key { display: none; }
 .panel ul.info { margin: 8px 0 14px; padding-left: 1.2em; display: grid; gap: 6px; line-height: 1.6; }
+
+/* lil-gui custom styling & placement */
+.lil-gui.root {
+  top: 76px !important;
+  right: 14px !important;
+  max-width: 250px;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(229, 185, 104, 0.35) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif !important;
+  z-index: 99 !important;
+}
+
+.lil-gui.root .title {
+  background: #39291f !important;
+  color: #dfc17c !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.06em;
+  padding: 8px 12px !important;
+}

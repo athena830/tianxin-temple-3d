@@ -461,6 +461,14 @@ export class TempleGame {
   }
 
   /** Show a guide arrow toward a station instead of teleporting. */
+  setMainHallScale(scale: number): void {
+    this.world.setMainHallScale(scale)
+  }
+
+  getMainHallScale(): number {
+    return this.world.getMainHallScale()
+  }
+
   setGuide(id: ShrinePointId | null): void {
     this.guide = id ? this.world.points.find(p => p.id === id) ?? null : null
     const p = this.body.translation()
