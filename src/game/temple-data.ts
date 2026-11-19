@@ -242,7 +242,8 @@ export class TempleStore {
       this.currentCrossGua = evaluateCrossGua(current.slots)
       if (this.currentCrossGua.allRevealed) {
         const c = this.currentCrossGua
-        const summaryRecord = `【${c.patternName}】${c.level}｜中[${c.slots.center.piece.name}] 上[${c.slots.top.piece.name}] 下[${c.slots.bottom.piece.name}] 左[${c.slots.left.piece.name}] 右[${c.slots.right.piece.name}]`
+        const formationsText = c.analysis.formations.length > 0 ? c.analysis.formations.map(f => f.name).join('、') : c.patternName
+        const summaryRecord = `【${formationsText}】${c.level}｜收獲${c.analysis.gains} ${c.analysis.compareSymbol} 付出${c.analysis.losses}｜中[${c.slots.center.piece.name}] 上[${c.slots.top.piece.name}] 下[${c.slots.bottom.piece.name}] 左[${c.slots.left.piece.name}] 右[${c.slots.right.piece.name}]`
         this.addRecord('象棋神卦', summaryRecord)
       }
     }

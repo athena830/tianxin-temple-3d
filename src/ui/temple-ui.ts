@@ -349,16 +349,76 @@ export class TempleUi {
         }
         const badgeClass = levelBadgeClass[gua.level] || 'badge-luck'
 
+        const posIndexNames = ['中宮・主位', '左方・客方', '右方・主方', '上方・天時', '下方・地利']
+
+        const formationsHtml = gua.analysis.formations.length > 0
+          ? gua.analysis.formations.map(f => `
+              <div class="formation-item">
+                <div class="formation-item-title">🔮 ${esc(f.name)}</div>
+                <div class="formation-item-desc">${esc(f.description)}</div>
+              </div>
+            `).join('')
+          : `
+              <div class="formation-item">
+                <div class="formation-item-desc">${esc(gua.summary)}</div>
+              </div>
+            `
+
+        const recordsHtml = gua.analysis.records.length > 0
+          ? `
+            <details class="chess-records-details">
+              <summary>查看十字吃子捕捉明細（共 ${gua.analysis.records.length} 筆）</summary>
+              <div class="records-content">
+                <ul class="records-list">
+                  ${gua.analysis.records.map(r => `
+                    <li class="${r.isGain ? 'record-gain' : 'record-loss'}">
+                      <span class="record-badge">${r.isGain ? '收獲' : '付出'}</span>
+                      <b>${posIndexNames[r.attackerPos]} [${esc(r.attacker.character)}]</b> 捕捉 <b>${posIndexNames[r.targetPos]} [${esc(r.target.character)}]</b>
+                      <span class="record-score">${r.isGain ? '+' : '-'}${r.score}分</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+            </details>
+          `
+          : ''
+
         const resultCard = gua.allRevealed ? `
           <div class="chess-result-box">
             <div class="result-head">
               <span class="result-level-badge ${badgeClass}">${gua.level}</span>
               <h3 class="result-pattern-name">${esc(gua.patternName)}</h3>
             </div>
-            <div class="result-summary-section">
-              <div class="summary-line"><b>仙姑總評：</b>${esc(gua.summary)}</div>
-              <div class="advice-line"><b>指點心法：</b>${esc(gua.advice)}</div>
+
+            <div class="result-score-bar">
+              <div class="score-item score-gain">
+                <span class="score-label">收獲</span>
+                <b class="score-val">${gua.analysis.gains}</b>
+                <span class="score-unit">分</span>
+              </div>
+              <span class="score-sym">${gua.analysis.compareSymbol}</span>
+              <div class="score-item score-loss">
+                <span class="score-label">付出</span>
+                <b class="score-val">${gua.analysis.losses}</b>
+                <span class="score-unit">分</span>
+              </div>
+              <div class="score-badges">
+                ${gua.analysis.hasGoodFriends ? '<span class="score-tag badge-friend">好朋友格・逐筆減半</span>' : ''}
+                ${gua.analysis.protectedColor !== null ? `<span class="score-tag badge-protect">護身免吃・${gua.analysis.protectedColor ? '紅方' : '黑方'}受庇佑</span>` : ''}
+              </div>
             </div>
+
+            <div class="result-formations-section">
+              <h4 class="section-title">仙姑格局詳解</h4>
+              ${formationsHtml}
+            </div>
+
+            <div class="result-summary-section">
+              <div class="advice-line"><b>仙姑指點心法：</b>${esc(gua.advice)}</div>
+            </div>
+
+            ${recordsHtml}
+
             <div class="result-pos-grid">
               <div class="pos-item center-item">
                 <span class="pos-badge">中宮・本質</span>
@@ -381,7 +441,7 @@ export class TempleUi {
                 <p>${esc(gua.posInterpretations.right)}</p>
               </div>
             </div>
-            <div class="result-save-hint">✨ 卦象與評語已完整存入個人「祈福紀錄」</div>
+            <div class="result-save-hint">✨ 卦象與仙姑評語已完整存入個人「祈福紀錄」</div>
           </div>
         ` : `
           <div class="chess-prompt-box">
