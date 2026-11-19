@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process'
 import { join } from 'node:path'
-import { rmSync, copyFileSync, writeFileSync, readdirSync, mkdirSync, unlinkSync } from 'node:fs'
+import { rmSync, cpSync, copyFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
 
 const rootDir = process.cwd()
 const distDir = join(rootDir, 'dist')
@@ -15,11 +15,11 @@ const distFiles = new Set(readdirSync(join(distDir, 'assets')))
 for (const existing of readdirSync(rootAssetsDir)) {
   if (existing === 'models' || existing === 'share') continue
   if (!distFiles.has(existing)) {
-    unlinkSync(join(rootAssetsDir, existing))
+    rmSync(join(rootAssetsDir, existing), { recursive: true, force: true })
   }
 }
 for (const file of distFiles) {
-  copyFileSync(join(distDir, 'assets', file), join(rootAssetsDir, file))
+  cpSync(join(distDir, 'assets', file), join(rootAssetsDir, file), { recursive: true })
 }
 
 console.log('[deploy] Preparing .nojekyll and 404.html...')

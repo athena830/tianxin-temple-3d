@@ -58,6 +58,7 @@ async function boot(): Promise<void> {
     explore: startExplore,
     exitExplore,
     cancelGuide: () => game?.setGuide(null),
+    goHome: () => { exitExplore(); audio.play('ui') },
     time: mode => game?.world.setTimeSetting(mode),
     toggleMusic: () => audio.toggleMusic(),
     isMusicPlaying: () => audio.isMusicPlaying(),

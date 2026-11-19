@@ -3,6 +3,7 @@ import { getLunarPhaseInfo, getRealWorldTimeOfDay, type ShrinePoint, type Shrine
 import { POS_META, type ChessPos } from '../divination'
 import type { MusicTrack } from '../engine/audio'
 import { APP_VERSION } from '../version'
+import { LINE_OFFICIAL_URL, renderQrLightbox, renderServiceModal, renderServiceSection } from './service-links'
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
 const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
@@ -35,6 +36,7 @@ export type TempleUiActions = {
   explore(): void
   exitExplore(): void
   cancelGuide(): void
+  goHome?(): void
   time(mode: TimeSetting): void
   toggleMusic(): { playing: boolean; track: MusicTrack; chantCount: number }
   isMusicPlaying(): boolean
@@ -72,6 +74,7 @@ export class TempleUi {
           <h1>玉皇宮</h1>
           <p class="lead">心願有寄，平安相伴。穿過宮門，走進觀世音菩薩主殿，以自己的步伐參拜祈福。</p>
           <button class="btn primary" data-act="begin">入宮祈福</button>
+          <p class="title-service-entry"><button type="button" class="link-btn" data-act="open-services">LINE 預約解卦・隨喜支持</button></p>
           <p class="note">祈願與紀錄僅保存在此瀏覽器中。</p>
         </div>
       </section>
@@ -85,7 +88,7 @@ export class TempleUi {
       </section>
       <section class="screen hud" data-screen="hud">
         <header class="hud-top">
-          <div class="badge"><span class="seal small">玉</span><div><b>玉皇宮</b><small data-who></small></div></div>
+          <button type="button" class="badge badge-btn" data-act="go-home" title="返回首頁" aria-label="返回玉皇宮首頁"><span class="seal small">玉</span><div><b>玉皇宮</b><small data-who></small></div></button>
           <div class="hud-buttons">
             <button class="chip" data-act="time">${initialTimeLabel}</button>
             <button class="chip" data-act="music">${initialMusicLabel}</button>
@@ -113,6 +116,8 @@ export class TempleUi {
       </section>
       <section class="screen pause" data-screen="pause"><div class="title-card"><h2>暫歇片刻</h2><p class="lead">點擊下方按鈕繼續參拜。</p><button class="btn primary" data-act="resume">繼續參拜</button></div></section>
       <div class="panel-wrap" hidden><article class="panel"><button class="close" data-act="close" aria-label="關閉">×</button><div class="panel-body"></div></article></div>
+      ${renderServiceModal()}
+      ${renderQrLightbox()}
       <div class="wish-banner" hidden></div>
       <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
       <div class="toast" hidden></div>`
@@ -136,7 +141,12 @@ export class TempleUi {
       this.actions.ritual('wish')
       this.open('prayer-wall', '你的心願已安放在祈願牆。')
     })
-    this.root.addEventListener('keydown', e => { if (e.key === 'Escape' && !this.panelHidden) { e.stopPropagation(); this.actions.closePanel() } })
+    this.root.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return
+      const overlay = this.root.querySelector<HTMLElement>('[data-qr-lightbox]:not([hidden]), [data-service-modal]:not([hidden])')
+      if (overlay) { e.stopPropagation(); overlay.hidden = true; return }
+      if (!this.panelHidden) { e.stopPropagation(); this.actions.closePanel() }
+    })
     this.refreshCharacter()
   }
 
@@ -314,7 +324,8 @@ export class TempleUi {
         return `<p class="eyebrow">天心仙姑問事亭</p><h2>問事服務介紹</h2>
           <p>天心仙姑問事亭位於前庭左側，是天心仙姑專屬的象棋卜卦與問事服務空間。</p>
           <ul class="info"><li>象棋卜卦：點擊亭內桌上的棋盤即可開始。</li><li>正式問事：採預約方式進行。</li><li>隱私：個人問事內容與卜卦紀錄僅保存在你自己的瀏覽器，不會顯示在公開場景。</li></ul>
-          <div class="row"><button class="btn primary" data-open="chess">返回象棋卜卦</button><button class="btn" data-act="contact">正式問事聯絡入口</button></div>`
+          <div class="row"><button class="btn primary" data-open="chess">返回象棋卜卦</button><button class="btn" data-act="contact">正式問事聯絡入口</button></div>
+          ${renderServiceSection()}`
       case 'chess': {
         const gua = this.store.currentCrossGua ?? this.store.startCrossGua()
         const renderSlot = (pos: ChessPos) => {
@@ -477,6 +488,7 @@ export class TempleUi {
             <button type="button" class="btn" data-open="consult">問事服務介紹</button>
             <button type="button" class="btn" data-act="contact">正式問事聯絡入口</button>
           </div>
+          ${renderServiceSection()}
         `
       }
       case 'woodfish':
@@ -550,10 +562,21 @@ export class TempleUi {
   }
 
 
+  private setOverlay(selector: string, open: boolean): void {
+    const el = this.root.querySelector<HTMLElement>(selector)
+    if (el) el.hidden = !open
+  }
+
   private onClick(e: MouseEvent): void {
     const t = (e.target as HTMLElement).closest<HTMLElement>('button')
     if (!t) {
-      if ((e.target as HTMLElement).classList.contains('panel-wrap')) {
+      const target = e.target as HTMLElement
+      if (target.matches('[data-qr-lightbox], [data-service-modal]')) {
+        e.stopPropagation()
+        target.hidden = true
+        return
+      }
+      if (target.classList.contains('panel-wrap')) {
         e.preventDefault()
         e.stopPropagation()
         this.closePanel()
@@ -575,7 +598,18 @@ export class TempleUi {
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'cushion-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'cushion' })) }
     else if (act === 'sky-lantern-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'sky-lantern' })) }
-    else if (act === 'contact') this.toast('正式問事聯絡方式即將公布，敬請期待')
+    else if (act === 'contact') window.open(LINE_OFFICIAL_URL, '_blank', 'noopener,noreferrer')
+    else if (act === 'go-home') {
+      this.closePanel()
+      const m = this.root.querySelector<HTMLElement>('.map')
+      if (m) m.hidden = true
+      this.actions.goHome?.()
+      this.show('title')
+    }
+    else if (act === 'open-services') this.setOverlay('[data-service-modal]', true)
+    else if (act === 'services-close') this.setOverlay('[data-service-modal]', false)
+    else if (act === 'qr-zoom') this.setOverlay('[data-qr-lightbox]', true)
+    else if (act === 'qr-close') this.setOverlay('[data-qr-lightbox]', false)
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
     else if (act === 'music') {
       const state = this.actions.toggleMusic()
