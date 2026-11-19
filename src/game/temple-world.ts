@@ -160,7 +160,7 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     sunVisualOpacity: 0.92,
     moonPos: [95, 35, -80],
     moonOpacity: 0.15,
-    starsOpacity: 0.08,
+    starsOpacity: 0.0,
     milkyWayOpacity: 0.0,
   },
   day: {
@@ -202,7 +202,7 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     sunVisualOpacity: 0.95,
     moonPos: [75, 60, -90],
     moonOpacity: 0.45,
-    starsOpacity: 0.15,
+    starsOpacity: 0.0,
     milkyWayOpacity: 0.0,
   },
   night: {
@@ -223,7 +223,7 @@ export const TIME_CONFIGS: Record<TimeOfDay, TimeConfig> = {
     sunVisualOpacity: 0.0,
     moonPos: [62, 92, -95],
     moonOpacity: 1.0,
-    starsOpacity: 0.85,
+    starsOpacity: 0.0,
     milkyWayOpacity: 0.0,
   },
 }
@@ -461,8 +461,6 @@ export class TempleWorld {
   private moonSprite?: THREE.Sprite
   private moonCanvas?: HTMLCanvasElement
   private moonTexture?: THREE.CanvasTexture
-  private starsPoints?: THREE.Points
-  private starsMat?: THREE.PointsMaterial
   private celestialGroup?: THREE.Group
 
   private currentSunVisualOpacity = 1.0
@@ -3856,73 +3854,6 @@ export class TempleWorld {
     this.moonSprite.visible = this.currentMoonOpacity > 0.005
     this.celestialGroup.add(this.moonSprite)
 
-    // 3. High-Mountain Starfield (sparse, gentle natural ~75 circular starlight points high in the sky dome)
-    const starCanvas = document.createElement('canvas')
-    starCanvas.width = 64
-    starCanvas.height = 64
-    const starCtx = starCanvas.getContext('2d')
-    if (starCtx) {
-      const g = starCtx.createRadialGradient(32, 32, 0, 32, 32, 28)
-      g.addColorStop(0, 'rgba(255, 255, 255, 1.0)')
-      g.addColorStop(0.2, 'rgba(255, 255, 255, 0.85)')
-      g.addColorStop(0.5, 'rgba(215, 235, 255, 0.3)')
-      g.addColorStop(1.0, 'rgba(180, 220, 255, 0)')
-      starCtx.fillStyle = g
-      starCtx.beginPath()
-      starCtx.arc(32, 32, 28, 0, Math.PI * 2)
-      starCtx.fill()
-    }
-    const starTex = new THREE.CanvasTexture(starCanvas)
-    starTex.colorSpace = THREE.SRGBColorSpace
-    starTex.minFilter = THREE.LinearFilter
-    starTex.magFilter = THREE.LinearFilter
-
-    const starCount = 75
-    const starPositions = new Float32Array(starCount * 3)
-    const starColors = new Float32Array(starCount * 3)
-    const colorPalette: [number, number, number][] = [
-      [1.0, 1.0, 1.0],       // Diamond white
-      [0.92, 0.96, 1.0],     // Ice blue
-      [1.0, 0.95, 0.85],     // Warm starlight
-      [0.85, 0.92, 1.0],     // Sapphire white
-    ]
-
-    for (let i = 0; i < starCount; i++) {
-      const u = Math.random()
-      const v = Math.random()
-      // Keep strictly to high upper sky dome (elevation > 40 degrees, completely clear of rooftops and horizon)
-      const theta = 0.08 + u * (Math.PI * 0.28)
-      const phi = v * Math.PI * 2
-      const r = 175 + (Math.random() - 0.5) * 4
-
-      starPositions[i * 3] = r * Math.sin(theta) * Math.cos(phi)
-      starPositions[i * 3 + 1] = r * Math.cos(theta) + 15 // Well above temple roofs
-      starPositions[i * 3 + 2] = r * Math.sin(theta) * Math.sin(phi)
-
-      const col = colorPalette[Math.floor(Math.random() * colorPalette.length)]
-      const brightness = 0.6 + Math.random() * 0.4
-      starColors[i * 3] = col[0] * brightness
-      starColors[i * 3 + 1] = col[1] * brightness
-      starColors[i * 3 + 2] = col[2] * brightness
-    }
-
-    const starGeo = new THREE.BufferGeometry()
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
-    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
-    this.starsMat = new THREE.PointsMaterial({
-      map: starTex,
-      size: 1.6,
-      vertexColors: true,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      opacity: this.currentStarsOpacity,
-      depthWrite: false,
-      fog: false,
-    })
-    this.starsPoints = new THREE.Points(starGeo, this.starsMat)
-    this.starsPoints.visible = this.currentStarsOpacity > 0.005
-    this.celestialGroup.add(this.starsPoints)
-
     this.scene.add(this.celestialGroup)
   }
 
@@ -4140,10 +4071,6 @@ export class TempleWorld {
         this.moonSprite.position.copy(this.currentMoonPos)
         ;(this.moonSprite.material as THREE.SpriteMaterial).opacity = this.currentMoonOpacity
         this.moonSprite.visible = this.currentMoonOpacity > 0.005
-      }
-      if (this.starsMat) {
-        this.starsMat.opacity = this.currentStarsOpacity
-        this.starsPoints && (this.starsPoints.visible = this.currentStarsOpacity > 0.005)
       }
 
       this.isSkyTransitioning = false
@@ -4440,11 +4367,6 @@ export class TempleWorld {
       this.moonSprite.position.copy(this.currentMoonPos)
       ;(this.moonSprite.material as THREE.SpriteMaterial).opacity = this.currentMoonOpacity
       this.moonSprite.visible = this.currentMoonOpacity > 0.005
-    }
-    if (this.starsMat) {
-      const twinkle = 0.85 + 0.15 * Math.sin(time * 2.2)
-      this.starsMat.opacity = this.currentStarsOpacity * twinkle
-      this.starsPoints && (this.starsPoints.visible = this.currentStarsOpacity > 0.005)
     }
 
     // Periodic check for lunar phase date updates (every 60 seconds)
