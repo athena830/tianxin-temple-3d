@@ -114,4 +114,25 @@ describe('main hall scale & collision avoidance', () => {
     expect(activeAtOldInsideLoc?.id).not.toBe('prayer')
     expect(activeAtOldInsideLoc?.id).not.toBe('prayer-wall')
   })
+
+  it('moves sky lantern stand beside the consultation pavilion away from the entrance', () => {
+    const physics = new Physics()
+    const world = new TempleWorld(physics)
+
+    const lanternStand = world.getPlayerLanternStand()
+    expect(lanternStand).toBeDefined()
+
+    // Sky lantern stand is placed beside the pavilion (z ≈ 23.5, x ≈ -12.5)
+    expect(lanternStand.z).toBeCloseTo(23.5, 1)
+    expect(lanternStand.x).toBeCloseTo(-12.5, 1)
+
+    // Approaching [-12.5, 23.5] triggers sky-lantern prompt
+    const activeNearLantern = world.nearestPoint(new (world.points[0].position.constructor as any)(-12.5, 0, 23.5))
+    expect(activeNearLantern).toBeDefined()
+    expect(activeNearLantern!.id).toBe('sky-lantern')
+
+    // At previous entrance location [-6.8, 29.8], sky lantern prompt is no longer active
+    const activeAtEntrance = world.nearestPoint(new (world.points[0].position.constructor as any)(-6.8, 0, 29.8))
+    expect(activeAtEntrance?.id).not.toBe('sky-lantern')
+  })
 })

@@ -282,7 +282,7 @@ const pointPositions: [number, number][] = [
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [LOTUS_POND.x - 5.8, LOTUS_POND.z], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z + 1.4], [15, 0.2],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x + 4.8, DRAGON_GUANYIN_POS.z],
-  [-6.8, 29.8],
+  [-12.5, 23.5],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
@@ -291,7 +291,7 @@ export const POINT_TARGETS: [number, number][] = [
   [12.5, -1.6], [8.5, -8.5], [15.2, -8], [LOTUS_POND.x, LOTUS_POND.z], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z], [17.2, 0.2],
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
-  [-6.8, 29.8],
+  [-12.5, 23.5],
 ]
 
 const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStandardMaterial =>

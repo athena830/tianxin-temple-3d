@@ -64,7 +64,7 @@ export class FrontCourtyard {
   private readonly lanternMats: THREE.MeshStandardMaterial[] = []
   private fairyMesh?: THREE.Mesh
   private readonly skyLanternGroups: CourtyardSkyLanternGroup[] = []
-  private readonly playerLanternStandPos = new THREE.Vector3(-6.8, 0, 29.8)
+  private readonly playerLanternStandPos = new THREE.Vector3(-12.5, 0, 23.5)
   private playerLanternGroup?: CourtyardSkyLanternGroup
 
   constructor(private readonly c: BuildContext) {
@@ -1898,9 +1898,9 @@ export class FrontCourtyard {
   private addSkyLanterns(): void {
     const glowTex = this.radialGlowTexture()
 
-    // 1. Group 1: NPC Couple holding lantern at (-9.2, 0, 26.8)
+    // 1. Group 1: NPC Couple holding lantern at (-15.2, 0, 24.2) beside the pavilion
     {
-      const origin = new THREE.Vector3(-9.2, 0, 26.8)
+      const origin = new THREE.Vector3(-15.2, 0, 24.2)
       const model = this.createSkyLanternModel('天心賜福', '所求如願')
       model.group.position.set(origin.x, 0.95, origin.z)
       this.add(model.group)
@@ -1950,9 +1950,9 @@ export class FrontCourtyard {
       })
     }
 
-    // 2. Group 2: NPC Devotee holding lantern at (-8.2, 0, 33.2)
+    // 2. Group 2: NPC Devotee holding lantern at (-9.8, 0, 23.0) beside the pavilion
     {
-      const origin = new THREE.Vector3(-8.2, 0, 33.2)
+      const origin = new THREE.Vector3(-9.8, 0, 23.0)
       const model = this.createSkyLanternModel('萬事如意', '平安喜樂')
       model.group.position.set(origin.x, 0.95, origin.z)
       this.add(model.group)
@@ -1993,7 +1993,7 @@ export class FrontCourtyard {
       })
     }
 
-    // 3. Group 3: Player Interactive Sky Lantern Stand at (-6.8, 0, 29.8)
+    // 3. Group 3: Player Interactive Sky Lantern Stand beside pavilion (-12.5, 0, 23.5)
     {
       const origin = this.playerLanternStandPos.clone()
 
