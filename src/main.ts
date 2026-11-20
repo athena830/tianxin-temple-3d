@@ -1,6 +1,6 @@
 import './styles/main.css'
 import GUI from 'lil-gui'
-import { Audio } from './engine/audio'
+import { Audio, getUserMuted } from './engine/audio'
 import { Assets } from './engine/assets'
 import { Input } from './engine/input'
 import { GameLoop } from './engine/loop'
@@ -32,7 +32,8 @@ async function boot(): Promise<void> {
   const store = new TempleStore()
   const input = new Input(canvas)
   const audio = new Audio()
-  audio.setVolumes(save.data.musicVolume * 0.6, save.data.sfxVolume, save.data.muted)
+  const initialUserMuted = getUserMuted()
+  audio.setVolumes(save.data.musicVolume * 0.6, save.data.sfxVolume, initialUserMuted || save.data.muted)
   let game: TempleGame | undefined
   let sceneManager: SceneManager | undefined
   let touch: TouchControls | undefined
@@ -44,10 +45,17 @@ async function boot(): Promise<void> {
   let interactBlockedUntil = 0
   const reopen = (id: ShrinePointId, msg: string) => ui.open(id, msg)
   const ui = new TempleUi(store, {
-    begin: () => { audio.unlock(); audio.startMusic(); audio.play('ui'); game?.showSelect(); ui.show('select') },
+    begin: () => {
+      audio.unlock()
+      if (!getUserMuted()) audio.startMusic()
+      audio.play('ui')
+      game?.showSelect()
+      ui.show('select')
+    },
     choose: id => { store.setCharacter(id); game?.world.setCharacter(id); audio.play('ui') },
     enter: () => {
-      audio.unlock(); audio.startMusic()
+      audio.unlock()
+      if (!getUserMuted()) audio.startMusic()
       game?.enter(); ui.show('hud'); loop.resetAccumulator()
       // Directly start exploring for all devices: seamless entry without an extra "開始探索" prompt
       startExplore()
@@ -183,6 +191,7 @@ async function boot(): Promise<void> {
   ui.show('boot')
   audio.onChantProgress = (cur, total) => ui.updateMusicProgress('green_tara', cur, total)
   audio.onTrackChange = (track, title, reason) => ui.onMusicTrackTransition(track, title, reason)
+  audio.onMusicStateChange = (playing, count) => ui.setMusicState(playing, count)
   ;(window as any).__templeAudio__ = audio
 
   let loaded = 0
@@ -412,6 +421,14 @@ async function boot(): Promise<void> {
       if (world === 'temple') game = active as TempleGame
       else game = undefined
       ui.setMode(active.mode)
+
+      // 全域 AudioManager：進入市集自動在 1.2 秒內淡出靜音並暫停；離開市集自動恢復
+      if (world === 'market') {
+        void audio.onEnterMarket()
+        ui.toast('已進入市集，背景音樂暫停', 2000)
+      } else if (world === 'temple') {
+        void audio.onLeaveMarket()
+      }
     },
     onError: message => ui.toast(message, 4200),
   })

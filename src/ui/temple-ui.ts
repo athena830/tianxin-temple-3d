@@ -107,7 +107,8 @@ export class TempleUi {
     this.currentEffectiveTime = initReal
     const initialTimeLabel = `⏰ 現實 (${getEffectiveTimeLabel(initReal)})`
     const initMusic = this.actions.getCurrentMusicState?.()
-    const initialMusicLabel = `🎵 綠度母 (${initMusic?.chantCount || 1}/12)`
+    const isPlaying = initMusic?.playing ?? false
+    const initialMusicLabel = isPlaying ? `🎵 綠度母 (${initMusic?.chantCount || 1}/12)` : '🔇 音樂：暫停'
 
     this.root = document.getElementById('ui')!
     this.root.innerHTML = `
@@ -141,7 +142,7 @@ export class TempleUi {
           <button type="button" class="badge badge-btn" data-act="go-home" title="返回首頁" aria-label="返回玉皇宮首頁"><span class="seal small">玉</span><div><b>玉皇宮</b><small data-who></small></div></button>
           <div class="hud-buttons">
             <button class="chip" data-act="time">${initialTimeLabel}</button>
-            <button class="chip" data-act="music">${initialMusicLabel}</button>
+            <button class="chip music-toggle-btn${isPlaying ? '' : ' is-muted'}" data-act="music" aria-label="切換背景音樂">${initialMusicLabel}</button>
             <button class="chip market-entry" data-act="market-enter">進入市集</button>
             <button class="chip" data-act="map">參拜指引</button>
             <button class="chip" data-open="records">祈福紀錄</button>
@@ -1577,11 +1578,10 @@ export class TempleUi {
     else if (act === 'map') { const m = this.root.querySelector<HTMLElement>('.map')!; m.hidden = !m.hidden }
     else if (act === 'music') {
       const state = this.actions.toggleMusic()
+      this.setMusicState(state.playing, state.chantCount)
       if (!state.playing) {
-        t.textContent = '🔇 音樂：關'
         this.toast('已將背景音樂靜音。')
       } else {
-        t.textContent = `🎵 綠度母 (${state.chantCount || 1}/12)`
         this.toast(`已開啟綠度母梵唱（第 ${state.chantCount || 1}/12 遍），梵音悠揚，心靈安寧。`)
       }
     }
@@ -1721,6 +1721,21 @@ export class TempleUi {
     }
     if (reason === 'manual' || reason === 'init') {
       this.toast(`🌸 正在播放《${title}》，梵音悠揚，心靈安寧。`, 3800)
+    }
+  }
+
+  setMusicState(playing: boolean, chantCount?: number): void {
+    const btn = this.root.querySelector<HTMLElement>('[data-act="music"]')
+    if (!btn) return
+    if (!playing) {
+      btn.textContent = '🔇 音樂：暫停'
+      btn.classList.add('is-muted')
+      btn.setAttribute('aria-label', '背景音樂已暫停，點擊播放')
+    } else {
+      const count = chantCount || this.actions.getCurrentMusicState?.().chantCount || 1
+      btn.textContent = `🎵 綠度母 (${count}/12)`
+      btn.classList.remove('is-muted')
+      btn.setAttribute('aria-label', `正在播放綠度母梵唱第 ${count}/12 遍，點擊靜音`)
     }
   }
 }

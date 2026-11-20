@@ -342,7 +342,26 @@ h3 {
 .ro-nav-grid button.ro-return:hover { background: linear-gradient(180deg, #ffffff, #9be8dc); }
 .chip.market-entry { border-color: rgba(126,214,190,.9); background: rgba(44,111,94,.9); color: #fff4bd; }
 .chip.market-entry:hover { background: rgba(64,139,112,.98); }
-body[data-world="market"] .hud-top { display: none; }
+body[data-world="market"] .hud-top {
+  display: flex !important;
+  justify-content: flex-end !important;
+  pointer-events: none !important;
+  z-index: 150 !important;
+}
+body[data-world="market"] .hud-top > :not(.hud-buttons) {
+  display: none !important;
+}
+body[data-world="market"] .hud-top .hud-buttons {
+  justify-content: flex-end !important;
+  pointer-events: none !important;
+}
+body[data-world="market"] .hud-top .hud-buttons > :not([data-act="music"]) {
+  display: none !important;
+}
+body[data-world="market"] .hud-top button[data-act="music"] {
+  display: inline-flex !important;
+  pointer-events: auto !important;
+}
 .market-panel-wrap { position: absolute; inset: 0; z-index: 260; display: grid; place-items: center; padding: 22px; background: rgba(25,52,72,.44); pointer-events: auto !important; }
 .market-panel-wrap[hidden] { display: none !important; pointer-events: none !important; }
 .market-panel { position: relative; width: min(620px, 100%); max-height: min(720px, calc(100vh - 44px)); overflow: auto; border: 2px solid #2b435c; border-radius: 8px; background: linear-gradient(180deg, #fbfdff, #eef4fb); color: #253b52; box-shadow: 0 6px 0 rgba(36, 58, 82, 0.34), 0 22px 60px rgba(18, 42, 64, 0.42); pointer-events: auto !important; }
@@ -522,8 +541,42 @@ body[data-world="market"] .hud-top { display: none; }
   background: rgba(64, 139, 112, .98);
 }
 
-body[data-world="market"] .hud-top {
-  display: none;
+/* 右上角奶油色半透明音樂開關按鈕 (Cream-colored translucent music toggle button) */
+button[data-act="music"],
+.music-toggle-btn {
+  background: rgba(253, 248, 237, 0.88) !important;
+  border: 1.5px solid rgba(201, 163, 90, 0.6) !important;
+  color: #3b2a1a !important;
+  border-radius: 999px !important;
+  padding: 5px 14px !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: 0 3px 12px rgba(40, 25, 15, 0.18) !important;
+  transition: all .2s ease !important;
+  pointer-events: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  user-select: none !important;
+}
+
+button[data-act="music"]:hover,
+.music-toggle-btn:hover {
+  background: #fffdf5 !important;
+  border-color: rgba(212, 175, 55, 0.9) !important;
+  color: #241608 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 5px 16px rgba(40, 25, 15, 0.28) !important;
+}
+
+button[data-act="music"].is-muted,
+.music-toggle-btn.is-muted {
+  background: rgba(246, 241, 230, 0.76) !important;
+  border-color: rgba(160, 140, 120, 0.45) !important;
+  color: #6e5d4f !important;
 }
 
 .market-panel-wrap {

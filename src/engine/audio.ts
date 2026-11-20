@@ -2,14 +2,34 @@
  * Web Audio mixer with music and SFX buses. Browsers only allow audio after a user gesture, so
  * call `unlock()` from the first click/key press (the title screen does this).
  *
- * The starter ships no audio files: SFX are synthesized and the music is a generative ambient
- * pad. To use recorded assets, `load(url)` an AudioBuffer and `playBuffer()` it on either bus.
+ * 全域 AudioManager 模組：
+ * - 進入市集（market）在 1.2 秒內將背景音樂（BGM）音量平滑淡出至 0，完成後 pause()。
+ * - 離開市集（temple）檢查 localStorage 的 userMuted 狀態；若為 false 則自動於 1.2 秒內淡入至預設音量 0.25。
+ * - 僅暫停背景音樂，不影響點擊音效與互動語音。
  */
 export type Sfx = 'pickup' | 'jump' | 'land' | 'hurt' | 'ui' | 'win' | 'lose' | 'dash' | 'bell' | 'woodfish' | 'coin' | 'chime' | 'drum' | 'coin-toss' | 'water-splash' | 'wish-chime'
 
 export type MusicTrack = 'green_tara' | 'heart_sutra'
 
 export const TARGET_TARA_CHANTS = 12
+export const DEFAULT_MUSIC_VOLUME = 0.25
+export const USER_MUTED_STORAGE_KEY = 'userMuted'
+
+/** 讀取使用者是否曾主動點擊靜音 */
+export function getUserMuted(): boolean {
+  try {
+    return localStorage.getItem(USER_MUTED_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+/** 記錄使用者是否手動靜音 */
+export function setUserMuted(muted: boolean): void {
+  try {
+    localStorage.setItem(USER_MUTED_STORAGE_KEY, muted ? 'true' : 'false')
+  } catch {}
+}
 
 const TARA_OFFSETS = [24.0, 37.5, 51.0, 64.5, 78.0, 91.5, 105.0, 118.5, 132.0, 145.5, 159.0, 172.5, 186.0, 199.5]
 
@@ -28,14 +48,26 @@ export class Audio {
   private meditationNoise?: AudioBufferSourceNode
   private meditationGain?: GainNode
 
+  // 淡入淡出動畫與狀態管理
+  private isFadingOut = false
+  private isFadingIn = false
+  private fadeRaf?: number
+  private isAutoMarketPaused = false
+  private unlocked = false
+
+  get autoMarketPaused(): boolean {
+    return this.isAutoMarketPaused
+  }
+
   onChantProgress?: (current: number, total: number) => void
   onTrackChange?: (track: MusicTrack, title: string, reason?: 'auto_complete' | 'manual' | 'init') => void
+  onMusicStateChange?: (playing: boolean, chantCount: number) => void
 
   constructor() {
     this.ctx = new AudioContext()
     this.master = this.ctx.createGain()
     this.music = this.ctx.createGain()
-    this.music.gain.value = 0.45
+    this.music.gain.value = DEFAULT_MUSIC_VOLUME
     this.sfx = this.ctx.createGain()
     this.music.connect(this.master)
     this.sfx.connect(this.master)
@@ -43,16 +75,158 @@ export class Audio {
   }
 
   unlock(): void {
+    this.unlocked = true
     if (this.ctx.state === 'suspended') void this.ctx.resume()
   }
 
   /** Volumes in 0..1. */
   setVolumes(music: number, sfx: number, muted = false): void {
     const t = this.ctx.currentTime
-    const targetMusicVol = muted ? 0 : music * 0.45
+    const targetMusicVol = muted ? 0 : music * DEFAULT_MUSIC_VOLUME
     this.music.gain.setTargetAtTime(targetMusicVol, t, 0.05)
     this.sfx.gain.setTargetAtTime(muted ? 0 : sfx * 0.8, t, 0.05)
     if (this.taraAudio) this.taraAudio.volume = targetMusicVol
+  }
+
+  /**
+   * 進入市集（market 場景）：
+   * 在 1.2 秒內將背景音樂（BGM）音量平滑淡出至 0，淡出完成後執行 pause() 暫停播放。
+   * 僅暫停背景音樂，不可靜音市集內的按鈕點擊音效、語音或影片元件。
+   */
+  fadeMusicOut(durationSeconds = 1.2): Promise<void> {
+    return new Promise(resolve => {
+      if (!this.musicOn && !this.taraAudio) {
+        this.isAutoMarketPaused = true
+        resolve()
+        return
+      }
+      this.isFadingOut = true
+      this.isFadingIn = false
+      if (this.fadeRaf) cancelAnimationFrame(this.fadeRaf)
+
+      const startVol = this.taraAudio ? this.taraAudio.volume : (this.music.gain.value || DEFAULT_MUSIC_VOLUME)
+      const startTime = performance.now()
+      const durationMs = Math.max(100, durationSeconds * 1000)
+
+      // Web Audio GainNode 平滑降音量
+      try {
+        const t = this.ctx.currentTime
+        this.music.gain.cancelScheduledValues(t)
+        this.music.gain.setValueAtTime(this.music.gain.value, t)
+        this.music.gain.linearRampToValueAtTime(0.0001, t + durationSeconds)
+      } catch {}
+
+      const step = () => {
+        if (!this.isFadingOut) return
+        const elapsed = performance.now() - startTime
+        const progress = Math.min(1, elapsed / durationMs)
+        const currentVol = Math.max(0, startVol * (1 - progress))
+        if (this.taraAudio) this.taraAudio.volume = currentVol
+
+        if (progress < 1) {
+          this.fadeRaf = requestAnimationFrame(step)
+        } else {
+          if (this.taraAudio) {
+            this.taraAudio.volume = 0
+            this.taraAudio.pause()
+          }
+          try {
+            this.music.gain.setValueAtTime(0, this.ctx.currentTime)
+          } catch {}
+          this.musicOn = false
+          this.isAutoMarketPaused = true
+          this.isFadingOut = false
+          this.onMusicStateChange?.(false, this.taraChantCount)
+          resolve()
+        }
+      }
+      this.fadeRaf = requestAnimationFrame(step)
+    })
+  }
+
+  /**
+   * 離開市集（返回大殿或廣場）：
+   * 檢查使用者是否曾「手動點擊靜音」（從 localStorage 讀取 userMuted 狀態）。
+   * 若 userMuted 為 false，則自動恢復播放 BGM，並在 1.2 秒內淡入至預設音量（0.25）。
+   * 若 userMuted 為 true，則維持靜音，不要幫使用者強制開啟。
+   */
+  fadeMusicIn(targetVolume = DEFAULT_MUSIC_VOLUME, durationSeconds = 1.2): Promise<void> {
+    return new Promise(resolve => {
+      // 檢查使用者是否曾手動點擊靜音
+      if (getUserMuted()) {
+        this.isAutoMarketPaused = false
+        resolve()
+        return
+      }
+
+      if (!this.unlocked) {
+        // 遵循瀏覽器自動播放政策，在使用者尚未進行首次互動前不強制播放
+        this.isAutoMarketPaused = false
+        resolve()
+        return
+      }
+
+      this.isFadingIn = true
+      this.isFadingOut = false
+      if (this.fadeRaf) cancelAnimationFrame(this.fadeRaf)
+
+      const ta = this.initTaraAudio()
+      ta.volume = 0
+      try {
+        const t = this.ctx.currentTime
+        this.music.gain.cancelScheduledValues(t)
+        this.music.gain.setValueAtTime(0, t)
+        this.music.gain.linearRampToValueAtTime(targetVolume, t + durationSeconds)
+      } catch {}
+
+      void ta.play().catch(() => {})
+      this.musicOn = true
+      this.isAutoMarketPaused = false
+      this.onMusicStateChange?.(true, this.taraChantCount)
+
+      const startTime = performance.now()
+      const durationMs = Math.max(100, durationSeconds * 1000)
+
+      const step = () => {
+        if (!this.isFadingIn) return
+        const elapsed = performance.now() - startTime
+        const progress = Math.min(1, elapsed / durationMs)
+        const currentVol = targetVolume * progress
+        if (this.taraAudio) this.taraAudio.volume = currentVol
+
+        if (progress < 1) {
+          this.fadeRaf = requestAnimationFrame(step)
+        } else {
+          if (this.taraAudio) this.taraAudio.volume = targetVolume
+          this.isFadingIn = false
+          resolve()
+        }
+      }
+      this.fadeRaf = requestAnimationFrame(step)
+    })
+  }
+
+  /**
+   * 場景進入市集統一調用
+   */
+  async onEnterMarket(): Promise<void> {
+    if (this.musicOn) {
+      await this.fadeMusicOut(1.2)
+    } else {
+      this.isAutoMarketPaused = true
+    }
+  }
+
+  /**
+   * 場景離開市集統一調用
+   */
+  async onLeaveMarket(): Promise<void> {
+    if (getUserMuted()) {
+      // 若曾手動點擊靜音，維持靜音
+      this.isAutoMarketPaused = false
+      return
+    }
+    await this.fadeMusicIn(DEFAULT_MUSIC_VOLUME, 1.2)
   }
 
   async load(url: string): Promise<AudioBuffer> {
@@ -147,14 +321,12 @@ export class Audio {
         tone(6400, 5800, 0.05, 'sine', 0.15, 0.02)
         break
       case 'water-splash':
-        // Liquid splash + bubble pop
         tone(520, 140, 0.18, 'sine', 0.42)
         tone(220, 60, 0.28, 'sine', 0.35, 0.02)
         tone(880, 280, 0.09, 'triangle', 0.22, 0.01)
         tone(120, 45, 0.35, 'sine', 0.25, 0.05)
         break
       case 'wish-chime':
-        // Ethereal sparkling pentatonic blessing chord: C5, E5, G5, B5, D6, G6
         [523.25, 659.25, 783.99, 987.77, 1174.66, 1567.98].forEach((f, i) => {
           tone(f, f * 0.998, 1.8 - i * 0.2, 'sine', 0.18 / (1 + i * 0.2), i * 0.08)
         })
@@ -170,7 +342,7 @@ export class Audio {
       el.src = './audio/green_tara.mp3?v=3.42.0'
       el.loop = true
       el.preload = 'none'
-      el.volume = 0.45
+      el.volume = DEFAULT_MUSIC_VOLUME
       this.taraAudio = el
 
       el.addEventListener('timeupdate', () => {
@@ -220,22 +392,32 @@ export class Audio {
   startMusic(): void {
     this.unlock()
     this.musicOn = true
+    this.isAutoMarketPaused = false
     const ta = this.initTaraAudio()
+    ta.volume = DEFAULT_MUSIC_VOLUME
+    try {
+      this.music.gain.setValueAtTime(DEFAULT_MUSIC_VOLUME, this.ctx.currentTime)
+    } catch {}
     void ta.play().catch(() => {})
     this.onChantProgress?.(Math.max(1, this.taraChantCount), TARGET_TARA_CHANTS)
     this.onTrackChange?.('green_tara', '綠度母心咒', 'init')
+    this.onMusicStateChange?.(true, this.taraChantCount)
   }
 
   stopMusic(): void {
     this.musicOn = false
     if (this.taraAudio) this.taraAudio.pause()
+    this.onMusicStateChange?.(false, this.taraChantCount)
   }
 
+  /** 手動點擊音樂開關按鈕（允許在大殿或市集中手動開關） */
   toggleMusic(): { playing: boolean; track: MusicTrack; chantCount: number } {
     if (this.musicOn) {
+      setUserMuted(true)
       this.stopMusic()
       return { playing: false, track: this.currentTrack, chantCount: this.taraChantCount }
     } else {
+      setUserMuted(false)
       this.startMusic()
       return { playing: true, track: this.currentTrack, chantCount: this.taraChantCount }
     }
@@ -253,3 +435,6 @@ export class Audio {
     return this.musicOn
   }
 }
+
+export { Audio as AudioManager }
+
