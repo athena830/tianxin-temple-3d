@@ -16,6 +16,8 @@ import {
 import { getLunarPhaseInfo, getRealWorldTimeOfDay, type ShrinePoint, type ShrinePointId, type TimeOfDay, type TimeSetting } from '../game/temple-world'
 import type { MarketPoint, MarketVenueId } from '../game/market-world'
 import type { ZiweiChart, ZiweiInput } from '../game/ziwei-engine'
+import type { HumanDesignChart, HumanDesignInput } from '../game/human-design-engine'
+import { listHumanDesignCharts, saveHumanDesignChart, clearHumanDesignCharts } from '../game/human-design-storage'
 import { TOPIC_LABELS, drawThreeCards, getDailyCard, type CardTopic, type ThreeCardSpread } from '../game/card-engine'
 import { POS_META, type ChessPos } from '../divination'
 import type { MusicTrack } from '../engine/audio'
@@ -31,22 +33,6 @@ import {
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
 const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
-
-function renderMarketPanel(id: MarketVenueId): string {
-  const close = '<button class="btn" data-act="market-panel-close">繼續探索市集</button>'
-  switch (id) {
-    case 'birth-chart-hall':
-      return `<p class="eyebrow">命盤探索館</p><h2>認識自己的探索入口</h2><p>紫微斗數排盤已可在此裝置上運算；人類圖功能仍在後續規劃中。</p><ul class="info"><li>出生資料預設只用於這次運算，不會自動儲存或上傳。</li><li>只有你主動按下儲存，資料才會寫入目前瀏覽器。</li></ul><div class="row"><button class="btn primary" data-act="market-ziwei">開啟紫微斗數排盤</button>${close}</div>`
-    case 'card-house':
-      return `<p class="eyebrow">牌卡靈感屋</p><h2>讓提問回到當下</h2><p>以反思文字協助整理工作、關係、內在狀態與下一步；不提供保證性預言或決策指令。</p><ul class="info"><li>每日一張：同一日固定一張，隔日更新。</li><li>三張牌：固定為過去、現在、建議，可選擇本機筆記。</li></ul><div class="row"><button class="btn primary" data-act="market-cards">開始牌卡反思</button>${close}</div>`
-    case 'moon-meditation':
-      return `<p class="eyebrow">月光靜心所</p><h2>留一段安靜給自己</h2><p>提供 60 秒呼吸引導、靜心文字與由你主動開啟的環境音。內容只供自我關照，不取代醫療或心理專業。</p><ul class="info"><li>環境音預設關閉，需由你自行播放。</li><li>靈氣服務資訊將由宮方確認後公告。</li></ul><div class="row"><button class="btn primary" data-act="market-meditation">開始 60 秒靜心</button>${close}</div>`
-    case 'chess-guide':
-      return `<p class="eyebrow">東方問事指引亭</p><h2>前往天心仙姑象棋卜卦</h2><p>市集不另建第二套卜卦規則。若想開始十字五星排卦，將帶你回到既有的天心仙姑問事亭。</p><div class="row"><button class="btn primary" data-act="market-chess">前往象棋卜卦</button>${close}</div>`
-    case 'service-desk':
-      return `<p class="eyebrow">市集服務台</p><h2>服務資訊與預約入口</h2><p>老師介紹、服務內容、價格、活動與名額，將在宮方提供並確認後公告。目前可透過既有 LINE 入口洽詢。</p><div class="row"><button class="btn primary" data-act="contact">洽 LINE 詢問</button>${close}</div>`
-  }
-}
 
 const SAMPLE_WISHES = ['願家人身體健康，平安順遂。', '祈求考試順利，心定不慌。', '願世間少些病苦，多些溫柔。', '新的一年，工作踏實、心安自在。']
 
@@ -107,6 +93,13 @@ export class TempleUi {
   private meditationRunning = false
   private meditationAmbient = false
   private meditationTimer = 0
+  private currentMarketVenue: MarketVenueId | null = null
+  private birthChartTab: 'ziwei' | 'human-design' = 'ziwei'
+  private humanDesignInput: HumanDesignInput | null = null
+  private humanDesignChart: HumanDesignChart | null = null
+  private humanDesignError = ''
+  private humanDesignSavedCount = 0
+  private serviceDeskMemo = ''
 
   constructor(private readonly store: TempleStore, private readonly actions: TempleUiActions) {
     const initReal = getRealWorldTimeOfDay().mode
@@ -202,7 +195,7 @@ export class TempleUi {
           </div>
         </section>
       </div>
-      <div class="market-panel-wrap" hidden><section class="market-panel ro-dialog" role="dialog" aria-modal="true" aria-label="市集介紹"><header class="ro-dialog-bar"><span>天心靈光市集・攤位資訊</span><button class="panel-x" data-act="market-panel-close" aria-label="關閉">×</button></header><div class="ro-dialog-body" data-market-panel-content></div></section></div>
+      <div class="market-panel-wrap" hidden><section class="market-panel ro-dialog" role="dialog" aria-modal="true" aria-label="市集介紹"><header class="ro-dialog-bar"><span data-market-dialog-title>天心靈光市集・攤位資訊</span><button class="panel-x" data-act="market-panel-close" aria-label="關閉">×</button></header><div class="ro-dialog-body" data-market-panel-content></div></section></div>
       <div class="ziwei-panel-wrap" hidden><section class="ziwei-panel" role="dialog" aria-modal="true" aria-label="紫微斗數排盤"><button class="panel-x" data-act="ziwei-close" aria-label="關閉">×</button><div data-ziwei-panel-content></div></section></div>
       <div class="world-transition" hidden><div><i></i><b data-world-transition>穿越靈光之門⋯</b><small>正在切換獨立世界</small></div></div>`
     this.root.addEventListener('click', e => this.onClick(e))
@@ -220,6 +213,7 @@ export class TempleUi {
       e.preventDefault()
       const form = e.target as HTMLFormElement
       if (form.matches('.ziwei-form')) { void this.generateZiwei(form); return }
+      if (form.matches('.hd-form')) { void this.generateHumanDesign(form); return }
       const text = (form.elements.namedItem('wish') as HTMLTextAreaElement).value
       const wish = this.store.submitWish(text)
       if (!wish) { this.toast('請先寫下你的心願'); return }
@@ -334,23 +328,70 @@ export class TempleUi {
     const isPortal = id === 'market-portal' || id === 'return-temple'
     const isMarketVenue = ['birth-chart-hall', 'card-house', 'moon-meditation', 'chess-guide', 'service-desk'].includes(id)
     action.classList.toggle('portal-entry', isPortal || isMarketVenue)
-    action.textContent = id === 'market-portal' ? '進入市集' : id === 'return-temple' ? '返回天心宮' : isMarketVenue ? '查看介紹' : '互動'
+    action.textContent = id === 'market-portal' ? '進入市集' : id === 'return-temple' ? '返回天心宮' : isMarketVenue ? '進入攤位' : '互動'
   }
 
   openMarketPanel(id: MarketVenueId): void {
+    this.currentMarketVenue = id
     const wrap = this.root.querySelector<HTMLElement>('.market-panel-wrap')!
-    const content = this.root.querySelector<HTMLElement>('[data-market-panel-content]')!
-    content.innerHTML = renderMarketPanel(id)
     wrap.hidden = false
+    switch (id) {
+      case 'birth-chart-hall':
+        void this.openBirthChartExperience()
+        break
+      case 'card-house':
+        void this.openCardExperience()
+        break
+      case 'moon-meditation':
+        this.openMeditationExperience()
+        break
+      case 'chess-guide':
+        this.openMarketChessExperience()
+        break
+      case 'service-desk':
+        this.openServiceDeskExperience()
+        break
+    }
   }
 
   closeMarketPanel(): void {
     const wrap = this.root.querySelector<HTMLElement>('.market-panel-wrap')
     if (wrap) wrap.hidden = true
+    this.currentMarketVenue = null
     window.clearInterval(this.meditationTimer)
     this.meditationRunning = false
     if (this.meditationAmbient) this.actions.stopMeditationAmbient()
     this.meditationAmbient = false
+  }
+
+  private setMarketDialogTitle(title: string): void {
+    const titleEl = this.root.querySelector<HTMLElement>('[data-market-dialog-title]')
+    if (titleEl) titleEl.textContent = title
+  }
+
+  async openBirthChartExperience(): Promise<void> {
+    const { listZiweiCharts } = await import('../game/ziwei-storage')
+    this.ziweiSavedCount = listZiweiCharts().length
+    this.humanDesignSavedCount = listHumanDesignCharts().length
+    this.setMarketDialogTitle('天心靈光市集・命盤探索館')
+    this.renderBirthChartExperience()
+  }
+
+  private renderBirthChartExperience(): void {
+    const content = this.root.querySelector<HTMLElement>('[data-market-panel-content]')!
+    content.innerHTML = `
+      <p class="eyebrow">命盤探索館・自我導引</p>
+      <h2>命盤與身心探索</h2>
+      <p class="venue-intro">在靈光市集探索你的星曜軌跡與能量藍圖。出生資料僅於本機運算，不公開、不上傳。</p>
+      <div class="ro-tab-bar">
+        <button type="button" class="ro-tab-btn ${this.birthChartTab === 'ziwei' ? 'active' : ''}" data-act="market-birth-tab" data-tab="ziwei">紫微斗數排盤</button>
+        <button type="button" class="ro-tab-btn ${this.birthChartTab === 'human-design' ? 'active' : ''}" data-act="market-birth-tab" data-tab="human-design">人類圖身心探索</button>
+      </div>
+      ${this.birthChartTab === 'ziwei' ? this.renderZiweiInner() : this.renderHumanDesignInner()}
+      <div class="row" style="margin-top: 14px;">
+        <button class="btn" data-act="market-panel-close">繼續探索市集</button>
+      </div>
+    `
   }
 
   async openZiweiPanel(): Promise<void> {
@@ -368,6 +409,12 @@ export class TempleUi {
 
   private renderZiweiPanel(): void {
     const content = this.root.querySelector<HTMLElement>('[data-ziwei-panel-content]')!
+    content.innerHTML = `
+      <p class="eyebrow">命盤探索館・紫微斗數</p><h2>本機紫微斗數排盤</h2>
+      ${this.renderZiweiInner()}`
+  }
+
+  private renderZiweiInner(): string {
     const chart = this.ziweiChart
     const error = this.ziweiError ? `<p class="ziwei-error" role="alert">${esc(this.ziweiError)}</p>` : ''
     const result = chart ? `
@@ -381,20 +428,136 @@ export class TempleUi {
         <p class="ziwei-meta">生年四化：${chart.transformations.length ? chart.transformations.map(item => `${esc(item.star)}化${esc(item.kind)}（${esc(item.palace)}）`).join('、') : '本盤未列出'}</p>
         <div class="row"><button class="btn primary" data-act="ziwei-save">儲存到此裝置</button><button class="btn" data-act="contact">出生時間不確定？洽 LINE</button></div>
       </section>` : ''
-    content.innerHTML = `
-      <p class="eyebrow">命盤探索館・紫微斗數</p><h2>本機紫微斗數排盤</h2>
+    return `
       <p class="ziwei-privacy">出生資料預設只在這次本機運算中使用，不上傳、不公開，也不會寫入祈願牆。只有按「儲存到此裝置」才會保存在這個瀏覽器。</p>
       <form class="ziwei-form">
         <label>識別名稱（選填，最多 20 字）<input name="alias" maxlength="20" autocomplete="off" placeholder="暱稱、代號或計畫名稱" /></label>
-        <div class="ziwei-form-grid"><label>出生日期<input name="date" type="date" required /></label><label>排盤性別<select name="gender"><option value="female">女</option><option value="male">男</option></select></label></div>
-        <label>出生時間（當地時間）<input name="time" type="time" /></label>
+        <div class="ziwei-form-grid"><label>出生日期<input name="date" type="date" required value="1995-06-15" /></label><label>排盤性別<select name="gender"><option value="female">女</option><option value="male">男</option></select></label></div>
+        <label>出生時間（當地時間）<input name="time" type="time" value="12:00" /></label>
         <label class="ziwei-check"><input name="timeUnknown" type="checkbox" /> 出生時間不確定（將以子時作技術參考並標示低精準度）</label>
-        <div class="ziwei-form-grid"><label>出生地：國家／地區<input name="country" required maxlength="40" autocomplete="country-name" placeholder="例如：台灣" /></label><label>出生城市<input name="city" required maxlength="40" autocomplete="address-level2" placeholder="例如：台北市" /></label></div>
+        <div class="ziwei-form-grid"><label>出生地：國家／地區<input name="country" required maxlength="40" autocomplete="country-name" value="台灣" /></label><label>出生城市<input name="city" required maxlength="40" autocomplete="address-level2" value="台北市" /></label></div>
         <button class="btn primary big" type="submit">產生十二宮命盤</button>
       </form>
       ${error}${result}
       <div class="ziwei-storage"><span>此裝置已儲存 ${this.ziweiSavedCount} 筆命盤。</span><button class="btn small" data-act="ziwei-clear" ${this.ziweiSavedCount ? '' : 'disabled'}>清除本機紀錄</button></div>
       <p class="ziwei-disclaimer">盤面資料與文字僅供自我理解與民俗文化參考，不構成醫療、法律、財務或任何保證性建議。</p>`
+  }
+
+  private renderHumanDesignInner(): string {
+    const chart = this.humanDesignChart
+    const error = this.humanDesignError ? `<p class="ziwei-error" role="alert">${esc(this.humanDesignError)}</p>` : ''
+    const result = chart ? `
+      <section class="ro-hd-result">
+        <div class="ziwei-summary">
+          <b>身心能量天賦設計圖</b>
+          <span>astronomy-engine ${esc(chart.engine.astronomyEngineVersion)}・本機推演</span>
+        </div>
+        ${chart.precisionNotice ? `<p class="ziwei-warning">${esc(chart.precisionNotice)}</p>` : ''}
+        
+        <div class="ro-hd-cards-grid">
+          <div class="ro-hd-card">
+            <span class="ro-hd-label">能量類型</span>
+            <b class="ro-hd-val">${esc(chart.type)}</b>
+          </div>
+          <div class="ro-hd-card">
+            <span class="ro-hd-label">人生策略</span>
+            <b class="ro-hd-val">${esc(chart.strategy)}</b>
+          </div>
+          <div class="ro-hd-card">
+            <span class="ro-hd-label">內在權威</span>
+            <b class="ro-hd-val">${esc(chart.authority)}</b>
+          </div>
+          <div class="ro-hd-card">
+            <span class="ro-hd-label">人生角色</span>
+            <b class="ro-hd-val">${esc(chart.profile)}</b>
+          </div>
+        </div>
+
+        <div class="ro-hd-section">
+          <h4>九大能量中心（定義狀態）</h4>
+          <div class="ro-centers-grid">
+            ${chart.centers.map(c => `
+              <div class="ro-center-pill ${c.defined ? 'is-defined' : 'is-open'}">
+                <span class="center-dot"></span>
+                <b>${esc(c.name)}</b>
+                <small>${c.defined ? '已定義' : '開放/未定義'}</small>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="ro-hd-section">
+          <h4>已接通通道（天賦能量）</h4>
+          ${chart.channels.length > 0 ? `
+            <ul class="ro-channels-list">
+              ${chart.channels.map(ch => `
+                <li>
+                  <span class="channel-badge">通道 ${ch.gates[0]} - ${ch.gates[1]}</span>
+                  <span class="channel-centers">${esc(ch.centers[0])} ↔ ${esc(ch.centers[1])}</span>
+                </li>
+              `).join('')}
+            </ul>
+          ` : `<p class="ro-subtext">無完全接通之通道（無固定通道連結中心，屬純開放能量流動）。</p>`}
+        </div>
+
+        <div class="ro-hd-section">
+          <h4>活化閘門總覽（共 ${chart.gates.length} 個）</h4>
+          <div class="ro-gates-tags">
+            ${chart.gates.map(g => `<span class="ro-gate-tag">閘門 ${g}</span>`).join('')}
+          </div>
+        </div>
+
+        <details class="ro-planets-details">
+          <summary>查看行星活化對照（個性／黑 vs 設計／紅）</summary>
+          <div class="ro-planets-grid">
+            <div class="ro-planet-col">
+              <h5>個性 Personality（意識／黑）</h5>
+              <ul>
+                ${chart.personality.map(p => `<li><b>${esc(p.body)}</b><span>閘門 ${p.gate}.${p.line}</span></li>`).join('')}
+              </ul>
+            </div>
+            <div class="ro-planet-col design-col">
+              <h5>設計 Design（潛意識／紅）</h5>
+              <ul>
+                ${chart.design.map(d => `<li><b>${esc(d.body)}</b><span>閘門 ${d.gate}.${d.line}</span></li>`).join('')}
+              </ul>
+            </div>
+          </div>
+        </details>
+
+        <p class="ziwei-reflection">💡 核心指引：遵循你的「${esc(chart.strategy)}」人生策略，並以「${esc(chart.authority)}」做重大決定，允許自己回歸自然的身體節奏，放下外在期待的制約。</p>
+        <div class="row">
+          <button class="btn primary" data-act="hd-save">儲存人類圖到此裝置</button>
+          <button class="btn" data-act="contact">預約深度人類圖諮詢</button>
+        </div>
+      </section>
+    ` : ''
+
+    const defaultTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Taipei'
+
+    return `
+      <p class="ziwei-privacy">出生資料僅在此裝置由天文演算法即時推算，不上傳雲端，保護個人私隱。只有點選「儲存到此裝置」才會保留。</p>
+      <form class="hd-form">
+        <label>識別名稱（選填，最多 20 字）<input name="alias" maxlength="20" autocomplete="off" placeholder="代號、暱稱或心靈代稱" /></label>
+        <div class="ziwei-form-grid">
+          <label>出生日期<input name="date" type="date" required value="1995-06-15" /></label>
+          <label>出生時間（當地時間）<input name="time" type="time" value="12:00" /></label>
+        </div>
+        <label class="ziwei-check"><input name="timeUnknown" type="checkbox" /> 出生時間不確定（將以中午 12:00 作技術參考並標示低精準度）</label>
+        <div class="ziwei-form-grid">
+          <label>出生國家／地區<input name="country" required maxlength="40" autocomplete="country-name" value="台灣" /></label>
+          <label>出生城市<input name="city" required maxlength="40" autocomplete="address-level2" value="台北市" /></label>
+        </div>
+        <label>IANA 時區（自動偵測）<input name="timeZone" required maxlength="60" value="${esc(defaultTz)}" /></label>
+        <button class="btn primary big" type="submit">產生人類圖設計藍圖</button>
+      </form>
+      ${error}${result}
+      <div class="ziwei-storage">
+        <span>此裝置已儲存 ${this.humanDesignSavedCount} 筆人類圖。</span>
+        <button class="btn small" data-act="hd-clear" ${this.humanDesignSavedCount ? '' : 'disabled'}>清除本機紀錄</button>
+      </div>
+      <p class="ziwei-disclaimer">人類圖是探索自我覺察、能量模式與決策風格的輔助工具，不取代醫療、心理諮商、法律或財務之專業判斷。</p>
+    `
   }
 
   private async generateZiwei(form: HTMLFormElement): Promise<void> {
@@ -416,14 +579,22 @@ export class TempleUi {
     } catch (error) {
       this.ziweiError = (error as Error).message || '排盤失敗，請確認輸入資料。'
     }
-    this.renderZiweiPanel()
+    if (this.currentMarketVenue === 'birth-chart-hall') {
+      this.renderBirthChartExperience()
+    } else {
+      this.renderZiweiPanel()
+    }
   }
 
   private async saveZiwei(): Promise<void> {
     if (!this.ziweiInput || !this.ziweiChart) return
     const { saveZiweiChart } = await import('../game/ziwei-storage')
     this.ziweiSavedCount = saveZiweiChart(this.ziweiInput, this.ziweiChart).length
-    this.renderZiweiPanel()
+    if (this.currentMarketVenue === 'birth-chart-hall') {
+      this.renderBirthChartExperience()
+    } else {
+      this.renderZiweiPanel()
+    }
     this.toast('命盤已依你的指示儲存在此裝置。')
   }
 
@@ -431,13 +602,55 @@ export class TempleUi {
     const { clearZiweiCharts } = await import('../game/ziwei-storage')
     clearZiweiCharts()
     this.ziweiSavedCount = 0
-    this.renderZiweiPanel()
+    if (this.currentMarketVenue === 'birth-chart-hall') {
+      this.renderBirthChartExperience()
+    } else {
+      this.renderZiweiPanel()
+    }
     this.toast('已清除這個瀏覽器中的紫微命盤紀錄。')
+  }
+
+  private async generateHumanDesign(form: HTMLFormElement): Promise<void> {
+    const value = new FormData(form)
+    const timeUnknown = value.get('timeUnknown') === 'on'
+    const input: HumanDesignInput = {
+      alias: String(value.get('alias') ?? '').trim() || undefined,
+      date: String(value.get('date') ?? ''),
+      time: String(value.get('time') ?? '') || undefined,
+      timeUnknown,
+      country: String(value.get('country') ?? '').trim(),
+      city: String(value.get('city') ?? '').trim(),
+      timeZone: String(value.get('timeZone') ?? '').trim() || (Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Taipei'),
+    }
+    try {
+      const { createHumanDesignChart } = await import('../game/human-design-engine')
+      this.humanDesignInput = input
+      this.humanDesignChart = createHumanDesignChart(input)
+      this.humanDesignError = ''
+    } catch (error) {
+      this.humanDesignError = (error as Error).message || '計算失敗，請確認輸入資料。'
+    }
+    this.renderBirthChartExperience()
+  }
+
+  private async saveHumanDesign(): Promise<void> {
+    if (!this.humanDesignInput || !this.humanDesignChart) return
+    this.humanDesignSavedCount = saveHumanDesignChart(this.humanDesignInput, this.humanDesignChart).length
+    this.renderBirthChartExperience()
+    this.toast('人類圖設計已依你的指示儲存在此裝置。')
+  }
+
+  private async clearHumanDesign(): Promise<void> {
+    clearHumanDesignCharts()
+    this.humanDesignSavedCount = 0
+    this.renderBirthChartExperience()
+    this.toast('已清除此裝置中的人類圖紀錄。')
   }
 
   async openCardExperience(): Promise<void> {
     const { listCardNotes } = await import('../game/card-storage')
     this.cardNoteCount = listCardNotes().length
+    this.setMarketDialogTitle('天心靈光市集・牌卡靈感屋')
     this.renderCardExperience()
   }
 
@@ -447,7 +660,7 @@ export class TempleUi {
     const spread = this.cardSpread
     const card = (item: typeof daily, position?: string) => `<article class="reflection-card" style="--card-color:${item.color}"><i>${item.symbol}</i><small>${position || '今日訊息'}</small><b>${item.name}</b><span>${item.keywords.join('・')}</span><p>${item.reflection}</p><em>${item.question}</em></article>`
     const spreadView = spread ? `<section class="spread-result"><h3>${TOPIC_LABELS[spread.topic]}・三張牌反思</h3><div class="spread-grid">${spread.cards.map((item, index) => card(item, ['過去', '現在', '建議'][index])).join('')}</div><label class="card-note-label">可選本機筆記<textarea class="card-note" maxlength="500" rows="3" placeholder="寫下你想記住的感受或下一步；不會自動儲存。"></textarea></label><div class="row"><button class="btn primary" data-act="card-save-note">儲存筆記到此裝置</button></div></section>` : ''
-    content.innerHTML = `<p class="eyebrow">牌卡靈感屋</p><h2>牌卡反思</h2><p>牌卡是整理當下感受的提示，不預測未來，也不替你做醫療、法律、財務或重大人生決定。</p><section class="daily-card"><div><h3>每日一張・${new Date().toLocaleDateString('sv-SE')}</h3><p>同一個本地日期固定同一張牌，不提供同日重抽；隔日會更新。</p></div>${card(daily)}</section><section class="spread-picker"><h3>三張牌問事</h3><p>選擇一個反思主題；位置固定為「過去／現在／建議」。</p><div class="topic-row">${(Object.keys(TOPIC_LABELS) as CardTopic[]).map(topic => `<button class="btn small" data-act="card-draw-spread" data-card-topic="${topic}">${TOPIC_LABELS[topic]}</button>`).join('')}</div></section>${spreadView}<div class="reflection-storage"><span>此裝置已儲存 ${this.cardNoteCount} 則牌卡筆記。</span><button class="btn small" data-act="card-clear-notes" ${this.cardNoteCount ? '' : 'disabled'}>清除本機筆記</button></div>`
+    content.innerHTML = `<p class="eyebrow">牌卡靈感屋</p><h2>牌卡反思</h2><p>牌卡是整理當下感受的提示，不預測未來，也不替你做醫療、法律、財務或重大人生決定。</p><section class="daily-card"><div><h3>每日一張・${new Date().toLocaleDateString('sv-SE')}</h3><p>同一個本地日期固定同一張牌，不提供同日重抽；隔日會更新。</p></div>${card(daily)}</section><section class="spread-picker"><h3>三張牌問事</h3><p>選擇一個反思主題；位置固定為「過去／現在／建議」。</p><div class="topic-row">${(Object.keys(TOPIC_LABELS) as CardTopic[]).map(topic => `<button class="btn small" data-act="card-draw-spread" data-card-topic="${topic}">${TOPIC_LABELS[topic]}</button>`).join('')}</div></section>${spreadView}<div class="reflection-storage"><span>此裝置已儲存 ${this.cardNoteCount} 則牌卡筆記。</span><button class="btn small" data-act="card-clear-notes" ${this.cardNoteCount ? '' : 'disabled'}>清除本機筆記</button></div><div class="row" style="margin-top: 14px;"><button class="btn" data-act="market-panel-close">繼續探索市集</button></div>`
   }
 
   private drawCardSpread(topic: CardTopic): void {
@@ -473,6 +686,7 @@ export class TempleUi {
   }
 
   openMeditationExperience(): void {
+    this.setMarketDialogTitle('天心靈光市集・月光靜心所')
     this.renderMeditationExperience()
   }
 
@@ -482,7 +696,7 @@ export class TempleUi {
     const inCycle = elapsed % 12
     const phase = inCycle < 4 ? '吸氣 4 秒' : inCycle < 6 ? '停留 2 秒' : '吐氣 6 秒'
     const detail = this.meditationRunning ? `剩餘 ${this.meditationSeconds} 秒・${phase}` : this.meditationSeconds === 0 ? '60 秒練習完成，感受此刻的呼吸與身體。' : '準備好後，開始 60 秒呼吸練習。'
-    content.innerHTML = `<p class="eyebrow">月光靜心所</p><h2>60 秒呼吸靜心</h2><p>找一個舒適姿勢，不必追求完美；只要溫和地把注意力帶回呼吸。</p><section class="breathing-card"><div class="breathing-orb ${this.meditationRunning ? 'active' : ''}"><span>${this.meditationSeconds}</span><small>秒</small></div><b>${detail}</b><p>吸氣時感受空氣進入，吐氣時讓肩膀與下顎慢慢放鬆。</p><div class="row"><button class="btn primary" data-act="meditation-start" ${this.meditationRunning ? 'disabled' : ''}>${this.meditationSeconds === 60 ? '開始 60 秒引導' : '重新開始'}</button><button class="btn" data-act="meditation-stop" ${this.meditationRunning ? '' : 'disabled'}>暫停</button></div></section><section class="meditation-text"><h3>靜心文字</h3><p>此刻不需要解決所有事情。請給自己一分鐘，讓念頭來去；若感到不適，隨時停止並回到熟悉、安全的環境。</p></section><section class="ambient-card"><h3>環境音</h3><p>環境音預設關閉，僅在你按下按鈕後播放。</p><button class="btn ${this.meditationAmbient ? '' : 'primary'}" data-act="meditation-ambient">${this.meditationAmbient ? '停止環境音' : '播放環境音'}</button></section><section class="meditation-text"><h3>靈氣服務與預約</h3><p>服務內容與安排將由宮方確認後公告；此頁不宣稱療效、診斷或可取代醫療與心理專業。</p><button class="btn" data-act="contact">洽 LINE 詢問</button></section>`
+    content.innerHTML = `<p class="eyebrow">月光靜心所</p><h2>60 秒呼吸靜心</h2><p>找一個舒適姿勢，不必追求完美；只要溫和地把注意力帶回呼吸。</p><section class="breathing-card"><div class="breathing-orb ${this.meditationRunning ? 'active' : ''}"><span>${this.meditationSeconds}</span><small>秒</small></div><b>${detail}</b><p>吸氣時感受空氣進入，吐氣時讓肩膀與下顎慢慢放鬆。</p><div class="row"><button class="btn primary" data-act="meditation-start" ${this.meditationRunning ? 'disabled' : ''}>${this.meditationSeconds === 60 ? '開始 60 秒引導' : '重新開始'}</button><button class="btn" data-act="meditation-stop" ${this.meditationRunning ? '' : 'disabled'}>暫停</button></div></section><section class="meditation-text"><h3>靜心文字</h3><p>此刻不需要解決所有事情。請給自己一分鐘，讓念頭來去；若感到不適，隨時停止並回到熟悉、安全的環境。</p></section><section class="ambient-card"><h3>環境音</h3><p>環境音預設關閉，僅在你按下按鈕後播放。</p><button class="btn ${this.meditationAmbient ? '' : 'primary'}" data-act="meditation-ambient">${this.meditationAmbient ? '停止環境音' : '播放環境音'}</button></section><section class="meditation-text"><h3>靈氣服務與預約</h3><p>服務內容與安排將由宮方確認後公告；此頁不宣稱療效、診斷或可取代醫療與心理專業。</p><button class="btn" data-act="contact">洽 LINE 詢問</button></section><div class="row" style="margin-top: 14px;"><button class="btn" data-act="market-panel-close">繼續探索市集</button></div>`
   }
 
   private startMeditation(): void {
@@ -505,6 +719,291 @@ export class TempleUi {
     window.clearInterval(this.meditationTimer)
     this.meditationRunning = false
     this.renderMeditationExperience()
+  }
+
+  openMarketChessExperience(): void {
+    this.setMarketDialogTitle('天心靈光市集・東方問事指引亭')
+    this.renderMarketChessExperience()
+  }
+
+  private renderMarketChessExperience(): void {
+    const content = this.root.querySelector<HTMLElement>('[data-market-panel-content]')!
+    const gua = this.store.currentCrossGua ?? this.store.startCrossGua()
+    
+    const renderSlot = (pos: ChessPos) => {
+      const slot = gua.slots[pos]
+      const meta = POS_META[pos]
+      if (slot.revealed) {
+        return `
+          <div class="chess-slot-cell ${pos}">
+            <span class="slot-pos-label">${meta.label}</span>
+            <div class="piece revealed ${slot.piece.color}" title="${meta.label}：${slot.piece.name}">${slot.piece.name}</div>
+            <span class="slot-aspect-tag">${meta.aspect}</span>
+          </div>
+        `
+      }
+      return `
+        <div class="chess-slot-cell ${pos}">
+          <span class="slot-pos-label">${meta.label}</span>
+          <button type="button" class="piece unrevealed pulse" data-market-flip-pos="${pos}" title="點擊翻開 ${meta.label}">
+            <span class="piece-back-inner">仙</span>
+          </button>
+          <span class="slot-aspect-tag flip-hint">點擊翻開</span>
+        </div>
+      `
+    }
+
+    const levelBadgeClass: Record<string, string> = {
+      大吉: 'badge-grand-luck',
+      吉: 'badge-luck',
+      平: 'badge-fair',
+      守中: 'badge-guard',
+      需慎: 'badge-caution',
+    }
+    const badgeClass = levelBadgeClass[gua.level] || 'badge-luck'
+    const posIndexNames = ['中宮・主位', '左方・客方', '右方・主方', '上方・天時', '下方・地利']
+
+    const formationsHtml = gua.analysis.formations.length > 0
+      ? gua.analysis.formations.map(f => `
+          <div class="formation-item">
+            <div class="formation-item-title">🔮 ${esc(f.name)}</div>
+            <div class="formation-item-desc">${esc(f.description)}</div>
+          </div>
+        `).join('')
+      : `
+          <div class="formation-item">
+            <div class="formation-item-desc">${esc(gua.summary)}</div>
+          </div>
+        `
+
+    const recordsHtml = gua.analysis.records.length > 0
+      ? `
+        <details class="chess-records-details">
+          <summary>查看十字吃子捕捉明細（共 ${gua.analysis.records.length} 筆）</summary>
+          <div class="records-content">
+            <ul class="records-list">
+              ${gua.analysis.records.map(r => `
+                <li class="${r.isGain ? 'record-gain' : 'record-loss'}">
+                  <span class="record-badge">${r.isGain ? '收獲' : '付出'}</span>
+                  <b>${posIndexNames[r.attackerPos]} [${esc(r.attacker.character)}]</b> 捕捉 <b>${posIndexNames[r.targetPos]} [${esc(r.target.character)}]</b>
+                  <span class="record-score">${r.isGain ? '+' : '-'}${r.score}分</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        </details>
+      `
+      : ''
+
+    const resultCard = gua.allRevealed ? `
+      <div class="chess-result-box" style="margin-top: 14px;">
+        <div class="result-head">
+          <span class="result-level-badge ${badgeClass}">${gua.level}</span>
+          <h3 class="result-pattern-name">${esc(gua.patternName)}</h3>
+        </div>
+
+        <div class="result-score-bar">
+          <div class="score-item score-gain">
+            <span class="score-label">收獲</span>
+            <b class="score-val">${gua.analysis.gains}</b>
+            <span class="score-unit">分</span>
+          </div>
+          <span class="score-sym">${gua.analysis.compareSymbol}</span>
+          <div class="score-item score-loss">
+            <span class="score-label">付出</span>
+            <b class="score-val">${gua.analysis.losses}</b>
+            <span class="score-unit">分</span>
+          </div>
+        </div>
+
+        <div class="result-formations">${formationsHtml}</div>
+        ${recordsHtml}
+
+        <div class="result-summary-section" style="margin: 12px 0; padding: 10px 12px; background: rgba(243,197,122,.12); border-left: 3px solid #d99616; border-radius: 4px;">
+          <div class="advice-line"><b>仙姑指點心法：</b>${esc(gua.advice)}</div>
+        </div>
+
+        <div class="result-pos-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0;">
+          <div class="pos-item center-item" style="grid-column: span 2; padding: 8px 10px; background: #fff; border: 1px solid #cbdbeb; border-radius: 6px;">
+            <span class="pos-badge" style="font-weight: 700; color: #b87b14; font-size: 11px;">中宮・本質</span>
+            <p style="margin: 3px 0 0; font-size: 12px; color: #243f5a;">${esc(gua.posInterpretations.center)}</p>
+          </div>
+          <div class="pos-item" style="padding: 8px 10px; background: #fff; border: 1px solid #cbdbeb; border-radius: 6px;">
+            <span class="pos-badge" style="font-weight: 700; color: #2e5984; font-size: 11px;">上方・天時</span>
+            <p style="margin: 3px 0 0; font-size: 12px; color: #243f5a;">${esc(gua.posInterpretations.top)}</p>
+          </div>
+          <div class="pos-item" style="padding: 8px 10px; background: #fff; border: 1px solid #cbdbeb; border-radius: 6px;">
+            <span class="pos-badge" style="font-weight: 700; color: #2e5984; font-size: 11px;">下方・地利</span>
+            <p style="margin: 3px 0 0; font-size: 12px; color: #243f5a;">${esc(gua.posInterpretations.bottom)}</p>
+          </div>
+          <div class="pos-item" style="padding: 8px 10px; background: #fff; border: 1px solid #cbdbeb; border-radius: 6px;">
+            <span class="pos-badge" style="font-weight: 700; color: #2e5984; font-size: 11px;">左方・客方</span>
+            <p style="margin: 3px 0 0; font-size: 12px; color: #243f5a;">${esc(gua.posInterpretations.left)}</p>
+          </div>
+          <div class="pos-item" style="padding: 8px 10px; background: #fff; border: 1px solid #cbdbeb; border-radius: 6px;">
+            <span class="pos-badge" style="font-weight: 700; color: #2e5984; font-size: 11px;">右方・主方</span>
+            <p style="margin: 3px 0 0; font-size: 12px; color: #243f5a;">${esc(gua.posInterpretations.right)}</p>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top: 12px; flex-wrap: wrap;">
+          <button class="btn primary small" data-act="market-chess-copy">📋 複製分享籤文</button>
+          <button class="btn small" data-act="market-chess-restart">🔄 重新排卦</button>
+          <button class="btn small" data-travel="chess">⛩️ 傳送回本堂問事亭</button>
+          <button class="btn small" data-act="contact">洽 LINE 人工解卦</button>
+        </div>
+      </div>
+    ` : `
+      <div class="chess-actions-bar" style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn primary small" data-act="market-chess-flip-all">⚡ 一鍵翻開全部五星</button>
+        <button class="btn small" data-act="market-chess-restart">🔄 重新洗牌</button>
+      </div>
+    `
+
+    content.innerHTML = `
+      <p class="eyebrow">天心仙姑問事・市集駐點</p>
+      <h2>東方問事指引亭・現場十字五星排卦</h2>
+      <p class="venue-intro">在靈光市集現場即刻起卦！心中默念所求之事（事業、感情、抉擇或困惑），依序點擊翻開五方星位，觀測吉凶生剋與格局意象。</p>
+      
+      <div class="chess-cross-board">
+        <div class="cross-row top-row">
+          ${renderSlot('top')}
+        </div>
+        <div class="cross-row mid-row">
+          ${renderSlot('left')}
+          ${renderSlot('center')}
+          ${renderSlot('right')}
+        </div>
+        <div class="cross-row bottom-row">
+          ${renderSlot('bottom')}
+        </div>
+      </div>
+
+      ${resultCard}
+
+      <div class="row" style="margin-top: 18px;">
+        <button class="btn" data-act="market-panel-close">繼續探索市集</button>
+      </div>
+    `
+  }
+
+  private loadServiceDeskMemo(): string {
+    try {
+      return localStorage.getItem('tianxin.service-desk.memo.v1') || ''
+    } catch { return '' }
+  }
+
+  private saveServiceDeskMemo(text: string): void {
+    try {
+      localStorage.setItem('tianxin.service-desk.memo.v1', text)
+      this.serviceDeskMemo = text
+      this.toast('旅人提問備忘已儲存在此裝置。')
+    } catch { /* storage disabled */ }
+  }
+
+  private clearServiceDeskMemo(): void {
+    try {
+      localStorage.removeItem('tianxin.service-desk.memo.v1')
+      this.serviceDeskMemo = ''
+      this.toast('已清除此裝置的提問備忘。')
+    } catch { /* storage disabled */ }
+  }
+
+  private async travelFromMarket(pointId: ShrinePointId): Promise<void> {
+    this.closeMarketPanel()
+    window.dispatchEvent(new CustomEvent('market:close-panel'))
+    window.dispatchEvent(new CustomEvent('market:travel-temple', { detail: pointId }))
+  }
+
+  openServiceDeskExperience(): void {
+    this.serviceDeskMemo = this.loadServiceDeskMemo()
+    this.renderServiceDeskExperience()
+  }
+
+  private renderServiceDeskExperience(): void {
+    this.setMarketDialogTitle('天心靈光市集・服務台（卡普拉接待所）')
+    const content = this.root.querySelector<HTMLElement>('[data-market-panel-content]')!
+    content.innerHTML = `
+      <p class="eyebrow">市集接待與諮詢總覽</p>
+      <h2>服務台（卡普拉接待所）</h2>
+      <p class="venue-intro">歡迎蒞臨天心靈光市集！服務台匯整天心仙姑各項神明問事、命理探索、能量療癒與祈福點燈服務，亦提供旅人私密提問備忘與各殿堂快速傳送。</p>
+      
+      <section class="ro-service-grid">
+        <article class="ro-service-card">
+          <div class="ro-service-icon">🔮</div>
+          <div class="ro-service-body">
+            <b>天心象棋十字排卦</b>
+            <p>融合三十二子象棋、五行生剋與十字吃子捕捉推演，專注於事業、感情、抉擇與當下瓶頸化解。</p>
+            <div class="ro-service-tags"><span>五方星位</span><span>現場解局</span><span>籤詩指引</span></div>
+          </div>
+        </article>
+        <article class="ro-service-card">
+          <div class="ro-service-icon">📜</div>
+          <div class="ro-service-body">
+            <b>紫微斗數命盤解析</b>
+            <p>十二宮本命格局、大限流年流月走勢與生年四化引動深入剖析，協助辨識先天優勢與生命課題。</p>
+            <div class="ro-service-tags"><span>十二宮位</span><span>四化星情</span><span>本機運算</span></div>
+          </div>
+        </article>
+        <article class="ro-service-card">
+          <div class="ro-service-icon">🧭</div>
+          <div class="ro-service-body">
+            <b>人類圖身心探索</b>
+            <p>解析能量類型、人生策略、內在權威、九大能量中心與通道閘門，找回不費力的本質運作軌跡。</p>
+            <div class="ro-service-tags"><span>9大中心</span><span>策略權威</span><span>天賦通道</span></div>
+          </div>
+        </article>
+        <article class="ro-service-card">
+          <div class="ro-service-icon">🌿</div>
+          <div class="ro-service-body">
+            <b>臼井靈氣能量療癒</b>
+            <p>溫和引導宇宙生命能量，促進深層身心放鬆、脈輪淨化平衡、減緩疲勞與焦慮感，安頓心神。</p>
+            <div class="ro-service-tags"><span>深層放鬆</span><span>脈輪調和</span><span>遠距/現場</span></div>
+          </div>
+        </article>
+        <article class="ro-service-card">
+          <div class="ro-service-icon">🪔</div>
+          <div class="ro-service-body">
+            <b>天心宮祈福點燈代辦</b>
+            <p>光明燈、太歲燈、文昌燈、財神燈線上登記與代拜疏文，為自己與家人祈求平安祥和、增福添慧。</p>
+            <div class="ro-service-tags"><span>光明燈</span><span>太歲安奉</span><span>宮方代拜</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="ro-line-cta">
+        <div class="ro-line-badge">官方諮詢與預約通道</div>
+        <p>如需預約一對一深度問事、解盤或報名點燈，歡迎加入天心仙姑官方 LINE：</p>
+        <button class="btn primary big ro-line-btn" data-act="contact">💬 加入 LINE 官方好友預約洽詢</button>
+      </section>
+
+      <section class="ro-teleport-section">
+        <h3>⛩️ 各殿堂快速傳送</h3>
+        <p>點擊可直接返回天心宮並自動導引至指定殿堂：</p>
+        <div class="ro-teleport-grid">
+          <button class="btn small ro-teleport-btn" data-travel="chess">🔮 天心仙姑問事亭</button>
+          <button class="btn small ro-teleport-btn" data-travel="cushion">👑 玉皇殿拜墊祈願</button>
+          <button class="btn small ro-teleport-btn" data-travel="statue_yuelao">🌸 月下老人求姻緣</button>
+          <button class="btn small ro-teleport-btn" data-travel="statue_caishen">💰 五路財神求財運</button>
+          <button class="btn small ro-teleport-btn" data-travel="sky-lantern">🏮 祈福天燈祈願處</button>
+          <button class="btn small ro-teleport-btn" data-travel="wishing-pool">🪷 蓮花祈願池投幣</button>
+        </div>
+      </section>
+
+      <section class="ro-memo-section">
+        <h3>📝 旅人私密提問備忘錄</h3>
+        <p>在此記下你想向天心仙姑詢問的具體問題或探索心得；僅保存在你目前的裝置瀏覽器中：</p>
+        <textarea class="ro-memo-input" rows="4" maxlength="600" placeholder="例如：1. 近期工作轉職是否合適？ 2. 感情對象的相處建議...">${esc(this.serviceDeskMemo)}</textarea>
+        <div class="row">
+          <button class="btn primary small" data-act="service-memo-save">儲存提問備忘</button>
+          <button class="btn small" data-act="service-memo-clear" ${this.serviceDeskMemo ? '' : 'disabled'}>清除備忘</button>
+        </div>
+      </section>
+
+      <div class="row" style="margin-top: 18px;">
+        <button class="btn" data-act="market-panel-close">繼續探索市集</button>
+      </div>
+    `
   }
 
   private npcDialogueTimer = 0
@@ -980,6 +1479,40 @@ export class TempleUi {
     }
     else if (act === 'market-cards') void this.openCardExperience()
     else if (act === 'market-meditation') this.openMeditationExperience()
+    else if (act === 'market-birth-tab') {
+      const tab = t.dataset.tab as 'ziwei' | 'human-design'
+      if (tab) {
+        this.birthChartTab = tab
+        this.renderBirthChartExperience()
+      }
+    }
+    else if (act === 'hd-save') void this.saveHumanDesign()
+    else if (act === 'hd-clear') void this.clearHumanDesign()
+    else if (act === 'market-chess-flip-all') {
+      const positions: ChessPos[] = ['center', 'left', 'right', 'top', 'bottom']
+      positions.forEach(p => this.store.revealCrossPiece(p))
+      this.renderMarketChessExperience()
+      this.toast('已一鍵翻開五方星位！')
+    }
+    else if (act === 'market-chess-restart') {
+      this.store.startCrossGua()
+      this.renderMarketChessExperience()
+      this.toast('已重新排卦，請翻開棋子。')
+    }
+    else if (act === 'market-chess-copy') {
+      const gua = this.store.currentCrossGua
+      if (!gua || !gua.allRevealed) { this.toast('請先翻開全部 5 顆棋子'); return }
+      this.copyText(formatCrossGuaShareText(gua), '已複製卦象摘要，可直接貼給天心仙姑 LINE 解卦')
+    }
+    else if (act === 'service-memo-save') {
+      const input = this.root.querySelector<HTMLTextAreaElement>('.ro-memo-input')
+      this.saveServiceDeskMemo(input?.value ?? '')
+      this.renderServiceDeskExperience()
+    }
+    else if (act === 'service-memo-clear') {
+      this.clearServiceDeskMemo()
+      this.renderServiceDeskExperience()
+    }
     else if (act === 'card-draw-spread') this.drawCardSpread((t.dataset.cardTopic as CardTopic) || 'inner-state')
     else if (act === 'card-save-note') void this.saveCardNote()
     else if (act === 'card-clear-notes') void this.clearCardNotes()
@@ -1131,6 +1664,17 @@ export class TempleUi {
       } else {
         this.open('chess')
       }
+    }
+    if (t.dataset.marketFlipPos) {
+      e.preventDefault()
+      const pos = t.dataset.marketFlipPos as ChessPos
+      this.store.revealCrossPiece(pos)
+      this.renderMarketChessExperience()
+    }
+    if (t.dataset.travel) {
+      e.preventDefault()
+      const targetPoint = t.dataset.travel as ShrinePointId
+      void this.travelFromMarket(targetPoint)
     }
     if (t.dataset.chessAct === 'restart') {
       e.preventDefault()

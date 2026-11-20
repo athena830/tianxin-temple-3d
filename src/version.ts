@@ -1,2 +1,2 @@
-/** VER 3.67.0 — complete RO 2.5D style for Tianxin Aura Market (3D striped stalls, Prontera-style central fountain, animated pixel sprites, Aura Slimes, RO warp portal, click-to-move, 360° orbit & RO HUD). */
-export const APP_VERSION = 'VER 3.67.0'
+/** VER 3.68.0 — materialized interactive market venues (Birth Chart Hall with Ziwei & Human Design, live Card Sanctuary, 60s Breathing Meditation, on-site Cross Xiangqi Divination, and Kafra Service Desk with service catalog, teleport portals & inquiry memo). */
+export const APP_VERSION = 'VER 3.68.0'

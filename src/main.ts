@@ -440,6 +440,18 @@ async function boot(): Promise<void> {
       ui.toast('已回到天心宮，正前往天心仙姑問事亭。')
     })()
   })
+  window.addEventListener('market:travel-temple', e => {
+    void (async () => {
+      if (!sceneManager || sceneManager.world !== 'market') return
+      ;(sceneManager.current as MarketGame).closePanel()
+      await sceneManager.returnTemple()
+      const pointId = (e as CustomEvent<ShrinePointId>).detail
+      if (pointId && game) {
+        game.setGuide(pointId)
+        ui.toast('已回到天心宮，正在為您導引前往目標。')
+      }
+    })()
+  })
 
   let stepped = false
   const loop = new GameLoop({
