@@ -7,7 +7,7 @@ import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
 import type { TempleGame } from './game/temple-game'
-import type { MarketGame } from './game/market-game'
+import { MarketGame } from './game/market-game'
 import type { MarketVenueId } from './game/market-world'
 import { SceneManager, type WorldId } from './game/scene-manager'
 import { LOTUS_POND, WISH_POOL } from './game/temple-courtyard'
@@ -390,7 +390,6 @@ async function boot(): Promise<void> {
       return next
     },
     createMarket: async () => {
-      const { MarketGame } = await import('./game/market-game')
       const next = new MarketGame(renderer, input, audio)
       next.onNear = point => ui.near(point)
       return next
