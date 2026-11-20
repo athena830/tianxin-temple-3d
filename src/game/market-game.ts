@@ -24,7 +24,7 @@ export class MarketGame {
   readonly body: RAPIER.RigidBody
   private readonly collider: RAPIER.Collider
   private readonly controller: RAPIER.KinematicCharacterController
-  private zoom = 7.6
+  private zoom = 11.5
   private cameraTarget = new THREE.Vector3()
   private cameraReady = false
   private verticalVelocity = 0
@@ -47,7 +47,7 @@ export class MarketGame {
     this.body.setTranslation({ x: spawn.x, y: spawn.y, z: spawn.z }, true)
     this.body.setNextKinematicTranslation({ x: spawn.x, y: spawn.y, z: spawn.z })
     this.mode = 'explore'
-    this.zoom = window.innerHeight > window.innerWidth ? 10.5 : 7.6
+    this.zoom = window.innerHeight > window.innerWidth ? 14.8 : 11.5
     this.cameraReady = false
     this.audio.play('chime')
   }
@@ -63,7 +63,7 @@ export class MarketGame {
     this.input.takeLook()
     const zoom = this.input.takeZoom()
     if (this.mode === 'explore') {
-      this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), 5.8, 13.5)
+      this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), 9.5, 17)
     }
     const forward = new THREE.Vector3(-Math.sin(ISOMETRIC_AZIMUTH), 0, -Math.cos(ISOMETRIC_AZIMUTH))
     const right = new THREE.Vector3(Math.cos(ISOMETRIC_AZIMUTH), 0, -Math.sin(ISOMETRIC_AZIMUTH))
