@@ -73,6 +73,7 @@ export type TempleUiActions = {
   openPanel(): void
   ritual(action: string): void
   travel(id: ShrinePointId): void
+  enterMarket(): void
   explore(): void
   exitExplore(): void
   cancelGuide(): void
@@ -148,6 +149,7 @@ export class TempleUi {
           <div class="hud-buttons">
             <button class="chip" data-act="time">${initialTimeLabel}</button>
             <button class="chip" data-act="music">${initialMusicLabel}</button>
+            <button class="chip market-entry" data-act="market-enter">進入市集</button>
             <button class="chip" data-act="map">參拜指引</button>
             <button class="chip" data-open="records">祈福紀錄</button>
             <button class="chip" data-open="prayer-wall">祈願牆</button>
@@ -939,6 +941,7 @@ export class TempleUi {
     else if (act === 'wish-again') { e.preventDefault(); this.hideWishBanner(); this.actions.ritual('coin') }
     else if (act === 'wish-close') { e.preventDefault(); this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
+    else if (act === 'market-enter') this.actions.enterMarket()
     else if (act === 'market-panel-close') {
       this.closeMarketPanel()
       window.dispatchEvent(new CustomEvent('market:close-panel'))

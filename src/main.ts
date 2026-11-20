@@ -71,6 +71,11 @@ async function boot(): Promise<void> {
       audio.play('ui')
       ui.toast('正在自動前往目的地（按方向鍵或點 × 可取消）')
     },
+    enterMarket: () => {
+      if (!sceneManager || sceneManager.world === 'market') return
+      audio.unlock()
+      void sceneManager.enterMarket()
+    },
     explore: startExplore,
     exitExplore,
     cancelGuide: () => game?.setGuide(null),

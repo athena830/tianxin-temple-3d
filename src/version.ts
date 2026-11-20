@@ -1,2 +1,2 @@
-/** VER 3.64.0 — rebuilt market as an original, fully sprite-based isometric 2.5D world. */
-export const APP_VERSION = 'VER 3.64.0'
+/** VER 3.65.0 — added a direct market entry control and corrected the market status visibility. */
+export const APP_VERSION = 'VER 3.65.0'
