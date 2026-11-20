@@ -597,6 +597,19 @@ export class TempleWorld {
     stepLeft2.receiveShadow = true
     hall.add(stepLeft2)
 
+    // 中央中門御路兩側登殿石階（左側與右側御道踏步）
+    for (const side of [-1, 1]) {
+      const stepCenter1 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.14, 0.8), stonePlinth)
+      stepCenter1.position.set(side * 1.6, 0.07, 7.5)
+      stepCenter1.receiveShadow = true
+      hall.add(stepCenter1)
+
+      const stepCenter2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.14, 0.5), stonePlinth)
+      stepCenter2.position.set(side * 1.55, 0.21, 6.9)
+      stepCenter2.receiveShadow = true
+      hall.add(stepCenter2)
+    }
+
     // Imperial Dragon Path Stone Relief (大殿中央中門御路龍陛石雕 / 丹墀雲龍階石)
     const dragonRamp = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.25), makeMat('#5f7169', 0.88, 0.15))
     dragonRamp.position.set(0, 0.16, 7.15)
@@ -1690,7 +1703,7 @@ export class TempleWorld {
     const urn = new THREE.Group()
     this.outdoorUrn = urn
     const stepsFrontEdge = this.mainHallZ + 7.9 * this.mainHallScale
-    const urnZ = Math.max(0.4, stepsFrontEdge + 1.25)
+    const urnZ = Math.max(0.4, stepsFrontEdge + 3.0)
     urn.position.set(0, 0, urnZ)
     const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.83, 0.65, 0.72, 12), bronze)
     bowl.position.y = 0.6
@@ -2736,13 +2749,45 @@ export class TempleWorld {
     this.guanyinModelPlaced = true
   }
 
-  /** Fallback when the 3D model cannot load: the flat golden image used before. */
+  /**
+   * Promotes an approved transparent 金身 artwork to the deity's main hall
+   * presentation. The procedural sculpture remains in the source as a safe
+   * rollback path, but is hidden once the replacement artwork has loaded.
+   */
+  private replaceDeityWithPortrait(
+    root: THREE.Group,
+    asset: string,
+    width: number,
+    height: number,
+    centerY: number,
+    depthZ = -0.335,
+  ): void {
+    new THREE.TextureLoader().load(asset, tex => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 1,
+        alphaTest: 0.06,
+        depthWrite: true,
+        side: THREE.DoubleSide,
+      })
+      const portrait = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat)
+      // The altar screen is local z -0.36/-0.40 behind each deity. Keep the
+      // transparent portrait just in front of it, then replace the old 3D view.
+      portrait.position.set(0, centerY, depthZ)
+      for (const child of root.children) child.visible = false
+      root.add(portrait)
+    })
+  }
+
+  /** Fallback when the 3D model cannot load: the updated transparent golden image. */
   showStatueImageFallback(): void {
     const root = this.guanyinRoot
     if (!root || this.guanyinModelPlaced) return
     const statueH = 3.2
-    const statueW = statueH * (376 / 537)
-    new THREE.TextureLoader().load('./assets/guanyin-golden.webp', tex => {
+    const statueW = statueH * (2 / 3)
+    new THREE.TextureLoader().load('./assets/guanyin-golden-v2.png', tex => {
       tex.colorSpace = THREE.SRGBColorSpace
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide })
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(statueW, statueH), mat)
@@ -2982,18 +3027,22 @@ export class TempleWorld {
     // 4. 溫暖奶油金圓滿背光輪 (Soft Warm Gold & Pastel Cream Halo)
     const haloMat = new THREE.MeshBasicMaterial({ color: '#ffeab5', transparent: true, opacity: 0.52, side: THREE.DoubleSide })
     const halo = new THREE.Mesh(new THREE.RingGeometry(0.88, 1.55, 36), haloMat)
-    halo.position.set(0, 1.75, -0.52)
+    halo.position.set(0, 1.75, -0.26)
     const haloInner = new THREE.Mesh(new THREE.CircleGeometry(0.88, 36), new THREE.MeshBasicMaterial({ color: '#fff3cf', transparent: true, opacity: 0.28 }))
-    haloInner.position.set(0, 1.75, -0.51)
+    haloInner.position.set(0, 1.75, -0.255)
     root.add(halo, haloInner)
 
     // Small lotus-like aureole beads remain readable at the main-hall viewing distance.
     for (let i = 0; i < 12; i++) {
       const angle = (i / 12) * Math.PI * 2
       const bead = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), brightGold)
-      bead.position.set(Math.cos(angle) * 1.28, 1.75 + Math.sin(angle) * 1.28, -0.535)
+      bead.position.set(Math.cos(angle) * 1.28, 1.75 + Math.sin(angle) * 1.28, -0.275)
       root.add(bead)
     }
+
+    // The centre niche has an additional carved panel, so the primary portrait
+    // needs a slightly forward layer to remain visible above that panel.
+    this.replaceDeityWithPortrait(root, './assets/guanyin-golden-v2.png', 2.42, 3.62, 1.78, -0.1)
 
     const statueGlow = new THREE.PointLight('#ffe5a8', 0.85, 8, 1.8)
     statueGlow.position.set(0, 2.0, 0.75)
@@ -3160,16 +3209,18 @@ export class TempleWorld {
       new THREE.RingGeometry(0.65, 1.12, 32),
       new THREE.MeshBasicMaterial({ color: '#ffe294', transparent: true, opacity: 0.46, side: THREE.DoubleSide })
     )
-    halo.position.set(0, 1.48, -0.44)
+    halo.position.set(0, 1.48, -0.29)
     root.add(halo)
 
     // Coin-like aureole details frame the official cap without hiding the face.
     for (let i = 0; i < 10; i++) {
       const angle = (i / 10) * Math.PI * 2
       const coin = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.014, 8, 12), brightGold)
-      coin.position.set(Math.cos(angle) * 0.94, 1.48 + Math.sin(angle) * 0.94, -0.455)
+      coin.position.set(Math.cos(angle) * 0.94, 1.48 + Math.sin(angle) * 0.94, -0.305)
       root.add(coin)
     }
+
+    this.replaceDeityWithPortrait(root, './assets/caishen-golden-v2.png', 2.1, 2.57, 1.48)
 
     root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
@@ -3359,17 +3410,19 @@ export class TempleWorld {
       new THREE.RingGeometry(0.65, 1.12, 32),
       new THREE.MeshBasicMaterial({ color: '#ffd6c4', transparent: true, opacity: 0.46, side: THREE.DoubleSide })
     )
-    halo.position.set(0, 1.48, -0.44)
+    halo.position.set(0, 1.48, -0.29)
     root.add(halo)
 
     for (let i = 0; i < 10; i++) {
       const angle = (i / 10) * Math.PI * 2
       const petal = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), brightGold)
       petal.scale.set(1.35, 0.75, 0.4)
-      petal.position.set(Math.cos(angle) * 0.94, 1.48 + Math.sin(angle) * 0.94, -0.455)
+      petal.position.set(Math.cos(angle) * 0.94, 1.48 + Math.sin(angle) * 0.94, -0.305)
       petal.rotation.z = angle
       root.add(petal)
     }
+
+    this.replaceDeityWithPortrait(root, './assets/yuelao-golden-v2.png', 1.92, 2.88, 1.56)
 
     root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
@@ -5014,7 +5067,7 @@ export class TempleWorld {
 
     // 5. Update outdoor Tiangong Urn (天公爐) position in front of the grand front steps
     const stepsFrontEdge = this.mainHallZ + 7.9 * s
-    const urnZ = Math.max(0.4, stepsFrontEdge + 1.25)
+    const urnZ = Math.max(0.4, stepsFrontEdge + 3.0)
     if (this.outdoorUrn) {
       this.outdoorUrn.position.set(0, 0, urnZ)
       if (this.outdoorUrnCollider) {
@@ -5074,13 +5127,48 @@ export class TempleWorld {
     }
     this.mainHallColliders = []
 
-    // 1. Raised podium
+    // 1. Raised podium (main floor ending at upper step edge to allow seamless climbing)
     this.mainHallColliders.push(
       this.physics.addStaticBox(
-        new THREE.Vector3(0, 0.14 * scale, hallZ - 0.3 * scale),
-        new THREE.Vector3(20.4 * scale, 0.28 * scale, 14.8 * scale)
+        new THREE.Vector3(0, 0.14 * scale, hallZ - 0.525 * scale),
+        new THREE.Vector3(20.4 * scale, 0.28 * scale, 14.35 * scale)
       )
     )
+
+    // 1b. Grand front steps & anti-stuck incline ramp across all three temple gates
+    // Upper step tier (0.14m to 0.28m, z: 6.65 to 7.15)
+    for (const [x, w] of [[0, 4.6], [6.75, 2.8], [-6.75, 2.8]] as const) {
+      this.mainHallColliders.push(
+        this.physics.addStaticBox(
+          new THREE.Vector3(x * scale, 0.14 * scale, hallZ + 6.9 * scale),
+          new THREE.Vector3(w * scale, 0.28 * scale, 0.5 * scale)
+        )
+      )
+    }
+
+    // Lower step tier (0.0m to 0.14m, z: 7.15 to 7.9)
+    for (const [x, w] of [[0, 4.6], [6.75, 2.8], [-6.75, 2.8]] as const) {
+      this.mainHallColliders.push(
+        this.physics.addStaticBox(
+          new THREE.Vector3(x * scale, 0.07 * scale, hallZ + 7.525 * scale),
+          new THREE.Vector3(w * scale, 0.14 * scale, 0.75 * scale)
+        )
+      )
+    }
+
+    // Smooth invisible transition ramp colliders (12.6° incline: 0 to 0.28m over 1.25m run)
+    const rampTheta = Math.atan2(0.28, 1.25)
+    const rampLen = Math.hypot(0.28, 1.25) * scale
+    const rampRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -rampTheta)
+    for (const [x, w] of [[0, 4.6], [6.75, 2.8], [-6.75, 2.8]] as const) {
+      this.mainHallColliders.push(
+        this.physics.addStaticBox(
+          new THREE.Vector3(x * scale, 0.14 * scale, hallZ + 7.275 * scale),
+          new THREE.Vector3(w * scale, 0.06 * scale, rampLen),
+          rampRot
+        )
+      )
+    }
 
     // 2. Central shrine back wall
     this.mainHallColliders.push(

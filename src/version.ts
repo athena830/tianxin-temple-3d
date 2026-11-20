@@ -1,2 +1,2 @@
-/** VER 3.59.0 — main hall 2x mode keeps the three consecrated figures at their reference size. */
-export const APP_VERSION = 'VER 3.59.0'
+/** VER 3.60.0 — smooth multi-tier stairs and incline ramps for main hall entrance to eliminate stair blocking. */
+export const APP_VERSION = 'VER 3.60.0'

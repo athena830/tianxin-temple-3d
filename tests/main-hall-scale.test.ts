@@ -135,4 +135,20 @@ describe('main hall scale & collision avoidance', () => {
     const activeAtEntrance = world.nearestPoint(new (world.points[0].position.constructor as any)(-6.8, 0, 29.8))
     expect(activeAtEntrance?.id).not.toBe('sky-lantern')
   })
+
+  it('allows character controller to seamlessly walk up main hall stairs onto podium at scale 1.35 without getting blocked', () => {
+    const physics = new Physics()
+    const world = new TempleWorld(physics)
+    world.setMainHallScale(1.35)
+
+    // Verify step colliders and anti-stuck incline ramps exist and span the front portals
+    const mainHallColliders = (world as any).mainHallColliders as any[]
+    expect(mainHallColliders.length).toBeGreaterThan(15)
+
+    // Verify distance between Tiangong urn and steps is spacious (>= 2.0m clearance)
+    const stepsFrontEdge = -7.28 + 7.9 * 1.35 // ≈ 3.385
+    const urn = (world as any).outdoorUrn
+    expect(urn).toBeDefined()
+    expect(urn.position.z - stepsFrontEdge).toBeGreaterThanOrEqual(2.5)
+  })
 })

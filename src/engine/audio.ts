@@ -25,6 +25,8 @@ export class Audio {
   private lastTTime = 0
   private taraAudio?: HTMLAudioElement
   private buffers = new Map<string, AudioBuffer>()
+  private meditationNoise?: AudioBufferSourceNode
+  private meditationGain?: GainNode
 
   onChantProgress?: (current: number, total: number) => void
   onTrackChange?: (track: MusicTrack, title: string, reason?: 'auto_complete' | 'manual' | 'init') => void
@@ -69,6 +71,46 @@ export class Audio {
     src.connect(bus === 'music' ? this.music : this.sfx)
     src.start()
     return src
+  }
+
+  /** User-initiated only: a soft filtered noise bed for the 60-second meditation. */
+  toggleMeditationAmbient(): boolean {
+    this.unlock()
+    if (this.meditationNoise) {
+      this.meditationNoise.stop()
+      this.meditationNoise.disconnect()
+      this.meditationGain?.disconnect()
+      this.meditationNoise = undefined
+      this.meditationGain = undefined
+      return false
+    }
+    if (this.ctx.state !== 'running') return false
+    const seconds = 2
+    const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * seconds, this.ctx.sampleRate)
+    const samples = buffer.getChannelData(0)
+    for (let i = 0; i < samples.length; i += 1) samples[i] = (Math.random() * 2 - 1) * 0.28
+    const source = this.ctx.createBufferSource()
+    const filter = this.ctx.createBiquadFilter()
+    const gain = this.ctx.createGain()
+    source.buffer = buffer
+    source.loop = true
+    filter.type = 'lowpass'
+    filter.frequency.value = 620
+    gain.gain.value = 0.045
+    source.connect(filter).connect(gain).connect(this.music)
+    source.start()
+    this.meditationNoise = source
+    this.meditationGain = gain
+    return true
+  }
+
+  stopMeditationAmbient(): void {
+    if (!this.meditationNoise) return
+    this.meditationNoise.stop()
+    this.meditationNoise.disconnect()
+    this.meditationGain?.disconnect()
+    this.meditationNoise = undefined
+    this.meditationGain = undefined
   }
 
   play(name: Sfx): void {

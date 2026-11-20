@@ -14,6 +14,9 @@ import {
   type WishBlessing,
 } from '../game/temple-data'
 import { getLunarPhaseInfo, getRealWorldTimeOfDay, type ShrinePoint, type ShrinePointId, type TimeOfDay, type TimeSetting } from '../game/temple-world'
+import type { MarketPoint, MarketVenueId } from '../game/market-world'
+import type { ZiweiChart, ZiweiInput } from '../game/ziwei-engine'
+import { TOPIC_LABELS, drawThreeCards, getDailyCard, type CardTopic, type ThreeCardSpread } from '../game/card-engine'
 import { POS_META, type ChessPos } from '../divination'
 import type { MusicTrack } from '../engine/audio'
 import { APP_VERSION } from '../version'
@@ -28,6 +31,22 @@ import {
 export type PanelId = ShrinePointId | 'consult' | 'bobei'
 
 const esc = (text: string) => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+
+function renderMarketPanel(id: MarketVenueId): string {
+  const close = '<button class="btn" data-act="market-panel-close">繼續探索市集</button>'
+  switch (id) {
+    case 'birth-chart-hall':
+      return `<p class="eyebrow">命盤探索館</p><h2>認識自己的探索入口</h2><p>紫微斗數排盤已可在此裝置上運算；人類圖功能仍在後續規劃中。</p><ul class="info"><li>出生資料預設只用於這次運算，不會自動儲存或上傳。</li><li>只有你主動按下儲存，資料才會寫入目前瀏覽器。</li></ul><div class="row"><button class="btn primary" data-act="market-ziwei">開啟紫微斗數排盤</button>${close}</div>`
+    case 'card-house':
+      return `<p class="eyebrow">牌卡靈感屋</p><h2>讓提問回到當下</h2><p>以反思文字協助整理工作、關係、內在狀態與下一步；不提供保證性預言或決策指令。</p><ul class="info"><li>每日一張：同一日固定一張，隔日更新。</li><li>三張牌：固定為過去、現在、建議，可選擇本機筆記。</li></ul><div class="row"><button class="btn primary" data-act="market-cards">開始牌卡反思</button>${close}</div>`
+    case 'moon-meditation':
+      return `<p class="eyebrow">月光靜心所</p><h2>留一段安靜給自己</h2><p>提供 60 秒呼吸引導、靜心文字與由你主動開啟的環境音。內容只供自我關照，不取代醫療或心理專業。</p><ul class="info"><li>環境音預設關閉，需由你自行播放。</li><li>靈氣服務資訊將由宮方確認後公告。</li></ul><div class="row"><button class="btn primary" data-act="market-meditation">開始 60 秒靜心</button>${close}</div>`
+    case 'chess-guide':
+      return `<p class="eyebrow">東方問事指引亭</p><h2>前往天心仙姑象棋卜卦</h2><p>市集不另建第二套卜卦規則。若想開始十字五星排卦，將帶你回到既有的天心仙姑問事亭。</p><div class="row"><button class="btn primary" data-act="market-chess">前往象棋卜卦</button>${close}</div>`
+    case 'service-desk':
+      return `<p class="eyebrow">市集服務台</p><h2>服務資訊與預約入口</h2><p>老師介紹、服務內容、價格、活動與名額，將在宮方提供並確認後公告。目前可透過既有 LINE 入口洽詢。</p><div class="row"><button class="btn primary" data-act="contact">洽 LINE 詢問</button>${close}</div>`
+  }
+}
 
 const SAMPLE_WISHES = ['願家人身體健康，平安順遂。', '祈求考試順利，心定不慌。', '願世間少些病苦，多些溫柔。', '新的一年，工作踏實、心安自在。']
 
@@ -63,6 +82,8 @@ export type TempleUiActions = {
   isMusicPlaying(): boolean
   getCurrentMusicState?(): { playing: boolean; track: MusicTrack; chantCount: number }
   switchTrack?(track: MusicTrack): void
+  toggleMeditationAmbient(): boolean
+  stopMeditationAmbient(): void
 }
 
 export class TempleUi {
@@ -75,6 +96,16 @@ export class TempleUi {
   selectedWishCategory: WishCategory = 'peace'
   lastWishBlessing: WishBlessing | null = null
   customWishInput = ''
+  private ziweiInput: ZiweiInput | null = null
+  private ziweiChart: ZiweiChart | null = null
+  private ziweiError = ''
+  private ziweiSavedCount = 0
+  private cardSpread: ThreeCardSpread | null = null
+  private cardNoteCount = 0
+  private meditationSeconds = 60
+  private meditationRunning = false
+  private meditationAmbient = false
+  private meditationTimer = 0
 
   constructor(private readonly store: TempleStore, private readonly actions: TempleUiActions) {
     const initReal = getRealWorldTimeOfDay().mode
@@ -131,7 +162,7 @@ export class TempleUi {
           <button data-go="wishing-pool">蓮花許願池</button><button data-go="prayer-wall">大殿外廣場・祈願牆</button><button data-go="records">祈福紀錄</button>
           <button data-go="market-portal">天心靈光市集</button>
         </nav>
-        <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact">互動</button></div>
+        <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact" data-prompt-action>互動</button></div>
         <div class="guide" hidden><span>前往</span><b data-guide-name></b><small data-guide-dist></small><button class="guide-x" data-act="guide-cancel" aria-label="取消指引">×</button></div>
         <div class="mode-bar">
           <button class="btn primary" data-act="explore" data-when="browse">開始探索</button>
@@ -148,7 +179,9 @@ export class TempleUi {
       <div class="wish-banner" hidden></div>
       <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
       <div class="toast" hidden></div>
-      <div class="market-status" hidden><b>天心靈光市集</b><span>市集建設中，敬請期待</span></div>
+      <div class="market-status" hidden><b>天心靈光市集</b><span>探索四館・跟隨金色指引查看介紹</span></div>
+      <div class="market-panel-wrap" hidden><section class="market-panel" role="dialog" aria-modal="true" aria-label="市集介紹"><button class="panel-x" data-act="market-panel-close" aria-label="關閉">×</button><div data-market-panel-content></div></section></div>
+      <div class="ziwei-panel-wrap" hidden><section class="ziwei-panel" role="dialog" aria-modal="true" aria-label="紫微斗數排盤"><button class="panel-x" data-act="ziwei-close" aria-label="關閉">×</button><div data-ziwei-panel-content></div></section></div>
       <div class="world-transition" hidden><div><i></i><b data-world-transition>穿越靈光之門⋯</b><small>正在切換獨立世界</small></div></div>`
     this.root.addEventListener('click', e => this.onClick(e))
     window.setInterval(() => {
@@ -164,6 +197,7 @@ export class TempleUi {
     this.root.addEventListener('submit', e => {
       e.preventDefault()
       const form = e.target as HTMLFormElement
+      if (form.matches('.ziwei-form')) { void this.generateZiwei(form); return }
       const text = (form.elements.namedItem('wish') as HTMLTextAreaElement).value
       const wish = this.store.submitWish(text)
       if (!wish) { this.toast('請先寫下你的心願'); return }
@@ -174,6 +208,20 @@ export class TempleUi {
       if (e.key !== 'Escape') return
       const overlay = this.root.querySelector<HTMLElement>('[data-qr-lightbox]:not([hidden]), [data-legal-modal]:not([hidden]), [data-service-modal]:not([hidden])')
       if (overlay) { e.stopPropagation(); overlay.hidden = true; return }
+      const marketPanel = this.root.querySelector<HTMLElement>('.market-panel-wrap')
+      if (marketPanel && !marketPanel.hidden) {
+        e.stopPropagation()
+        this.closeMarketPanel()
+        window.dispatchEvent(new CustomEvent('market:close-panel'))
+        return
+      }
+      const ziweiPanel = this.root.querySelector<HTMLElement>('.ziwei-panel-wrap')
+      if (ziweiPanel && !ziweiPanel.hidden) {
+        e.stopPropagation()
+        this.closeZiweiPanel()
+        window.dispatchEvent(new CustomEvent('market:close-panel'))
+        return
+      }
       if (!this.panelHidden) { e.stopPropagation(); this.actions.closePanel() }
     })
     this.refreshCharacter()
@@ -200,6 +248,13 @@ export class TempleUi {
     if (world === 'market') {
       this.closePanel()
       this.guideTo(null, 0)
+    } else {
+      this.closeMarketPanel()
+      this.closeZiweiPanel()
+      window.clearInterval(this.meditationTimer)
+      this.meditationRunning = false
+      this.actions.stopMeditationAmbient()
+      this.meditationAmbient = false
     }
   }
 
@@ -236,12 +291,194 @@ export class TempleUi {
     this.root.querySelector<HTMLElement>('[data-who]')!.textContent = `${c.title}・${c.name}`
   }
 
-  near(point: ShrinePoint | null): void {
+  near(point: ShrinePoint | MarketPoint | null): void {
     const el = this.root.querySelector<HTMLElement>('.prompt')!
+    const action = el.querySelector<HTMLButtonElement>('[data-prompt-action]')!
     el.hidden = !point
-    if (!point) return
+    if (!point) {
+      action.classList.remove('portal-entry')
+      action.textContent = '互動'
+      return
+    }
     el.querySelector('[data-prompt-title]')!.textContent = point.title
     el.querySelector('[data-prompt-sub]')!.textContent = point.subtitle
+    // A guided destination should never end on a keyboard-only dead end.
+    // Both the temple portal and the market return portal expose a clear CTA.
+    const id = (point as { id: string }).id
+    const isPortal = id === 'market-portal' || id === 'return-temple'
+    const isMarketVenue = ['birth-chart-hall', 'card-house', 'moon-meditation', 'chess-guide', 'service-desk'].includes(id)
+    action.classList.toggle('portal-entry', isPortal || isMarketVenue)
+    action.textContent = id === 'market-portal' ? '進入市集' : id === 'return-temple' ? '返回天心宮' : isMarketVenue ? '查看介紹' : '互動'
+  }
+
+  openMarketPanel(id: MarketVenueId): void {
+    const wrap = this.root.querySelector<HTMLElement>('.market-panel-wrap')!
+    const content = this.root.querySelector<HTMLElement>('[data-market-panel-content]')!
+    content.innerHTML = renderMarketPanel(id)
+    wrap.hidden = false
+  }
+
+  closeMarketPanel(): void {
+    const wrap = this.root.querySelector<HTMLElement>('.market-panel-wrap')
+    if (wrap) wrap.hidden = true
+    window.clearInterval(this.meditationTimer)
+    this.meditationRunning = false
+    if (this.meditationAmbient) this.actions.stopMeditationAmbient()
+    this.meditationAmbient = false
+  }
+
+  async openZiweiPanel(): Promise<void> {
+    const { listZiweiCharts } = await import('../game/ziwei-storage')
+    this.ziweiSavedCount = listZiweiCharts().length
+    this.ziweiError = ''
+    this.renderZiweiPanel()
+    this.root.querySelector<HTMLElement>('.ziwei-panel-wrap')!.hidden = false
+  }
+
+  closeZiweiPanel(): void {
+    const wrap = this.root.querySelector<HTMLElement>('.ziwei-panel-wrap')
+    if (wrap) wrap.hidden = true
+  }
+
+  private renderZiweiPanel(): void {
+    const content = this.root.querySelector<HTMLElement>('[data-ziwei-panel-content]')!
+    const chart = this.ziweiChart
+    const error = this.ziweiError ? `<p class="ziwei-error" role="alert">${esc(this.ziweiError)}</p>` : ''
+    const result = chart ? `
+      <section class="ziwei-result">
+        <div class="ziwei-summary"><b>十二宮本命盤</b><span>iztro ${esc(chart.engine.version)} ・本機運算</span></div>
+        ${chart.precisionNotice ? `<p class="ziwei-warning">${esc(chart.precisionNotice)}</p>` : ''}
+        <p class="ziwei-meta">農曆：${esc(chart.lunarDate)} ・時辰：${esc(chart.timeLabel)}（${esc(chart.timeRange)}）・五行局：${esc(chart.fiveElementsClass)}</p>
+        <p class="ziwei-meta">命主：${esc(chart.soul)} ・身主：${esc(chart.body)}</p>
+        <div class="ziwei-grid">${chart.palaces.map(palace => `<article class="ziwei-palace ${palace.name === '命宮' ? 'life' : ''}"><b>${esc(palace.name)}${palace.isBodyPalace ? '・身宮' : ''}</b><small>${esc(palace.earthlyBranch)}</small><span>${esc(palace.majorStars.join('、') || '—')}</span><em>${esc(palace.minorStars.join('、') || '')}</em></article>`).join('')}</div>
+        <p class="ziwei-reflection">${esc(chart.reflection)}</p>
+        <p class="ziwei-meta">生年四化：${chart.transformations.length ? chart.transformations.map(item => `${esc(item.star)}化${esc(item.kind)}（${esc(item.palace)}）`).join('、') : '本盤未列出'}</p>
+        <div class="row"><button class="btn primary" data-act="ziwei-save">儲存到此裝置</button><button class="btn" data-act="contact">出生時間不確定？洽 LINE</button></div>
+      </section>` : ''
+    content.innerHTML = `
+      <p class="eyebrow">命盤探索館・紫微斗數</p><h2>本機紫微斗數排盤</h2>
+      <p class="ziwei-privacy">出生資料預設只在這次本機運算中使用，不上傳、不公開，也不會寫入祈願牆。只有按「儲存到此裝置」才會保存在這個瀏覽器。</p>
+      <form class="ziwei-form">
+        <label>識別名稱（選填，最多 20 字）<input name="alias" maxlength="20" autocomplete="off" placeholder="暱稱、代號或計畫名稱" /></label>
+        <div class="ziwei-form-grid"><label>出生日期<input name="date" type="date" required /></label><label>排盤性別<select name="gender"><option value="female">女</option><option value="male">男</option></select></label></div>
+        <label>出生時間（當地時間）<input name="time" type="time" /></label>
+        <label class="ziwei-check"><input name="timeUnknown" type="checkbox" /> 出生時間不確定（將以子時作技術參考並標示低精準度）</label>
+        <div class="ziwei-form-grid"><label>出生地：國家／地區<input name="country" required maxlength="40" autocomplete="country-name" placeholder="例如：台灣" /></label><label>出生城市<input name="city" required maxlength="40" autocomplete="address-level2" placeholder="例如：台北市" /></label></div>
+        <button class="btn primary big" type="submit">產生十二宮命盤</button>
+      </form>
+      ${error}${result}
+      <div class="ziwei-storage"><span>此裝置已儲存 ${this.ziweiSavedCount} 筆命盤。</span><button class="btn small" data-act="ziwei-clear" ${this.ziweiSavedCount ? '' : 'disabled'}>清除本機紀錄</button></div>
+      <p class="ziwei-disclaimer">盤面資料與文字僅供自我理解與民俗文化參考，不構成醫療、法律、財務或任何保證性建議。</p>`
+  }
+
+  private async generateZiwei(form: HTMLFormElement): Promise<void> {
+    const value = new FormData(form)
+    const input: ZiweiInput = {
+      alias: String(value.get('alias') ?? '').trim() || undefined,
+      date: String(value.get('date') ?? ''),
+      time: String(value.get('time') ?? '') || undefined,
+      timeUnknown: value.get('timeUnknown') === 'on',
+      country: String(value.get('country') ?? '').trim(),
+      city: String(value.get('city') ?? '').trim(),
+      gender: value.get('gender') === 'male' ? 'male' : 'female',
+    }
+    try {
+      const { createZiweiChart } = await import('../game/ziwei-engine')
+      this.ziweiInput = input
+      this.ziweiChart = createZiweiChart(input)
+      this.ziweiError = ''
+    } catch (error) {
+      this.ziweiError = (error as Error).message || '排盤失敗，請確認輸入資料。'
+    }
+    this.renderZiweiPanel()
+  }
+
+  private async saveZiwei(): Promise<void> {
+    if (!this.ziweiInput || !this.ziweiChart) return
+    const { saveZiweiChart } = await import('../game/ziwei-storage')
+    this.ziweiSavedCount = saveZiweiChart(this.ziweiInput, this.ziweiChart).length
+    this.renderZiweiPanel()
+    this.toast('命盤已依你的指示儲存在此裝置。')
+  }
+
+  private async clearZiwei(): Promise<void> {
+    const { clearZiweiCharts } = await import('../game/ziwei-storage')
+    clearZiweiCharts()
+    this.ziweiSavedCount = 0
+    this.renderZiweiPanel()
+    this.toast('已清除這個瀏覽器中的紫微命盤紀錄。')
+  }
+
+  async openCardExperience(): Promise<void> {
+    const { listCardNotes } = await import('../game/card-storage')
+    this.cardNoteCount = listCardNotes().length
+    this.renderCardExperience()
+  }
+
+  private renderCardExperience(): void {
+    const content = this.root.querySelector<HTMLElement>('[data-market-panel-content]')!
+    const daily = getDailyCard()
+    const spread = this.cardSpread
+    const card = (item: typeof daily, position?: string) => `<article class="reflection-card" style="--card-color:${item.color}"><i>${item.symbol}</i><small>${position || '今日訊息'}</small><b>${item.name}</b><span>${item.keywords.join('・')}</span><p>${item.reflection}</p><em>${item.question}</em></article>`
+    const spreadView = spread ? `<section class="spread-result"><h3>${TOPIC_LABELS[spread.topic]}・三張牌反思</h3><div class="spread-grid">${spread.cards.map((item, index) => card(item, ['過去', '現在', '建議'][index])).join('')}</div><label class="card-note-label">可選本機筆記<textarea class="card-note" maxlength="500" rows="3" placeholder="寫下你想記住的感受或下一步；不會自動儲存。"></textarea></label><div class="row"><button class="btn primary" data-act="card-save-note">儲存筆記到此裝置</button></div></section>` : ''
+    content.innerHTML = `<p class="eyebrow">牌卡靈感屋</p><h2>牌卡反思</h2><p>牌卡是整理當下感受的提示，不預測未來，也不替你做醫療、法律、財務或重大人生決定。</p><section class="daily-card"><div><h3>每日一張・${new Date().toLocaleDateString('sv-SE')}</h3><p>同一個本地日期固定同一張牌，不提供同日重抽；隔日會更新。</p></div>${card(daily)}</section><section class="spread-picker"><h3>三張牌問事</h3><p>選擇一個反思主題；位置固定為「過去／現在／建議」。</p><div class="topic-row">${(Object.keys(TOPIC_LABELS) as CardTopic[]).map(topic => `<button class="btn small" data-act="card-draw-spread" data-card-topic="${topic}">${TOPIC_LABELS[topic]}</button>`).join('')}</div></section>${spreadView}<div class="reflection-storage"><span>此裝置已儲存 ${this.cardNoteCount} 則牌卡筆記。</span><button class="btn small" data-act="card-clear-notes" ${this.cardNoteCount ? '' : 'disabled'}>清除本機筆記</button></div>`
+  }
+
+  private drawCardSpread(topic: CardTopic): void {
+    this.cardSpread = drawThreeCards(topic)
+    this.renderCardExperience()
+  }
+
+  private async saveCardNote(): Promise<void> {
+    if (!this.cardSpread) return
+    const note = this.root.querySelector<HTMLTextAreaElement>('.card-note')?.value ?? ''
+    const { saveCardNote } = await import('../game/card-storage')
+    this.cardNoteCount = saveCardNote(this.cardSpread, note).length
+    this.renderCardExperience()
+    this.toast(note.trim() ? '牌卡筆記已儲存在此裝置。' : '請先寫下想保存的筆記。')
+  }
+
+  private async clearCardNotes(): Promise<void> {
+    const { clearCardNotes } = await import('../game/card-storage')
+    clearCardNotes()
+    this.cardNoteCount = 0
+    this.renderCardExperience()
+    this.toast('已清除這個瀏覽器中的牌卡筆記。')
+  }
+
+  openMeditationExperience(): void {
+    this.renderMeditationExperience()
+  }
+
+  private renderMeditationExperience(): void {
+    const content = this.root.querySelector<HTMLElement>('[data-market-panel-content]')!
+    const elapsed = 60 - this.meditationSeconds
+    const inCycle = elapsed % 12
+    const phase = inCycle < 4 ? '吸氣 4 秒' : inCycle < 6 ? '停留 2 秒' : '吐氣 6 秒'
+    const detail = this.meditationRunning ? `剩餘 ${this.meditationSeconds} 秒・${phase}` : this.meditationSeconds === 0 ? '60 秒練習完成，感受此刻的呼吸與身體。' : '準備好後，開始 60 秒呼吸練習。'
+    content.innerHTML = `<p class="eyebrow">月光靜心所</p><h2>60 秒呼吸靜心</h2><p>找一個舒適姿勢，不必追求完美；只要溫和地把注意力帶回呼吸。</p><section class="breathing-card"><div class="breathing-orb ${this.meditationRunning ? 'active' : ''}"><span>${this.meditationSeconds}</span><small>秒</small></div><b>${detail}</b><p>吸氣時感受空氣進入，吐氣時讓肩膀與下顎慢慢放鬆。</p><div class="row"><button class="btn primary" data-act="meditation-start" ${this.meditationRunning ? 'disabled' : ''}>${this.meditationSeconds === 60 ? '開始 60 秒引導' : '重新開始'}</button><button class="btn" data-act="meditation-stop" ${this.meditationRunning ? '' : 'disabled'}>暫停</button></div></section><section class="meditation-text"><h3>靜心文字</h3><p>此刻不需要解決所有事情。請給自己一分鐘，讓念頭來去；若感到不適，隨時停止並回到熟悉、安全的環境。</p></section><section class="ambient-card"><h3>環境音</h3><p>環境音預設關閉，僅在你按下按鈕後播放。</p><button class="btn ${this.meditationAmbient ? '' : 'primary'}" data-act="meditation-ambient">${this.meditationAmbient ? '停止環境音' : '播放環境音'}</button></section><section class="meditation-text"><h3>靈氣服務與預約</h3><p>服務內容與安排將由宮方確認後公告；此頁不宣稱療效、診斷或可取代醫療與心理專業。</p><button class="btn" data-act="contact">洽 LINE 詢問</button></section>`
+  }
+
+  private startMeditation(): void {
+    window.clearInterval(this.meditationTimer)
+    this.meditationSeconds = 60
+    this.meditationRunning = true
+    this.renderMeditationExperience()
+    this.meditationTimer = window.setInterval(() => {
+      this.meditationSeconds = Math.max(0, this.meditationSeconds - 1)
+      if (this.meditationSeconds === 0) {
+        window.clearInterval(this.meditationTimer)
+        this.meditationRunning = false
+        this.toast('60 秒呼吸練習完成。')
+      }
+      this.renderMeditationExperience()
+    }, 1000)
+  }
+
+  private stopMeditation(): void {
+    window.clearInterval(this.meditationTimer)
+    this.meditationRunning = false
+    this.renderMeditationExperience()
   }
 
   private npcDialogueTimer = 0
@@ -702,6 +939,35 @@ export class TempleUi {
     else if (act === 'wish-again') { e.preventDefault(); this.hideWishBanner(); this.actions.ritual('coin') }
     else if (act === 'wish-close') { e.preventDefault(); this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
+    else if (act === 'market-panel-close') {
+      this.closeMarketPanel()
+      window.dispatchEvent(new CustomEvent('market:close-panel'))
+    }
+    else if (act === 'market-ziwei') {
+      this.closeMarketPanel()
+      window.dispatchEvent(new CustomEvent('market:open-ziwei'))
+    }
+    else if (act === 'market-cards') void this.openCardExperience()
+    else if (act === 'market-meditation') this.openMeditationExperience()
+    else if (act === 'card-draw-spread') this.drawCardSpread((t.dataset.cardTopic as CardTopic) || 'inner-state')
+    else if (act === 'card-save-note') void this.saveCardNote()
+    else if (act === 'card-clear-notes') void this.clearCardNotes()
+    else if (act === 'meditation-start') this.startMeditation()
+    else if (act === 'meditation-stop') this.stopMeditation()
+    else if (act === 'meditation-ambient') {
+      this.meditationAmbient = this.actions.toggleMeditationAmbient()
+      this.renderMeditationExperience()
+    }
+    else if (act === 'ziwei-close') {
+      this.closeZiweiPanel()
+      window.dispatchEvent(new CustomEvent('market:close-panel'))
+    }
+    else if (act === 'ziwei-save') void this.saveZiwei()
+    else if (act === 'ziwei-clear') void this.clearZiwei()
+    else if (act === 'market-chess') {
+      this.closeMarketPanel()
+      window.dispatchEvent(new CustomEvent('market:open-chess'))
+    }
     else if (act === 'cushion-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'cushion' })) }
     else if (act === 'sky-lantern-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'sky-lantern' })) }
     else if (act === 'contact') window.open(LINE_OFFICIAL_URL, '_blank', 'noopener,noreferrer')

@@ -1,7 +1,7 @@
 {
   "name": "yuhuang",
   "private": true,
-  "version": "3.59.0",
+  "version": "3.60.0",
   "type": "module",
   "scripts": {
     "dev": "node scripts/manus-game-assets/restore.mjs && vite",
@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
+    "astronomy-engine": "^2.1.19",
+    "iztro": "2.6.5",
     "lil-gui": "^0.21.0",
     "three": "^0.186.1"
   },

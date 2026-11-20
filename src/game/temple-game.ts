@@ -156,8 +156,8 @@ export class TempleGame {
     this.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(s.x, s.y, s.z))
     this.collider = this.physics.world.createCollider(RAPIER.ColliderDesc.capsule(HALF_HEIGHT, RADIUS).setFriction(0), this.body)
     this.controller = this.physics.world.createCharacterController(0.02)
-    this.controller.enableAutostep(0.35, 0.2, false)
-    this.controller.enableSnapToGround(0.35)
+    this.controller.enableAutostep(0.65, 0.15, false)
+    this.controller.enableSnapToGround(0.65)
     this.renderer.gl.shadowMap.enabled = true
     this.physics.world.step()
   }

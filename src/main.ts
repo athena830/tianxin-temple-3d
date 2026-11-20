@@ -8,6 +8,7 @@ import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
 import type { TempleGame } from './game/temple-game'
 import type { MarketGame } from './game/market-game'
+import type { MarketVenueId } from './game/market-world'
 import { SceneManager, type WorldId } from './game/scene-manager'
 import { LOTUS_POND, WISH_POOL } from './game/temple-courtyard'
 import { DRAGON_GUANYIN_POS, type ShrinePointId } from './game/temple-world'
@@ -79,6 +80,8 @@ async function boot(): Promise<void> {
     isMusicPlaying: () => audio.isMusicPlaying(),
     getCurrentMusicState: () => audio.getCurrentMusicState(),
     switchTrack: track => audio.switchToTrack(track),
+    toggleMeditationAmbient: () => audio.toggleMeditationAmbient(),
+    stopMeditationAmbient: () => audio.stopMeditationAmbient(),
     ritual: action => {
       if (!game) return
       const w = game.world
@@ -315,6 +318,10 @@ async function boot(): Promise<void> {
     if (sceneManager?.world === 'market') {
       const market = sceneManager.current as MarketGame
       if (market.active?.id === 'return-temple') void sceneManager.returnTemple()
+      else if (market.active) {
+        market.openPanel()
+        ui.openMarketPanel(market.active.id as MarketVenueId)
+      }
       return
     }
     const temple = game
@@ -380,12 +387,15 @@ async function boot(): Promise<void> {
     createMarket: async () => {
       const { MarketGame } = await import('./game/market-game')
       const next = new MarketGame(renderer, input, audio)
-      next.onNear = point => ui.near(point as unknown as import('./game/temple-world').ShrinePoint)
+      next.onNear = point => ui.near(point)
       return next
     },
     onTransition: (state, message) => ui.setWorldTransition(state !== 'idle', message),
     onWorldChanged: (world: WorldId, active) => {
       ui.setWorld(world)
+      // The hall-scale tuning panel is irrelevant while the independent market
+      // world is active, and otherwise makes the arrival screen look unfinished.
+      gui.domElement.style.display = world === 'market' ? 'none' : ''
       if (world === 'temple') game = active as TempleGame
       else game = undefined
       ui.setMode(active.mode)
@@ -394,7 +404,32 @@ async function boot(): Promise<void> {
   })
   sceneManager.adoptInitial(g)
   window.addEventListener('market:interact', e => {
-    if ((e as CustomEvent<string>).detail === 'return-temple') void sceneManager?.returnTemple()
+    const id = (e as CustomEvent<string>).detail
+    if (id === 'return-temple') {
+      void sceneManager?.returnTemple()
+      return
+    }
+    const market = sceneManager?.current as MarketGame | undefined
+    if (!market || sceneManager?.world !== 'market') return
+    market.openPanel()
+    ui.openMarketPanel(id as MarketVenueId)
+  })
+  window.addEventListener('market:close-panel', () => {
+    if (sceneManager?.world === 'market') (sceneManager.current as MarketGame).closePanel()
+  })
+  window.addEventListener('market:open-ziwei', () => {
+    if (sceneManager?.world !== 'market') return
+    ;(sceneManager.current as MarketGame).openPanel()
+    void ui.openZiweiPanel()
+  })
+  window.addEventListener('market:open-chess', () => {
+    void (async () => {
+      if (!sceneManager || sceneManager.world !== 'market') return
+      ;(sceneManager.current as MarketGame).closePanel()
+      await sceneManager.returnTemple()
+      game?.setGuide('chess')
+      ui.toast('已回到天心宮，正前往天心仙姑問事亭。')
+    })()
   })
 
   let stepped = false

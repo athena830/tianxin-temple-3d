@@ -7,7 +7,7 @@ import { CONFIG } from './config'
 import { MarketWorld, type MarketPoint } from './market-world'
 import { disposeWorldScene } from './world-dispose'
 
-export type MarketMode = 'browse' | 'explore'
+export type MarketMode = 'browse' | 'explore' | 'panel'
 const HALF_HEIGHT = 0.55
 const RADIUS = 0.36
 const FOOT_OFFSET = HALF_HEIGHT + RADIUS
@@ -36,7 +36,8 @@ export class MarketGame {
     this.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(spawn.x, spawn.y, spawn.z))
     this.collider = this.physics.world.createCollider(RAPIER.ColliderDesc.capsule(HALF_HEIGHT, RADIUS).setFriction(0), this.body)
     this.controller = this.physics.world.createCharacterController(0.02)
-    this.controller.enableAutostep(0.35, 0.2, false)
+    this.controller.enableAutostep(0.65, 0.15, false)
+    this.controller.enableSnapToGround(0.65)
     this.controller.enableSnapToGround(0.35)
     this.physics.world.step()
   }
@@ -55,8 +56,8 @@ export class MarketGame {
 
   startExplore(): void { this.mode = 'explore' }
   stopExplore(): void { this.mode = 'browse'; this.input.clearHeld() }
-  openPanel(): void { this.stopExplore() }
-  closePanel(): void { this.input.clearHeld() }
+  openPanel(): void { this.mode = 'panel'; this.input.clearHeld() }
+  closePanel(): void { this.mode = 'explore'; this.input.clearHeld() }
   get feet(): THREE.Vector3 { const p = this.body.translation(); return new THREE.Vector3(p.x, p.y - FOOT_OFFSET, p.z) }
   get worshipping(): boolean { return false }
 

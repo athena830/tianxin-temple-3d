@@ -11,6 +11,12 @@ importers:
       '@dimforge/rapier3d-compat':
         specifier: ^0.21.0
         version: 0.21.0
+      iztro:
+        specifier: 2.6.5
+        version: 2.6.5
+      lil-gui:
+        specifier: ^0.21.0
+        version: 0.21.0
       three:
         specifier: ^0.186.1
         version: 0.186.1
@@ -32,6 +38,10 @@ importers:
         version: 5.0.2(vite@8.3.1)
 
 packages:
+
+  '@babel/runtime@7.29.14':
+    resolution: {integrity: sha512-Y5tqevQaUAZhhj82BpYMNC1ssvLQTVAfwKdm8iy8qwmhvC2/CpcAu8OC+QEtjM7pMk7knx83u1Qj8gzkicyelw==}
+    engines: {node: '>=6.9.0'}
 
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
@@ -188,6 +198,9 @@ packages:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
 
+  dayjs@1.11.23:
+    resolution: {integrity: sha512-QDTCU0M0MxR3hQfnlDJfwekQiaanm1ubOD231u73WBckQ/fsamwRLiE2GBz6D3a/xF1NgfiDLJjXBa1hYOYTtQ==}
+
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -218,6 +231,12 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  i18next@23.16.8:
+    resolution: {integrity: sha512-06r/TitrM88Mg5FdUXAKL96dJMzgqLE5dv3ryBAra4KCwD9mJ4ndOTS95ZuymIGoE+2hzfdaMak2X11/es7ZWg==}
+
+  iztro@2.6.5:
+    resolution: {integrity: sha512-mObboktSBInBv68+dr6R46cyMUXlYKp9C0jnXBBZtwFuB0PAKeYNYICqelMM1yQ7/rvgd7EUKKfsZ+PVQiBFbA==}
 
   lightningcss-android-arm64@1.33.0:
     resolution: {integrity: sha512-gEpRTalKdosp4Bb8qWtc2iOgE5SeIHlpS1up9bFq2wAyYhl1UdTObYiHe98zEM9SQvSoqQZ1IQD0JNpg3Ml5pg==}
@@ -288,6 +307,15 @@ packages:
   lightningcss@1.33.0:
     resolution: {integrity: sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA==}
     engines: {node: '>= 12.0.0'}
+
+  lil-gui@0.21.0:
+    resolution: {integrity: sha512-tpvxN7v1GvE/Tv+GRopfOp0W7fVEjF4PltkuX8vOCIfim22rD1ztvfkoEMcv9lzQeuNUSeIrUmUjBwmlW/oUew==}
+
+  lunar-lite@0.2.9:
+    resolution: {integrity: sha512-yBME4vIT3nohm3yLy0M7zT/yqMNexS3OW3ds1IE4kgcx2JKPO7jOVOC9MOPiAZeyG0XRY/DFI8OkMP3Ol2CAiw==}
+
+  lunar-typescript@1.8.7:
+    resolution: {integrity: sha512-w1ZxRf+mmIqXGnk40Dl2U+qPdm2phHsoxpOEIy7BPc/+kkWZtfW98NCZvsBTYCuNXQMBanaw+u+DboXD65NrVA==}
 
   magic-string@1.4.2:
     resolution: {integrity: sha512-vG+rjFRj1PqdIBozIxAGMjPlOhaVe+GXpbttY/iSK7rGcJRMlwNJO7dcUwmUqkymsFLJiNGI06t4D7Fr7yRC9g==}
@@ -448,6 +476,8 @@ packages:
 
 snapshots:
 
+  '@babel/runtime@7.29.14': {}
+
   '@dimforge/rapier3d-compat@0.12.0': {}
 
   '@dimforge/rapier3d-compat@0.21.0': {}
@@ -549,6 +579,8 @@ snapshots:
 
   chai@6.2.2: {}
 
+  dayjs@1.11.23: {}
+
   detect-libc@2.1.2: {}
 
   es-module-lexer@2.3.2: {}
@@ -567,6 +599,17 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  i18next@23.16.8:
+    dependencies:
+      '@babel/runtime': 7.29.14
+
+  iztro@2.6.5:
+    dependencies:
+      dayjs: 1.11.23
+      i18next: 23.16.8
+      lunar-lite: 0.2.9
+      lunar-typescript: 1.8.7
 
   lightningcss-android-arm64@1.33.0:
     optional: true
@@ -616,6 +659,14 @@ snapshots:
       lightningcss-linux-x64-musl: 1.33.0
       lightningcss-win32-arm64-msvc: 1.33.0
       lightningcss-win32-x64-msvc: 1.33.0
+
+  lil-gui@0.21.0: {}
+
+  lunar-lite@0.2.9:
+    dependencies:
+      lunar-typescript: 1.8.7
+
+  lunar-typescript@1.8.7: {}
 
   magic-string@1.4.2:
     dependencies:

@@ -5,7 +5,18 @@ const PALETTE = {
   sky: '#161B3B', purple: '#544B8A', jade: '#7FB7AD', gold: '#F3C57A', pink: '#F5A7C0', ivory: '#F2E9D8', wood: '#3d2d3e', stone: '#403b61',
 }
 
-export type MarketPoint = { id: 'return-temple'; title: string; subtitle: string; position: THREE.Vector3; radius: number }
+export type MarketVenueId = 'birth-chart-hall' | 'card-house' | 'moon-meditation' | 'chess-guide' | 'service-desk'
+export type MarketPointId = 'return-temple' | MarketVenueId
+export type MarketPoint = { id: MarketPointId; title: string; subtitle: string; position: THREE.Vector3; radius: number }
+
+type Venue = {
+  id: MarketVenueId
+  title: string
+  subtitle: string
+  x: number
+  z: number
+  accent: string
+}
 
 function material(color: string, emissive?: string, intensity = 0): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.08, emissive: emissive ?? '#000000', emissiveIntensity: intensity })
@@ -39,6 +50,14 @@ export class MarketWorld {
   readonly returnPoint: MarketPoint = {
     id: 'return-temple', title: '返回天心宮', subtitle: '踏入時空門，回到主殿', position: new THREE.Vector3(0, 0, 8.6), radius: 2.8,
   }
+  readonly venuePoints: MarketPoint[] = [
+    { id: 'birth-chart-hall', title: '命盤探索館', subtitle: '人類圖・紫微斗數介紹', position: new THREE.Vector3(-10, 0, 0.6), radius: 3.15 },
+    { id: 'card-house', title: '牌卡靈感屋', subtitle: '每日一張牌・三張牌問事預告', position: new THREE.Vector3(-7.6, 0, -8.2), radius: 3.15 },
+    { id: 'moon-meditation', title: '月光靜心所', subtitle: '呼吸引導・靜心服務介紹', position: new THREE.Vector3(7.6, 0, -8.2), radius: 3.15 },
+    { id: 'chess-guide', title: '東方問事指引亭', subtitle: '前往既有天心仙姑象棋卜卦', position: new THREE.Vector3(10, 0, 0.6), radius: 3.15 },
+    { id: 'service-desk', title: '市集服務台', subtitle: '服務資訊與 LINE 預約入口', position: new THREE.Vector3(0, 0, -2.6), radius: 2.9 },
+  ]
+  readonly points: MarketPoint[] = [...this.venuePoints, this.returnPoint]
   readonly avatar = new THREE.Group()
   private readonly swirl = new THREE.Group()
   private stars!: THREE.Points
@@ -56,6 +75,7 @@ export class MarketWorld {
     this.addStars()
     this.addArrivalGate()
     this.addStalls()
+    this.addMarketGuide()
     this.addReturnPortal()
     this.addAvatar()
   }
@@ -117,28 +137,89 @@ export class MarketWorld {
   }
 
   private addStalls(): void {
-    const stalls = [
-      ['命盤探索館', -10, -2, PALETTE.jade],
-      ['牌卡靈感屋', -7.6, -10.2, PALETTE.pink],
-      ['月光靜心所', 7.6, -10.2, '#b7c7ee'],
-      ['東方問事指引亭', 10, -2, PALETTE.gold],
-    ] as const
-    for (const [title, x, z, accent] of stalls) {
-      const group = new THREE.Group()
-      group.position.set(x, 0, z)
-      const base = new THREE.Mesh(new THREE.BoxGeometry(4.7, 2.8, 3.4), material(PALETTE.wood))
-      base.position.y = 1.4
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(3.25, 1.5, 4), material('#2a2445', accent, 0.12))
-      roof.rotation.y = Math.PI / 4
-      roof.position.y = 3.5
-      const awning = new THREE.Mesh(new THREE.PlaneGeometry(3.7, 0.7), label(title, PALETTE.ivory, '#453861'))
-      awning.position.set(0, 2.25, 1.73)
-      const coming = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 0.44), label('即將開放', PALETTE.gold, '#312743'))
-      coming.position.set(0, 1.42, 1.75)
-      group.add(base, roof, awning, coming)
-      this.scene.add(group)
-      this.physics.addStaticBox(new THREE.Vector3(x, 1.4, z), new THREE.Vector3(4.7, 2.8, 3.4))
+    const venues: Venue[] = [
+      { id: 'birth-chart-hall', title: '命盤探索館', subtitle: '人類圖・紫微斗數', x: -10, z: -2, accent: PALETTE.jade },
+      { id: 'card-house', title: '牌卡靈感屋', subtitle: '每日一張・三張問事', x: -7.6, z: -10.2, accent: PALETTE.pink },
+      { id: 'moon-meditation', title: '月光靜心所', subtitle: '呼吸・靜心・自我關照', x: 7.6, z: -10.2, accent: '#b7c7ee' },
+      { id: 'chess-guide', title: '東方問事指引亭', subtitle: '連結天心仙姑象棋卜卦', x: 10, z: -2, accent: PALETTE.gold },
+    ]
+    for (const venue of venues) this.addVenue(venue)
+    this.addServiceDesk()
+  }
+
+  /** Phase 2 venue facade: a completed-looking pavilion while its future tool stays clearly unlaunched. */
+  private addVenue(venue: Venue): void {
+    const group = new THREE.Group()
+    group.position.set(venue.x, 0, venue.z)
+    const wood = material(PALETTE.wood)
+    const trim = material(venue.accent, venue.accent, 0.16)
+    const foundation = new THREE.Mesh(new THREE.BoxGeometry(5.25, 0.32, 3.95), material('#575273', PALETTE.purple, 0.08))
+    foundation.position.y = 0.16
+    const hall = new THREE.Mesh(new THREE.BoxGeometry(4.65, 2.5, 3.28), wood)
+    hall.position.y = 1.55
+    const roofLower = new THREE.Mesh(new THREE.ConeGeometry(3.38, 1.14, 4), material('#292342', venue.accent, 0.16))
+    roofLower.rotation.y = Math.PI / 4
+    roofLower.position.y = 3.38
+    const roofCap = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 0.42, 8), trim)
+    roofCap.position.y = 4.14
+    group.add(foundation, hall, roofLower, roofCap)
+
+    for (const side of [-1, 1]) {
+      const column = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 2.82, 10), trim)
+      column.position.set(side * 2.05, 1.42, 1.48)
+      const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshBasicMaterial({ color: venue.accent, transparent: true, opacity: 0.9 }))
+      lantern.position.set(side * 1.78, 2.54, 1.62)
+      group.add(column, lantern)
     }
+
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.92, 0.66), label(venue.title, PALETTE.ivory, '#453861'))
+    sign.position.set(0, 2.48, 1.675)
+    const subtitle = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 0.42), label(venue.subtitle, PALETTE.gold, '#312743'))
+    subtitle.position.set(0, 1.65, 1.69)
+    const entrance = new THREE.Mesh(new THREE.PlaneGeometry(1.55, 1.22), material('#211c39', venue.accent, 0.08))
+    entrance.position.set(0, 0.98, 1.655)
+    group.add(sign, subtitle, entrance)
+    this.scene.add(group)
+    this.physics.addStaticBox(new THREE.Vector3(venue.x, 1.35, venue.z), new THREE.Vector3(4.65, 2.7, 3.28))
+  }
+
+  /** Neutral service placeholder: it intentionally contains no invented staff, rates, or event details. */
+  private addServiceDesk(): void {
+    const group = new THREE.Group()
+    group.position.set(0, 0, -4.7)
+    const desk = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.22, 1.45), material('#473451', PALETTE.gold, 0.1))
+    desk.position.y = 0.61
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(5.1, 0.18, 2.25), material('#2a2445', PALETTE.gold, 0.08))
+    canopy.position.y = 2.72
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.25, 0.62), label('市 集 服 務 台', PALETTE.gold, '#34274c'))
+    sign.position.set(0, 2.22, 0.75)
+    const note = new THREE.Mesh(new THREE.PlaneGeometry(2.85, 0.42), label('服務資訊・LINE 預約', PALETTE.ivory, '#423358'))
+    note.position.set(0, 1.62, 0.76)
+    group.add(desk, canopy, sign, note)
+    this.scene.add(group)
+    this.physics.addStaticBox(new THREE.Vector3(0, 0.61, -4.7), new THREE.Vector3(4.4, 1.22, 1.45))
+  }
+
+  /** Gold compass lines and a central guide plaque make all five Phase 2 destinations legible on arrival. */
+  private addMarketGuide(): void {
+    const guide = new THREE.Group()
+    const gold = new THREE.MeshBasicMaterial({ color: PALETTE.gold, transparent: true, opacity: 0.75 })
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.45, 1.62, 40), gold)
+    ring.rotation.x = -Math.PI / 2
+    ring.position.y = 0.025
+    guide.add(ring)
+    for (const target of this.venuePoints) {
+      const direction = new THREE.Vector3(target.position.x, 0, target.position.z).normalize()
+      const length = Math.min(Math.hypot(target.position.x, target.position.z) - 2.2, 8.2)
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.025, length), gold)
+      line.position.set(direction.x * (length / 2 + 1.7), 0.028, direction.z * (length / 2 + 1.7))
+      line.rotation.y = Math.atan2(direction.x, direction.z)
+      guide.add(line)
+    }
+    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(2.55, 0.52), label('市 集 導 覽', PALETTE.gold, '#302343'))
+    plaque.position.set(0, 2.18, 1.18)
+    guide.add(plaque)
+    this.scene.add(guide)
   }
 
   private addReturnPortal(): void {
@@ -168,7 +249,16 @@ export class MarketWorld {
   }
 
   nearestPoint(position: THREE.Vector3): MarketPoint | null {
-    return Math.hypot(position.x - this.returnPoint.position.x, position.z - this.returnPoint.position.z) <= this.returnPoint.radius ? this.returnPoint : null
+    let nearest: MarketPoint | null = null
+    let nearestDistance = Infinity
+    for (const point of this.points) {
+      const distance = Math.hypot(position.x - point.position.x, position.z - point.position.z)
+      if (distance <= point.radius && distance < nearestDistance) {
+        nearest = point
+        nearestDistance = distance
+      }
+    }
+    return nearest
   }
 
   update(dt: number): void {
