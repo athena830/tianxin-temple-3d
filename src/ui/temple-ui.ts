@@ -181,8 +181,28 @@ export class TempleUi {
       <div class="wish-banner" hidden></div>
       <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
       <div class="toast" hidden></div>
-      <div class="market-status" hidden><b>天心靈光市集</b><span>探索四館・跟隨金色指引查看介紹</span></div>
-      <div class="market-panel-wrap" hidden><section class="market-panel" role="dialog" aria-modal="true" aria-label="市集介紹"><button class="panel-x" data-act="market-panel-close" aria-label="關閉">×</button><div data-market-panel-content></div></section></div>
+      <div class="market-ro-hud" hidden>
+        <section class="ro-window ro-basic-info" aria-label="旅人狀態">
+          <header class="ro-win-bar"><span>✦ 天心靈光市集</span><small>中央廣場</small></header>
+          <div class="ro-win-body">
+            <div class="ro-char-row"><b>靈光旅人</b><span>Lv.1 初心探索者</span></div>
+            <div class="ro-stat-bar"><label>靜心</label><i><em style="width:100%"></em></i><span>100%</span></div>
+            <div class="ro-stat-bar sp"><label>靈光</label><i><em style="width:100%"></em></i><span>100%</span></div>
+          </div>
+        </section>
+        <section class="ro-window ro-mini-nav" aria-label="市集快速導覽">
+          <header class="ro-win-bar"><span>🗺 市集導覽</span><small>點擊走動</small></header>
+          <div class="ro-nav-grid">
+            <button type="button" data-act="market-walk" data-market-target="birth-chart-hall">命盤探索館</button>
+            <button type="button" data-act="market-walk" data-market-target="card-house">牌卡靈感屋</button>
+            <button type="button" data-act="market-walk" data-market-target="moon-meditation">月光靜心所</button>
+            <button type="button" data-act="market-walk" data-market-target="chess-guide">問事指引亭</button>
+            <button type="button" data-act="market-walk" data-market-target="service-desk">市集服務台</button>
+            <button type="button" class="ro-return" data-act="market-walk" data-market-target="return-temple">返回天心宮</button>
+          </div>
+        </section>
+      </div>
+      <div class="market-panel-wrap" hidden><section class="market-panel ro-dialog" role="dialog" aria-modal="true" aria-label="市集介紹"><header class="ro-dialog-bar"><span>天心靈光市集・攤位資訊</span><button class="panel-x" data-act="market-panel-close" aria-label="關閉">×</button></header><div class="ro-dialog-body" data-market-panel-content></div></section></div>
       <div class="ziwei-panel-wrap" hidden><section class="ziwei-panel" role="dialog" aria-modal="true" aria-label="紫微斗數排盤"><button class="panel-x" data-act="ziwei-close" aria-label="關閉">×</button><div data-ziwei-panel-content></div></section></div>
       <div class="world-transition" hidden><div><i></i><b data-world-transition>穿越靈光之門⋯</b><small>正在切換獨立世界</small></div></div>`
     this.root.addEventListener('click', e => this.onClick(e))
@@ -245,8 +265,12 @@ export class TempleUi {
 
   setWorld(world: 'temple' | 'market'): void {
     document.body.dataset.world = world
-    const status = this.root.querySelector<HTMLElement>('.market-status')
-    if (status) status.hidden = world !== 'market'
+    const roHud = this.root.querySelector<HTMLElement>('.market-ro-hud')
+    if (roHud) roHud.hidden = world !== 'market'
+    const helpText = world === 'market'
+      ? '左鍵點擊地面走動／WASD 移動・右鍵拖曳 360° 旋轉視角・滾輪縮放・點擊攤位或按 E 互動'
+      : '滑鼠點擊／WASD 移動・右鍵拖曳 旋轉視角・滾輪 縮放・點擊／E 互動'
+    for (const el of this.root.querySelectorAll<HTMLElement>('.help')) el.textContent = helpText
     if (world === 'market') {
       this.closePanel()
       this.guideTo(null, 0)
@@ -942,6 +966,10 @@ export class TempleUi {
     else if (act === 'wish-close') { e.preventDefault(); this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'market-enter') this.actions.enterMarket()
+    else if (act === 'market-walk') {
+      const targetId = t.dataset.marketTarget
+      if (targetId) window.dispatchEvent(new CustomEvent('market:walk-to', { detail: targetId }))
+    }
     else if (act === 'market-panel-close') {
       this.closeMarketPanel()
       window.dispatchEvent(new CustomEvent('market:close-panel'))

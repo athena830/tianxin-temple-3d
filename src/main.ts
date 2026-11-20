@@ -421,6 +421,11 @@ async function boot(): Promise<void> {
   window.addEventListener('market:close-panel', () => {
     if (sceneManager?.world === 'market') (sceneManager.current as MarketGame).closePanel()
   })
+  window.addEventListener('market:walk-to', e => {
+    if (sceneManager?.world !== 'market') return
+    const targetId = (e as CustomEvent<string>).detail
+    if (targetId) (sceneManager.current as MarketGame).walkToPoint(targetId as any)
+  })
   window.addEventListener('market:open-ziwei', () => {
     if (sceneManager?.world !== 'market') return
     ;(sceneManager.current as MarketGame).openPanel()
