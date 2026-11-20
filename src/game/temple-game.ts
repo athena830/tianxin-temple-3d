@@ -9,6 +9,7 @@ import { CONFIG } from './config'
 import { TEMPLE_MODEL_URLS } from './temple-assets'
 import { LOTUS_POND, WISH_POOL } from './temple-courtyard'
 import { POINT_TARGETS, TempleWorld, type ShrinePoint, type ShrinePointId } from './temple-world'
+import { disposeWorldScene } from './world-dispose'
 
 /**
  * - `browse`: in the temple, mouse is free for the page; the visitor stands still (default after entering).
@@ -277,6 +278,13 @@ export class TempleGame {
   get inTemple(): boolean { return this.mode === 'browse' || this.mode === 'explore' || this.mode === 'panel' }
 
   setQuality(quality: Quality): void { this.renderer.applyQuality(quality) }
+
+  /** Used after returning from MarketWorld; the destination is beside the portal, not inside it. */
+  enterFromMarket(): void {
+    this.enter()
+    this.teleportTo(21.8, 14.2)
+    this.mode = 'explore'
+  }
 
   step(dt: number): void {
     this.time += dt
@@ -635,5 +643,14 @@ export class TempleGame {
     }
     this.world.update(frameSeconds, this.time, p, this.inTemple ? this.active?.id ?? null : null, this.camera)
     this.renderer.render(this.world.scene, this.camera)
+  }
+
+  /** Release this world's Rapier and GPU resources while leaving shared renderer, audio and stores alive. */
+  dispose(): void {
+    this.input.clearHeld()
+    this.controller.free()
+    this.physics.removeBody(this.body)
+    disposeWorldScene(this.world.scene)
+    this.physics.dispose()
   }
 }

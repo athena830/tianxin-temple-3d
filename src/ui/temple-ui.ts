@@ -129,6 +129,7 @@ export class TempleUi {
           <button data-go="offerings">虛擬供奉</button><button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
           <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="drum">鼓樓擊鼓</button>
           <button data-go="wishing-pool">蓮花許願池</button><button data-go="prayer-wall">大殿外廣場・祈願牆</button><button data-go="records">祈福紀錄</button>
+          <button data-go="market-portal">天心靈光市集</button>
         </nav>
         <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact">互動</button></div>
         <div class="guide" hidden><span>前往</span><b data-guide-name></b><small data-guide-dist></small><button class="guide-x" data-act="guide-cancel" aria-label="取消指引">×</button></div>
@@ -146,7 +147,9 @@ export class TempleUi {
       ${renderQrLightbox()}
       <div class="wish-banner" hidden></div>
       <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
-      <div class="toast" hidden></div>`
+      <div class="toast" hidden></div>
+      <div class="market-status" hidden><b>天心靈光市集</b><span>市集建設中，敬請期待</span></div>
+      <div class="world-transition" hidden><div><i></i><b data-world-transition>穿越靈光之門⋯</b><small>正在切換獨立世界</small></div></div>`
     this.root.addEventListener('click', e => this.onClick(e))
     window.setInterval(() => {
       if (this.currentTimeSetting === 'auto') {
@@ -188,6 +191,28 @@ export class TempleUi {
     const hud = this.root.querySelector<HTMLElement>('.hud')!
     hud.dataset.mode = mode
     document.body.dataset.mode = mode
+  }
+
+  setWorld(world: 'temple' | 'market'): void {
+    document.body.dataset.world = world
+    const status = this.root.querySelector<HTMLElement>('.market-status')
+    if (status) status.hidden = world !== 'market'
+    if (world === 'market') {
+      this.closePanel()
+      this.guideTo(null, 0)
+    }
+  }
+
+  setWorldTransition(active: boolean, message = ''): void {
+    const overlay = this.root.querySelector<HTMLElement>('.world-transition')
+    if (!overlay) return
+    overlay.hidden = !active
+    const text = overlay.querySelector<HTMLElement>('[data-world-transition]')
+    if (text && message) text.textContent = message
+    if (active) {
+      this.near(null)
+      this.guideTo(null, 0)
+    }
   }
 
   guideTo(point: ShrinePoint | null, distance: number): void {
@@ -297,6 +322,8 @@ export class TempleUi {
       case 'prayer':
         return `<p class="eyebrow">大殿外前庭廣場・祈願牆</p><h2>寫下心願</h2><p>心願將懸掛於大殿外前庭廣場祈願牆，也會記入你的祈福紀錄。</p>${note}
           <form class="wish-form"><textarea name="wish" maxlength="120" rows="4" placeholder="例如：願家人平安健康，萬事順心。"></textarea><button class="btn primary" type="submit">送出祈願</button></form>`
+      case 'market-portal':
+        return `<p class="eyebrow">天心靈光市集</p><h2>靈光時空門</h2><p>正在準備進入市集入口廣場。</p>${note}`
       case 'offerings':
         return `<p class="eyebrow">虛擬供奉</p><h2>供花・供果・供茶</h2><p>選擇一份心意，供品會出現在主殿供桌上。</p>${note}
           <div class="tiles">${([['flower', '供花', '清香鮮花，敬表虔心'], ['fruit', '供果', '四時鮮果，感恩豐足'], ['tea', '供茶', '一盞清茶，敬奉清心']] as [OfferingId, string, string][])

@@ -7,6 +7,8 @@ import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
 import type { TempleGame } from './game/temple-game'
+import type { MarketGame } from './game/market-game'
+import { SceneManager, type WorldId } from './game/scene-manager'
 import { LOTUS_POND, WISH_POOL } from './game/temple-courtyard'
 import { DRAGON_GUANYIN_POS, type ShrinePointId } from './game/temple-world'
 import { TempleUi } from './ui/temple-ui'
@@ -24,10 +26,12 @@ async function boot(): Promise<void> {
   const audio = new Audio()
   audio.setVolumes(save.data.musicVolume * 0.6, save.data.sfxVolume, save.data.muted)
   let game: TempleGame | undefined
+  let sceneManager: SceneManager | undefined
   let touch: TouchControls | undefined
-  const syncMode = () => { if (game) ui.setMode(game.mode === 'panel' ? 'panel' : game.mode) }
-  const startExplore = () => { if (!game) return; audio.unlock(); game.startExplore(); syncMode(); loop.resetAccumulator() }
-  const exitExplore = () => { if (!game) return; game.stopExplore(); touch?.releaseStick(); syncMode() }
+  const currentGame = (): TempleGame | MarketGame | undefined => sceneManager?.current ?? game
+  const syncMode = () => { const current = currentGame(); if (current) ui.setMode(current.mode === 'panel' ? 'panel' : current.mode) }
+  const startExplore = () => { const current = currentGame(); if (!current) return; audio.unlock(); current.startExplore(); syncMode(); loop.resetAccumulator() }
+  const exitExplore = () => { const current = currentGame(); if (!current) return; current.stopExplore(); touch?.releaseStick(); syncMode() }
 
   let interactBlockedUntil = 0
   const reopen = (id: ShrinePointId, msg: string) => ui.open(id, msg)
@@ -194,64 +198,73 @@ async function boot(): Promise<void> {
     console.warn('Shader precompile:', err)
   }
   ui.setBootProgress(1.0)
-  g.world.setCharacter(store.data.character)
-  for (const id of Object.keys(store.data.lamps) as LampId[]) if (store.data.lamps[id]) g.world.perform(`lamp-${id}`)
-  for (const id of Object.keys(store.data.offerings) as OfferingId[]) {
-    for (let i = 1; i <= Math.min(2, store.data.offerings[id]); i += 1) g.world.perform(`offer-${id}`, { [id]: i })
-  }
-  g.onNear = point => ui.near(point)
-  g.onGuide = (point, distance) => ui.guideTo(point, distance)
-  g.world.onNpcDialogue = (speaker, text) => ui.showNpcDialogue(speaker, text)
-  g.world.onTimeOfDayChange = mode => ui.updateTimeSettingLabel(g.world.getTimeSetting(), mode)
-  g.onClickResult = result => {
+  const configureTemple = (temple: TempleGame): void => {
+    temple.reducedMotion = save.data.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches
+    temple.world.reducedSmoke = temple.reducedMotion
+    temple.world.setCharacter(store.data.character)
+    for (const id of Object.keys(store.data.lamps) as LampId[]) if (store.data.lamps[id]) temple.world.perform(`lamp-${id}`)
+    for (const id of Object.keys(store.data.offerings) as OfferingId[]) {
+      for (let i = 1; i <= Math.min(2, store.data.offerings[id]); i += 1) temple.world.perform(`offer-${id}`, { [id]: i })
+    }
+    temple.onNear = point => ui.near(point)
+    temple.onGuide = (point, distance) => ui.guideTo(point, distance)
+    temple.world.onNpcDialogue = (speaker, text) => ui.showNpcDialogue(speaker, text)
+    temple.world.onTimeOfDayChange = mode => ui.updateTimeSettingLabel(temple.world.getTimeSetting(), mode)
+    temple.onClickResult = result => {
     if (!result) return
-    if (Date.now() < interactBlockedUntil || g.worshipping) return
-    if (result.kind === 'open') ui.open(result.id)
-    else { ui.toast(`前往「${result.point.title}」...`); g.setGuide(result.point.id) }
+      if (Date.now() < interactBlockedUntil || temple.worshipping) return
+      if (result.kind === 'open') {
+        if (result.id === 'market-portal') void sceneManager?.enterMarket()
+        else ui.open(result.id)
+      } else { ui.toast(`前往「${result.point.title}」...`); temple.setGuide(result.point.id) }
+    }
   }
+  configureTemple(g)
   // Click anywhere on canvas immediately ensures explore mode is active
   const triggerCushionPrayer = () => {
-    if (!g || g.worshipping || Date.now() < interactBlockedUntil) return
-    const emptyCushion = g.world.getNearestEmptyCushion(g.feet, 2.5)
+    const temple = game
+    if (!temple || temple.worshipping || Date.now() < interactBlockedUntil) return
+    const emptyCushion = temple.world.getNearestEmptyCushion(temple.feet, 2.5)
     if (!emptyCushion) {
       ui.toast('請靠近觀音菩薩前的紅色拜墊，按 E 跪下拜拜。')
       return
     }
     interactBlockedUntil = Date.now() + 5200
     ui.closePanel()
-    g.closePanel()
+    temple.closePanel()
     syncMode()
 
     // 鎖定該拜墊為玩家正在參拜，避免 NPC 重疊
-    g.world.setPlayerOnCushion(emptyCushion.index, true)
+    temple.world.setPlayerOnCushion(emptyCushion.index, true)
 
     // 角色精準對齊至拜墊位置
-    g.teleportTo(emptyCushion.worldX, emptyCushion.worldZ)
+    temple.teleportTo(emptyCushion.worldX, emptyCushion.worldZ)
 
     // 播放引罄清脆聲響與香爐裊裊香煙
     audio.play('chime')
-    g.world.perform('incense')
+    temple.world.perform('incense')
     ui.toast('於觀世音菩薩前跪下虔誠祈福...', 2200)
 
     // 面向大殿正中央觀音聖像方向虔誠合十跪拜 4.2 秒
-    g.worship(g.world.getGuanyinStatueWorldPos(), 4.2, () => {
+    temple.worship(temple.world.getGuanyinStatueWorldPos(), 4.2, () => {
       store.offerIncense()
       audio.play('bell')
       ui.toast('跪拜祈福圓滿：心香一瓣，願觀音菩薩慈悲庇佑，福慧增長、平安吉祥。', 4500)
-      g.world.setPlayerOnCushion(emptyCushion.index, false)
+      temple.world.setPlayerOnCushion(emptyCushion.index, false)
     })
   }
 
   const triggerSkyLantern = () => {
-    if (!g || g.worshipping || Date.now() < interactBlockedUntil) return
-    const standPos = g.world.getPlayerLanternStand()
+    const temple = game
+    if (!temple || temple.worshipping || Date.now() < interactBlockedUntil) return
+    const standPos = temple.world.getPlayerLanternStand()
     if (!standPos) return
-    const dist = Math.hypot(g.feet.x - standPos.x, g.feet.z - standPos.z)
+    const dist = Math.hypot(temple.feet.x - standPos.x, temple.feet.z - standPos.z)
     if (dist > 3.0) {
       ui.toast('請靠近天心仙姑旁的祈福天燈台，按 E 點燃天燈。')
       return
     }
-    const launched = g.world.triggerPlayerSkyLantern()
+    const launched = temple.world.triggerPlayerSkyLantern()
     if (!launched) {
       ui.toast('祈福天燈正在冉冉升空中，稍候片刻再放一盞祈願天燈。')
       return
@@ -259,18 +272,18 @@ async function boot(): Promise<void> {
 
     interactBlockedUntil = Date.now() + 5200
     ui.closePanel()
-    g.closePanel()
+    temple.closePanel()
     syncMode()
 
     // 角色對齊至天燈台前方
-    g.teleportTo(standPos.x, standPos.z + 1.1)
+    temple.teleportTo(standPos.x, standPos.z + 1.1)
 
     // 播放引罄清脆聲響
     audio.play('chime')
     ui.toast('點燃祈福天燈：心願隨燈火冉冉升空...', 2500)
 
     // 面向天燈台方向虔誠合十祈福 4.2 秒
-    g.worship({ x: standPos.x, z: standPos.z }, 4.2, () => {
+    temple.worship({ x: standPos.x, z: standPos.z }, 4.2, () => {
       store.addRecord('天燈祈福', '於天心仙姑問事亭前點燃祈福天燈，祈願天心指路、福慧圓滿')
       audio.play('bell')
       ui.toast('天燈祈福圓滿：燈耀天心、心願通達，願天心仙姑指點迷津，所求如願、福壽安康！', 4500)
@@ -281,7 +294,8 @@ async function boot(): Promise<void> {
     if (game && game.mode === 'browse' && !game.worshipping && Date.now() >= interactBlockedUntil) startExplore()
   })
   window.addEventListener('temple:interact', e => {
-    if (Date.now() < interactBlockedUntil || g.worshipping) return
+    const temple = game
+    if (!temple || Date.now() < interactBlockedUntil || temple.worshipping) return
     const id = (e as CustomEvent<ShrinePointId>).detail
     if (id === 'cushion') {
       triggerCushionPrayer()
@@ -291,20 +305,31 @@ async function boot(): Promise<void> {
       triggerSkyLantern()
       return
     }
+    if (id === 'market-portal') {
+      void sceneManager?.enterMarket()
+      return
+    }
     ui.open(id)
   })
   window.addEventListener('temple:interact-touch', () => {
-    if (Date.now() < interactBlockedUntil || g.worshipping) return
-    if (g.active && (g.mode === 'explore' || g.mode === 'browse')) {
-      if (g.active.id === 'cushion') {
+    if (sceneManager?.world === 'market') {
+      const market = sceneManager.current as MarketGame
+      if (market.active?.id === 'return-temple') void sceneManager.returnTemple()
+      return
+    }
+    const temple = game
+    if (!temple || Date.now() < interactBlockedUntil || temple.worshipping) return
+    if (temple.active && (temple.mode === 'explore' || temple.mode === 'browse')) {
+      if (temple.active.id === 'cushion') {
         triggerCushionPrayer()
         return
       }
-      if (g.active.id === 'sky-lantern') {
+      if (temple.active.id === 'sky-lantern') {
         triggerSkyLantern()
         return
       }
-      ui.open(g.active.id)
+      if (temple.active.id === 'market-portal') void sceneManager?.enterMarket()
+      else ui.open(temple.active.id)
     }
   })
   window.addEventListener('temple:toast', e => {
@@ -341,27 +366,62 @@ async function boot(): Promise<void> {
     await registerGameTuning(tuning)
   }
 
+  sceneManager = new SceneManager({
+    renderer,
+    input,
+    audio,
+    createTemple: async () => {
+      const { TempleGame } = await import('./game/temple-game')
+      const next = new TempleGame(renderer, input, audio)
+      configureTemple(next)
+      next.setMainHallScale(initialScale)
+      return next
+    },
+    createMarket: async () => {
+      const { MarketGame } = await import('./game/market-game')
+      const next = new MarketGame(renderer, input, audio)
+      next.onNear = point => ui.near(point as unknown as import('./game/temple-world').ShrinePoint)
+      return next
+    },
+    onTransition: (state, message) => ui.setWorldTransition(state !== 'idle', message),
+    onWorldChanged: (world: WorldId, active) => {
+      ui.setWorld(world)
+      if (world === 'temple') game = active as TempleGame
+      else game = undefined
+      ui.setMode(active.mode)
+    },
+    onError: message => ui.toast(message, 4200),
+  })
+  sceneManager.adoptInitial(g)
+  window.addEventListener('market:interact', e => {
+    if ((e as CustomEvent<string>).detail === 'return-temple') void sceneManager?.returnTemple()
+  })
+
   let stepped = false
   const loop = new GameLoop({
     beforeFrame: frameSeconds => input.update(frameSeconds),
-    step: dt => { g.step(dt); stepped = true },
+    step: dt => { sceneManager?.step(dt); stepped = true },
     render: (alpha, frameSeconds) => {
       // Esc closes the open panel first; otherwise it leaves exploration and returns the mouse to the page.
       if (input.consume('pause')) {
-        if (ui.panelOpen) { ui.closePanel(); g.closePanel(); syncMode() }
-        else if (g.mode === 'explore') exitExplore()
+        const current = currentGame()
+        if (ui.panelOpen) { ui.closePanel(); current?.closePanel(); syncMode() }
+        else if (current?.mode === 'explore') exitExplore()
       }
-      g.render(alpha, frameSeconds)
+      sceneManager?.render(alpha, frameSeconds)
       // Clear edge presses only once the simulation has seen them; a frame with no fixed step must not drop a key.
       if (stepped) { input.endFrame(); stepped = false }
     },
   })
   loop.start()
   document.addEventListener('visibilitychange', () => { if (document.hidden) exitExplore() })
-  touch = new TouchControls(document.getElementById('ui')!, input, () => g.mode === 'explore' || g.mode === 'browse', () => g.mode === 'explore')
+  touch = new TouchControls(document.getElementById('ui')!, input, () => {
+    const current = currentGame()
+    return current?.mode === 'explore' || current?.mode === 'browse'
+  }, () => currentGame()?.mode === 'explore')
   g.mode = 'select'
   ui.show('title')
-  ;(window as unknown as { __game: unknown }).__game = { game: g, ui, input, store }
+  ;(window as unknown as { __game: unknown }).__game = { get game() { return sceneManager?.current }, sceneManager, ui, input, store }
 }
 
 function safeGet(key: string): string | null {

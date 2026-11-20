@@ -10,7 +10,7 @@ export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
 export type ShrinePointId =
   | 'incense' | 'prayer' | 'offerings' | 'daily-lot' | 'chess'
   | 'lamps' | 'woodfish' | 'bell' | 'wishing-pool' | 'prayer-wall' | 'records' | 'tiangong'
-  | 'drum' | 'yuhuang' | 'gold-furnace' | 'guanyin-dragon' | 'cushion' | 'sky-lantern'
+  | 'drum' | 'yuhuang' | 'gold-furnace' | 'guanyin-dragon' | 'cushion' | 'sky-lantern' | 'market-portal'
 
 export interface CushionWorshipper {
   group: THREE.Group
@@ -276,6 +276,7 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'gold-furnace', title: '八角金亭', subtitle: '化金祈福，添香油聚善緣', radius: 3.0 },
   { id: 'guanyin-dragon', title: '參拜昇龍觀音', subtitle: '仰望五層樓高乘龍觀音金身', radius: 4.8 },
   { id: 'sky-lantern', title: '天燈祈福', subtitle: '於天心仙姑旁點燃祈福天燈', radius: 2.4 },
+  { id: 'market-portal', title: '踏入靈光時空門', subtitle: '前往天心靈光市集', radius: 2.8 },
 ]
 const pointPositions: [number, number][] = [
   [0, 0.4], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z + 1.4], [-2.25, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
@@ -283,6 +284,7 @@ const pointPositions: [number, number][] = [
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x + 4.8, DRAGON_GUANYIN_POS.z],
   [-12.5, 23.5],
+  [23.8, 14.2],
 ]
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
@@ -292,6 +294,7 @@ export const POINT_TARGETS: [number, number][] = [
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
   [-12.5, 23.5],
+  [21.8, 14.2],
 ]
 
 const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStandardMaterial =>
@@ -454,6 +457,7 @@ export class TempleWorld {
   private auraParticleData?: { radius: number; angle: number; speed: number; rotSpeed: number }[]
   private dragonGuanyinUrnPos?: THREE.Vector3
   private dragonPuffTimer = 1.2
+  private marketPortalSwirl?: THREE.Group
   readonly cushionSlots: CushionSlot[] = []
   private readonly mainHallSmokeSpots: THREE.Vector3[] = []
   private mainHallSmokeTimer = 0.75
@@ -525,6 +529,7 @@ export class TempleWorld {
     this.addDrumTower()
     this.addSideArchitecture()
     this.addRitualProps()
+    this.addMarketPortal()
     this.addCourtyardPrayerWall()
     this.addMarkers()
     this.setMainHallScale(this.mainHallScale)
@@ -1854,6 +1859,38 @@ export class TempleWorld {
     for (const lamp of this.lamps) this.physics.addStaticBox(new THREE.Vector3(lamp.position.x, 1, lamp.position.z), new THREE.Vector3(1.3, 2, 1.3))
   }
 
+  /** Right-side, walkable portal to the separate MarketWorld. It intentionally has no blocking collider through its opening. */
+  private addMarketPortal(): void {
+    const group = new THREE.Group()
+    group.position.set(23.8, 0, 14.2)
+    const stone = makeMat('#4d466e', 0.7, 0.08)
+    stone.emissive.set('#171936')
+    stone.emissiveIntensity = 0.18
+    const gold = makeMat('#d2a95c', 0.36, 0.4)
+    const left = new THREE.Mesh(new THREE.BoxGeometry(0.42, 3.7, 0.54), stone)
+    left.position.set(-2.05, 1.85, 0)
+    const right = left.clone()
+    right.position.x = 2.05
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(2.05, 0.21, 10, 32, Math.PI), stone)
+    arch.rotation.z = Math.PI / 2
+    arch.position.y = 2.05
+    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 0.62), this.textMaterial('靈 光 時 空 門', '#f3c57a', '#33294e'))
+    plaque.position.set(0, 3.58, 0.3)
+    const core = new THREE.Mesh(new THREE.CircleGeometry(1.3, 36), new THREE.MeshBasicMaterial({ color: '#7fb7ad', transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false }))
+    core.position.set(0, 1.62, 0.05)
+    const swirl = new THREE.Group()
+    for (let i = 0; i < 2; i += 1) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.93 + i * 0.2, 0.035, 6, 30), new THREE.MeshBasicMaterial({ color: i ? '#f3c57a' : '#f5a7c0', transparent: true, opacity: 0.76 }))
+      ring.position.set(0, 1.62, 0.11 + i * 0.02)
+      swirl.add(ring)
+    }
+    const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), gold)
+    lantern.position.set(0, 3.12, 0.18)
+    group.add(left, right, arch, plaque, core, swirl, lantern)
+    this.marketPortalSwirl = swirl
+    this.scene.add(group)
+  }
+
   /**
    * Courtyard Plaza Prayer Wall Pavilion (大殿外廣場・祈願亭 / 祈願牆):
    * 移至大殿外東側前庭廣場 (x = 8.8, z = 8.2)，徹底釋放大殿內走道空間與視覺動線。
@@ -2062,7 +2099,7 @@ export class TempleWorld {
       incense: '#e8bb71', prayer: '#e8bb71', offerings: '#d8a45e', 'daily-lot': '#d8a45e', chess: '#a9c2a9',
       lamps: '#edba61', woodfish: '#d68c63', bell: '#e8c77d', 'wishing-pool': '#a8d2c6', 'prayer-wall': '#e8c77d',
       records: '#e8c77d', tiangong: '#f0c070', drum: '#d68c63', yuhuang: '#f5d77f', 'gold-furnace': '#e27b4e',
-      'guanyin-dragon': '#ffea70', cushion: '#e5b968', 'sky-lantern': '#ff9b3d',
+      'guanyin-dragon': '#ffea70', cushion: '#e5b968', 'sky-lantern': '#ff9b3d', 'market-portal': '#7fb7ad',
     }
     for (const point of this.points) {
       if (point.id === 'prayer') continue // Consolidated with prayer-wall at the courtyard plaza
@@ -4379,6 +4416,7 @@ export class TempleWorld {
   }
 
   update(dt: number, time: number, playerPosition: THREE.Vector3, activePoint: ShrinePointId | null, camera?: THREE.Camera): void {
+    if (this.marketPortalSwirl) this.marketPortalSwirl.rotation.y += dt * 0.45
     const frontThresholdZ = this.mainHallZ + 5.28 * this.mainHallScale
     const backWallZ = this.mainHallZ - 6.5 * this.mainHallScale
     const sideWallX = 9.5 * this.mainHallScale

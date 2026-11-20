@@ -32,6 +32,12 @@ const PAL = {
 const yAxis = new THREE.Vector3(0, 1, 0)
 const rotY = (a: number) => new THREE.Quaternion().setFromAxisAngle(yAxis, a)
 
+/** Sky lanterns are intentionally a prominent three-times-scale focal point. */
+const SKY_LANTERN_SCALE = 3
+const SKY_LANTERN_LOWEST_LOCAL_Y = -0.37
+const skyLanternMountedY = (baselineY: number): number =>
+  baselineY - SKY_LANTERN_LOWEST_LOCAL_Y * (SKY_LANTERN_SCALE - 1)
+
 export interface CourtyardChibiActor {
   group: THREE.Group
   torso: THREE.Group
@@ -1729,6 +1735,7 @@ export class FrontCourtyard {
     pointLight: THREE.PointLight
   } {
     const group = new THREE.Group()
+    group.scale.setScalar(SKY_LANTERN_SCALE)
 
     // 1. Eight-sided octagonal envelope
     const geom = new THREE.CylinderGeometry(0.32, 0.22, 0.74, 8, 1, false)
@@ -1902,7 +1909,8 @@ export class FrontCourtyard {
     {
       const origin = new THREE.Vector3(-15.2, 0, 24.2)
       const model = this.createSkyLanternModel('天心賜福', '所求如願')
-      model.group.position.set(origin.x, 0.95, origin.z)
+      const lanternOriginY = skyLanternMountedY(0.95)
+      model.group.position.set(origin.x, lanternOriginY, origin.z)
       this.add(model.group)
 
       const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false })
@@ -1943,8 +1951,8 @@ export class FrontCourtyard {
         actors: [actor1, actor2],
         state: 'holding',
         timer: 5.0,
-        lanternY: 0.95,
-        lanternOriginY: 0.95,
+        lanternY: lanternOriginY,
+        lanternOriginY,
         targetY: 36.0,
         drift: { x: 0.16, z: -0.14 },
       })
@@ -1954,7 +1962,9 @@ export class FrontCourtyard {
     {
       const origin = new THREE.Vector3(-9.8, 0, 23.0)
       const model = this.createSkyLanternModel('萬事如意', '平安喜樂')
-      model.group.position.set(origin.x, 0.95, origin.z)
+      const lanternOriginY = skyLanternMountedY(0.95)
+      const lanternY = skyLanternMountedY(6.5)
+      model.group.position.set(origin.x, lanternY, origin.z)
       this.add(model.group)
 
       const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false })
@@ -1986,8 +1996,8 @@ export class FrontCourtyard {
         actors: [actor3],
         state: 'ascending',
         timer: 14.0,
-        lanternY: 6.5,
-        lanternOriginY: 0.95,
+        lanternY,
+        lanternOriginY,
         targetY: 36.0,
         drift: { x: 0.12, z: 0.18 },
       })
@@ -2032,7 +2042,8 @@ export class FrontCourtyard {
       this.c.scene.add(markerRing)
 
       const model = this.createSkyLanternModel('天心指路', '福慧雙增')
-      model.group.position.set(origin.x, 1.22, origin.z)
+      const lanternOriginY = skyLanternMountedY(1.22)
+      model.group.position.set(origin.x, lanternOriginY, origin.z)
       model.group.userData = { skyLantern: true }
       model.paperMesh.userData = { skyLantern: true }
       this.add(model.group)
@@ -2056,8 +2067,8 @@ export class FrontCourtyard {
         actors: [],
         state: 'holding',
         timer: 0,
-        lanternY: 1.22,
-        lanternOriginY: 1.22,
+        lanternY: lanternOriginY,
+        lanternOriginY,
         targetY: 36.0,
         drift: { x: 0.14, z: -0.18 },
         isPlayerStand: true,
