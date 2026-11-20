@@ -70,6 +70,14 @@ async function run() {
   })
   console.log('Player position after walking up stairs:', finalPos)
 
+  await page.evaluate(() => {
+    // If an NPC speech bubble was triggered by walking, dismiss or hide it so it doesn't cover the deities
+    document.querySelectorAll('.npc-bubble, .speech-bubble, [class*="bubble"]').forEach(el => {
+      el.style.display = 'none'
+    })
+  })
+  await page.waitForTimeout(300)
+
   const shotPath = join(artifactDir, 'main_hall_stairs_climbed_live.png')
   await page.screenshot({ path: shotPath })
   console.log('Saved screenshot to:', shotPath)
