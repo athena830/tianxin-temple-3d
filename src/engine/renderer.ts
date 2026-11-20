@@ -30,7 +30,7 @@ export class Renderer {
   private bloom?: UnrealBloomPass
   private preset: Preset
   private scene?: THREE.Scene
-  private camera?: THREE.PerspectiveCamera
+  private camera?: THREE.Camera
 
   constructor(readonly canvas: HTMLCanvasElement, quality: Quality) {
     this.preset = QUALITY_PRESETS[quality]
@@ -58,7 +58,7 @@ export class Renderer {
     this.resize()
   }
 
-  private ensureComposer(scene: THREE.Scene, camera: THREE.PerspectiveCamera): EffectComposer | undefined {
+  private ensureComposer(scene: THREE.Scene, camera: THREE.Camera): EffectComposer | undefined {
     if (!this.preset.bloom) return undefined
     if (this.composer && this.scene === scene && this.camera === camera) return this.composer
     this.scene = scene
@@ -78,16 +78,16 @@ export class Renderer {
     const h = this.canvas.clientHeight || window.innerHeight
     this.gl.setSize(w, h, false)
     this.composer?.setSize(w, h)
-    if (this.camera) {
+    if (this.camera instanceof THREE.PerspectiveCamera) {
       this.camera.aspect = w / h
       this.camera.updateProjectionMatrix()
     }
   }
 
-  render(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
+  render(scene: THREE.Scene, camera: THREE.Camera): void {
     const w = this.canvas.clientWidth || window.innerWidth
     const h = this.canvas.clientHeight || window.innerHeight
-    if (Math.abs(camera.aspect - w / h) > 1e-3) {
+    if (camera instanceof THREE.PerspectiveCamera && Math.abs(camera.aspect - w / h) > 1e-3) {
       camera.aspect = w / h
       camera.updateProjectionMatrix()
     }

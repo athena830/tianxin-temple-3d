@@ -11,22 +11,22 @@ export type MarketMode = 'browse' | 'explore' | 'panel'
 const HALF_HEIGHT = 0.55
 const RADIUS = 0.36
 const FOOT_OFFSET = HALF_HEIGHT + RADIUS
+const ISOMETRIC_DIRECTION = new THREE.Vector3(0.72, 0.94, 0.72).normalize()
+const ISOMETRIC_AZIMUTH = Math.PI / 4
 
 /** Gameplay shell for the market. Its physics, scene and update loop are independent from TempleGame. */
 export class MarketGame {
   mode: MarketMode = 'explore'
   readonly physics = new Physics(-24)
   readonly world = new MarketWorld(this.physics)
-  readonly camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 0.05, 120)
+  /** A fixed orthographic camera gives the market its readable 2.5D isometric silhouette. */
+  readonly camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.05, 120)
   readonly body: RAPIER.RigidBody
   private readonly collider: RAPIER.Collider
   private readonly controller: RAPIER.KinematicCharacterController
-  private yaw = 0
-  private pitch = 0.3
-  private zoom = 5.1
+  private zoom = 7.6
   private cameraTarget = new THREE.Vector3()
   private cameraReady = false
-  private heading = 0
   private verticalVelocity = 0
   active: MarketPoint | null = null
   onNear: (point: MarketPoint | null) => void = () => undefined
@@ -47,9 +47,7 @@ export class MarketGame {
     this.body.setTranslation({ x: spawn.x, y: spawn.y, z: spawn.z }, true)
     this.body.setNextKinematicTranslation({ x: spawn.x, y: spawn.y, z: spawn.z })
     this.mode = 'explore'
-    this.yaw = 0
-    this.heading = 0
-    this.zoom = window.innerHeight > window.innerWidth ? 10.5 : 5.5
+    this.zoom = window.innerHeight > window.innerWidth ? 10.5 : 7.6
     this.cameraReady = false
     this.audio.play('chime')
   }
@@ -62,15 +60,13 @@ export class MarketGame {
   get worshipping(): boolean { return false }
 
   step(dt: number): void {
-    const look = this.input.takeLook()
+    this.input.takeLook()
     const zoom = this.input.takeZoom()
     if (this.mode === 'explore') {
-      this.yaw -= look.x
-      this.pitch = THREE.MathUtils.clamp(this.pitch + look.y, -0.15, 1.05)
-      this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), 2.8, 12)
+      this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), 5.8, 13.5)
     }
-    const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
-    const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw))
+    const forward = new THREE.Vector3(-Math.sin(ISOMETRIC_AZIMUTH), 0, -Math.cos(ISOMETRIC_AZIMUTH))
+    const right = new THREE.Vector3(Math.cos(ISOMETRIC_AZIMUTH), 0, -Math.sin(ISOMETRIC_AZIMUTH))
     const wish = new THREE.Vector3()
     if (this.mode === 'explore') wish.addScaledVector(right, this.input.move.x).addScaledVector(forward, this.input.move.y)
     if (wish.lengthSq() > 1) wish.normalize()
@@ -83,7 +79,6 @@ export class MarketGame {
     const next = { x: t.x + move.x, y: Math.max(FOOT_OFFSET, t.y + move.y), z: t.z + move.z }
     this.body.setNextKinematicTranslation(next)
     this.physics.step(dt)
-    if (wish.lengthSq() > 0.001) this.heading = Math.atan2(wish.x, wish.z)
     const point = this.world.nearestPoint(new THREE.Vector3(next.x, 0, next.z))
     if (point?.id !== this.active?.id) { this.active = point; this.onNear(point) }
     if (this.mode === 'explore' && this.input.consume('interact') && this.active) window.dispatchEvent(new CustomEvent('market:interact', { detail: this.active.id }))
@@ -94,12 +89,16 @@ export class MarketGame {
   render(_alpha: number, frameSeconds: number): void {
     const feet = this.feet
     this.world.avatar.position.copy(feet)
-    this.world.avatar.rotation.y = this.heading
     const target = new THREE.Vector3(feet.x, feet.y + 1.25, feet.z)
     if (!this.cameraReady) { this.cameraTarget.copy(target); this.cameraReady = true }
     else this.cameraTarget.lerp(target, 1 - Math.exp(-12 * Math.min(frameSeconds, 0.1)))
-    const dir = new THREE.Vector3(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch))
-    this.camera.position.copy(this.cameraTarget).addScaledVector(dir, this.zoom)
+    const aspect = Math.max(0.5, window.innerWidth / Math.max(1, window.innerHeight))
+    this.camera.top = this.zoom
+    this.camera.bottom = -this.zoom
+    this.camera.right = this.zoom * aspect
+    this.camera.left = -this.zoom * aspect
+    this.camera.updateProjectionMatrix()
+    this.camera.position.copy(this.cameraTarget).addScaledVector(ISOMETRIC_DIRECTION, 26)
     this.camera.lookAt(this.cameraTarget)
     this.world.update(frameSeconds)
     this.renderer.render(this.world.scene, this.camera)
