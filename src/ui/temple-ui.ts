@@ -1449,6 +1449,14 @@ export class TempleUi {
         e.stopPropagation()
         this.closePanel()
         this.actions.closePanel()
+        return
+      }
+      if (target.classList.contains('market-panel-wrap')) {
+        e.preventDefault()
+        e.stopPropagation()
+        this.closeMarketPanel()
+        window.dispatchEvent(new CustomEvent('market:close-panel'))
+        return
       }
       return
     }
@@ -1474,8 +1482,8 @@ export class TempleUi {
       window.dispatchEvent(new CustomEvent('market:close-panel'))
     }
     else if (act === 'market-ziwei') {
-      this.closeMarketPanel()
-      window.dispatchEvent(new CustomEvent('market:open-ziwei'))
+      this.birthChartTab = 'ziwei'
+      void this.openBirthChartExperience()
     }
     else if (act === 'market-cards') void this.openCardExperience()
     else if (act === 'market-meditation') this.openMeditationExperience()
@@ -1529,8 +1537,7 @@ export class TempleUi {
     else if (act === 'ziwei-save') void this.saveZiwei()
     else if (act === 'ziwei-clear') void this.clearZiwei()
     else if (act === 'market-chess') {
-      this.closeMarketPanel()
-      window.dispatchEvent(new CustomEvent('market:open-chess'))
+      this.openMarketChessExperience()
     }
     else if (act === 'cushion-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'cushion' })) }
     else if (act === 'sky-lantern-pray') { e.preventDefault(); this.closePanel(); this.actions.closePanel(); window.dispatchEvent(new CustomEvent('temple:interact', { detail: 'sky-lantern' })) }

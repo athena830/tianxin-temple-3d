@@ -343,9 +343,18 @@ h3 {
 .chip.market-entry { border-color: rgba(126,214,190,.9); background: rgba(44,111,94,.9); color: #fff4bd; }
 .chip.market-entry:hover { background: rgba(64,139,112,.98); }
 body[data-world="market"] .hud-top { display: none; }
-.market-panel-wrap { position: absolute; inset: 0; z-index: 260; display: grid; place-items: center; padding: 22px; background: rgba(25,52,72,.44); pointer-events: auto; }
-.market-panel-wrap[hidden] { display: none; }
-.market-panel { position: relative; width: min(620px, 100%); max-height: min(720px, calc(100vh - 44px)); overflow: auto; border: 2px solid #2b435c; border-radius: 8px; background: linear-gradient(180deg, #fbfdff, #eef4fb); color: #253b52; box-shadow: 0 6px 0 rgba(36, 58, 82, 0.34), 0 22px 60px rgba(18, 42, 64, 0.42); }
+.market-panel-wrap { position: absolute; inset: 0; z-index: 260; display: grid; place-items: center; padding: 22px; background: rgba(25,52,72,.44); pointer-events: auto !important; }
+.market-panel-wrap[hidden] { display: none !important; pointer-events: none !important; }
+.market-panel { position: relative; width: min(620px, 100%); max-height: min(720px, calc(100vh - 44px)); overflow: auto; border: 2px solid #2b435c; border-radius: 8px; background: linear-gradient(180deg, #fbfdff, #eef4fb); color: #253b52; box-shadow: 0 6px 0 rgba(36, 58, 82, 0.34), 0 22px 60px rgba(18, 42, 64, 0.42); pointer-events: auto !important; }
+.market-panel button,
+.market-panel input,
+.market-panel select,
+.market-panel textarea,
+.market-panel a,
+.market-panel .panel-x,
+.market-panel .btn {
+  pointer-events: auto !important;
+}
 .ro-dialog-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: linear-gradient(180deg, #9cc4eb 0%, #6899ce 52%, #5081b7 100%); border-bottom: 2px solid #2b435c; color: #ffffff; font-weight: 700; font-size: 13px; text-shadow: 0 1px 1px rgba(20, 38, 60, 0.65); }
 .ro-dialog-body { padding: 22px 24px 26px; }
 .market-panel h2 { margin: 5px 0 12px; font: 700 24px var(--serif); color: #24577a; }
