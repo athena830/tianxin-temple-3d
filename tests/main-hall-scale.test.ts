@@ -151,4 +151,31 @@ describe('main hall scale & collision avoidance', () => {
     expect(urn).toBeDefined()
     expect(urn.position.z - stepsFrontEdge).toBeGreaterThanOrEqual(2.5)
   })
+
+  it('guarantees unobstructed sightline for Yue Lao and Cai Shen without indoor walkway roof penetration', () => {
+    const physics = new Physics()
+    const world = new TempleWorld(physics)
+    world.setMainHallScale(1.35)
+
+    // Verify there are no floating roof meshes inside the Main Hall back sanctuary (z > -16.0 and z < -10.0)
+    let indoorRoofMeshes = 0
+    world.scene.traverse((o: any) => {
+      if (o.isMesh && (o.geometry?.type === 'ConeGeometry' || o.geometry?.type === 'BoxGeometry')) {
+        let p = o.parent
+        let inHall = false
+        while (p) {
+          if (p === (world as any).mainHallGroup) { inHall = true; break }
+          p = p.parent
+        }
+        if (!inHall) {
+          const wp = o.position.clone()
+          o.getWorldPosition(wp)
+          if (Math.abs(wp.x) > 3.0 && Math.abs(wp.x) < 8.5 && wp.z > -16.0 && wp.z < -11.5 && wp.y > 3.0) {
+            indoorRoofMeshes++
+          }
+        }
+      }
+    })
+    expect(indoorRoofMeshes).toBe(0)
+  })
 })

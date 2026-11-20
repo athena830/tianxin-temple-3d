@@ -1170,29 +1170,26 @@ export class TempleWorld {
 
     // Courtyard Atrium Stone Paving & Seamless Connecting Covered Walkways (天井與左右連通穿堂迴廊，無障礙平整銜接)
     for (const side of [-1, 1]) {
-      // Covered walkway floor connecting Main Hall seamlessly to Rear Hall at y = 0.28m
-      const corridorFloor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.28, 4.4), stonePlinth)
-      corridorFloor.position.set(side * 5.85, 0.14, 10.45)
+      // Covered walkway floor connecting Main Hall seamlessly to Rear Hall at y = 0.28m (positioned strictly between halls, no indoor penetration)
+      const corridorFloor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.28, 1.2), stonePlinth)
+      corridorFloor.position.set(side * 5.85, 0.14, 8.5)
       corridorFloor.receiveShadow = true
       rear.add(corridorFloor)
-      this.physics.addStaticBox(new THREE.Vector3(side * 5.85, 0.14, -14.55), new THREE.Vector3(3.6, 0.28, 4.4))
+      this.physics.addStaticBox(new THREE.Vector3(side * 5.85, 0.14, -16.5), new THREE.Vector3(3.6, 0.28, 1.2))
 
-      // Walkway Pillars placed on outer edges (側邊立柱，通道中央保留 2.6m 寬敞通暢走道)
-      for (const cz of [8.8, 11.8]) {
-        const cPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 4.4, 10), red)
-        cPillar.position.set(side * 7.6, 2.2, cz)
-        rear.add(cPillar)
-        this.physics.addStaticCylinder(new THREE.Vector3(side * 7.6, 2.2, cz - 25.0), 0.22, 4.4)
-      }
+      // Walkway Pillars placed on outer edges in the courtyard (立柱位於天井通道外側，通道中央寬敞通暢，不侵入大殿)
+      const cPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 4.4, 10), red)
+      cPillar.position.set(side * 7.6, 2.2, 8.8)
+      rear.add(cPillar)
+      this.physics.addStaticCylinder(new THREE.Vector3(side * 7.6, 2.2, 8.8 - 25.0), 0.22, 4.4)
 
-      // Walkway Roof
-      const corrRoof = this.createRoof(4.2, 4.8, 4.4, 5.5)
-      corrRoof.position.set(side * 5.85, 0, -14.65)
-      this.scene.add(corrRoof)
+      // Notice: Main Hall roof (depth 21.87m, extending back past z = -18.2m) and Rear Hall roof (reaching z = -15.75m)
+      // already span and overlap seamlessly by over 2.4m above the walkway, so no intermediate miniature roof is needed
+      // (preventing any indoor roof eaves from obstructing deity sightlines).
 
       // Walkway warm ceiling lantern (穿堂連通迴廊原神璃月六角挑簷長明宮燈)
       const corrLantern = new THREE.Group()
-      corrLantern.position.set(side * 5.85, 3.6, 10.45)
+      corrLantern.position.set(side * 5.85, 3.6, 8.5)
       const corrCord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.45, 4), gold)
       corrCord.position.y = 0.32
       const corrCap = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.32, 0.14, 6), gold)
@@ -1211,7 +1208,7 @@ export class TempleWorld {
       rear.add(corrLantern)
 
       const corrLight = new THREE.PointLight('#ffbf66', 1.8, 12, 1.5)
-      corrLight.position.set(side * 5.85, 3.4, 10.45)
+      corrLight.position.set(side * 5.85, 3.4, 8.5)
       rear.add(corrLight)
     }
 
@@ -2760,7 +2757,7 @@ export class TempleWorld {
     width: number,
     height: number,
     centerY: number,
-    depthZ = -0.335,
+    depthZ = -0.1,
   ): void {
     new THREE.TextureLoader().load(asset, tex => {
       tex.colorSpace = THREE.SRGBColorSpace
@@ -2774,9 +2771,12 @@ export class TempleWorld {
       })
       const portrait = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat)
       // The altar screen is local z -0.36/-0.40 behind each deity. Keep the
-      // transparent portrait just in front of it, then replace the old 3D view.
+      // transparent portrait just in front of it at depthZ = -0.1, aligned with Guanyin,
+      // completely clear of shadows and fully visible from the temple entrance.
       portrait.position.set(0, centerY, depthZ)
-      for (const child of root.children) child.visible = false
+      root.traverse(child => {
+        if (child !== root && child !== portrait) child.visible = false
+      })
       root.add(portrait)
     })
   }
@@ -3220,7 +3220,7 @@ export class TempleWorld {
       root.add(coin)
     }
 
-    this.replaceDeityWithPortrait(root, './assets/caishen-golden-v2.png', 2.1, 2.57, 1.48)
+    this.replaceDeityWithPortrait(root, './assets/caishen-golden-v2.png', 2.1, 2.57, 1.48, -0.1)
 
     root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
@@ -3422,7 +3422,7 @@ export class TempleWorld {
       root.add(petal)
     }
 
-    this.replaceDeityWithPortrait(root, './assets/yuelao-golden-v2.png', 1.92, 2.88, 1.56)
+    this.replaceDeityWithPortrait(root, './assets/yuelao-golden-v2.png', 1.92, 2.88, 1.56, -0.1)
 
     root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {

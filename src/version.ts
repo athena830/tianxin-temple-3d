@@ -1,2 +1,2 @@
-/** VER 3.60.0 — smooth multi-tier stairs and incline ramps for main hall entrance to eliminate stair blocking. */
-export const APP_VERSION = 'VER 3.60.0'
+/** VER 3.61.0 — unobstructed sightline to Yue Lao and Cai Shen from Main Hall entrance without walkway roof clipping. */
+export const APP_VERSION = 'VER 3.61.0'
