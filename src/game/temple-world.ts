@@ -300,6 +300,9 @@ const makeMat = (color: string, roughness = 0.82, metalness = 0): THREE.MeshStan
 /** Height of the 3D Guanyin figure above the lotus throne, in metres. */
 const GUANYIN_HEIGHT = 2.6
 
+/** The 1.35x hall is the approved deity-size reference. Larger halls add headroom, not larger deities. */
+const MAIN_HALL_DEITY_REFERENCE_SCALE = 1.35
+
 interface FlyingCoin {
   mesh: THREE.Group
   start: THREE.Vector3
@@ -348,6 +351,8 @@ interface WishSparkle {
 
 export class TempleWorld {
   private guanyinRoot: THREE.Group | null = null
+  private caiShenRoot: THREE.Group | null = null
+  private yueLaoRoot: THREE.Group | null = null
   private guanyinModelPlaced = false
   readonly scene = new THREE.Scene()
   readonly spawn = new THREE.Vector3(STAND.x, 1.2, STAND.z)
@@ -1007,11 +1012,13 @@ export class TempleWorld {
 
     // 2. 龍邊陪祀（面對神桌右側）：Q 版啞光黏土財神爺 (Chibi Clay Cai Shen at x = +1.98)
     const caiShenStatue = this.createCaiShenStatue()
+    this.caiShenRoot = caiShenStatue
     caiShenStatue.position.set(1.98, 1.82, -5.64)
     hall.add(caiShenStatue)
 
     // 3. 虎邊陪祀（面對神桌左側）：Q 版啞光黏土月下老人 (Chibi Clay Yue Lao at x = -1.98)
     const yueLaoStatue = this.createYueLaoStatue()
+    this.yueLaoRoot = yueLaoStatue
     yueLaoStatue.position.set(-1.98, 1.82, -5.64)
     hall.add(yueLaoStatue)
 
@@ -2716,11 +2723,16 @@ export class TempleWorld {
     const root = new THREE.Group()
     this.guanyinModelPlaced = true
 
-    const clayCream = makeMat('#fbf4e8', 0.92, 0.02)
-    const clayCreamShade = makeMat('#efe3d0', 0.92, 0.02)
+    // Use a restrained gilt-ivory finish: Guanyin remains recognisably white-robed,
+    // while the throne and sacred ornaments read as a polished golden statue.
+    const clayCream = makeMat('#f7edcf', 0.48, 0.22)
+    const clayCreamShade = makeMat('#d6ae53', 0.34, 0.62)
     const clayPeach = makeMat('#f3b3a2', 0.9, 0.02)
     const clayPeachLight = makeMat('#fad6cb', 0.9, 0.02)
-    const clayGold = makeMat('#e5b966', 0.78, 0.14)
+    const clayGold = makeMat('#d8a62b', 0.24, 0.82)
+    const brightGold = makeMat('#ffe08a', 0.18, 0.9)
+    brightGold.emissive.set('#7b4b08')
+    brightGold.emissiveIntensity = 0.18
     const claySkin = makeMat('#fde7d6', 0.92, 0.01)
     const clayHair = makeMat('#422e25', 0.92, 0.01)
     const clayJade = makeMat('#8fc2a9', 0.85, 0.05)
@@ -2784,6 +2796,12 @@ export class TempleWorld {
     goldNecklace.position.set(0, 1.28, 0.12)
     root.add(innerCollar, goldNecklace)
 
+    // Gilt chest pendant and paired cuff rings give the white robe a clear 金身 focal point.
+    const pendant = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.028, 16), brightGold)
+    pendant.rotation.x = Math.PI / 2
+    pendant.position.set(0, 1.16, 0.365)
+    root.add(pendant)
+
     // 雙肩柔和寬袖與腹前結印小手
     for (const side of [-1, 1]) {
       const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), clayCream)
@@ -2794,11 +2812,14 @@ export class TempleWorld {
       forearm.rotation.set(0.85, 0, -side * 0.55)
       const hand = new THREE.Mesh(new THREE.SphereGeometry(0.105, 14, 12), claySkin)
       hand.position.set(side * 0.11, 0.86, 0.42)
+      const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.022, 8, 16), brightGold)
+      cuff.rotation.x = Math.PI / 2
+      cuff.position.set(side * 0.2, 0.99, 0.27)
       // 蜜桃粉仙家披帛飄帶
       const ribbon = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.045, 10, 20, Math.PI * 1.15), clayPeach)
       ribbon.position.set(side * 0.46, 0.96, 0.14)
       ribbon.rotation.set(0.3, side * 0.4, side * 0.5)
-      root.add(shoulder, forearm, hand, ribbon)
+      root.add(shoulder, forearm, hand, cuff, ribbon)
     }
 
     // 掌中羊脂白玉甘露淨瓶與翠綠楊柳枝
@@ -2859,6 +2880,12 @@ export class TempleWorld {
     const crownGem = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), clayPeach)
     crownGem.position.set(0, 0.55, 0.29)
     head.add(topBun, crownBase, crownFlame, crownGem)
+
+    for (let i = -2; i <= 2; i++) {
+      const crownBead = new THREE.Mesh(new THREE.SphereGeometry(0.026, 10, 8), brightGold)
+      crownBead.position.set(i * 0.075, 0.485, 0.265)
+      head.add(crownBead)
+    }
 
     // 奶油白觀音披紗（自寶冠後方柔順垂落雙肩）
     const veilTop = new THREE.Mesh(
@@ -2923,6 +2950,14 @@ export class TempleWorld {
     haloInner.position.set(0, 1.75, -0.51)
     root.add(halo, haloInner)
 
+    // Small lotus-like aureole beads remain readable at the main-hall viewing distance.
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), brightGold)
+      bead.position.set(Math.cos(angle) * 1.28, 1.75 + Math.sin(angle) * 1.28, -0.535)
+      root.add(bead)
+    }
+
     const statueGlow = new THREE.PointLight('#ffe5a8', 0.85, 8, 1.8)
     statueGlow.position.set(0, 2.0, 0.75)
     root.add(statueGlow)
@@ -2938,8 +2973,11 @@ export class TempleWorld {
   private createCaiShenStatue(): THREE.Group {
     const root = new THREE.Group()
 
-    const clayRed = makeMat('#d64937', 0.9, 0.02)
-    const clayGold = makeMat('#ebb85e', 0.76, 0.16)
+    const clayRed = makeMat('#b92820', 0.4, 0.18)
+    const clayGold = makeMat('#d9a52a', 0.22, 0.86)
+    const brightGold = makeMat('#ffe18a', 0.16, 0.92)
+    brightGold.emissive.set('#7c4b08')
+    brightGold.emissiveIntensity = 0.2
     const clayPeach = makeMat('#f3b2a2', 0.9, 0.02)
     const claySkin = makeMat('#fde4d0', 0.92, 0.01)
     const clayDark = makeMat('#33221b', 0.92, 0.01)
@@ -2974,6 +3012,18 @@ export class TempleWorld {
     collar.position.set(0, 1.18, 0.06)
     root.add(legs, torso, jadeBelt, collar)
 
+    // A raised gilt longevity seal makes the red ceremonial robe feel like a gilded 金身,
+    // not a flat clay figure.
+    const robeSeal = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.024, 12), brightGold)
+    robeSeal.rotation.x = Math.PI / 2
+    robeSeal.position.set(0, 1.0, 0.355)
+    root.add(robeSeal)
+    for (const side of [-1, 1]) {
+      const robeCoin = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.014, 8, 12), brightGold)
+      robeCoin.position.set(side * 0.22, 0.98, 0.355)
+      root.add(robeCoin)
+    }
+
     // 雙臂合捧大金元寶
     for (const side of [-1, 1]) {
       const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.38, 14), clayRed)
@@ -2992,7 +3042,10 @@ export class TempleWorld {
     const ingotBump = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 12), ingotGlowMat)
     ingotBump.scale.set(1.15, 0.85, 0.85)
     ingotBump.position.y = 0.07
-    ingotGroup.add(ingotBoat, ingotBump)
+    const ingotRim = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.018, 8, 16), brightGold)
+    ingotRim.rotation.x = Math.PI / 2
+    ingotRim.position.y = 0.035
+    ingotGroup.add(ingotBoat, ingotBump, ingotRim)
     root.add(ingotGroup)
 
     // 3. Q 版喜氣財神大頭與展翅財神官帽
@@ -3046,6 +3099,12 @@ export class TempleWorld {
     hatGem.position.set(0, 0.36, 0.34)
     head.add(hatBrim, hatGoldBand, hatCrown, hatGem)
 
+    for (let i = -2; i <= 2; i++) {
+      const hatStud = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), brightGold)
+      hatStud.position.set(i * 0.085, 0.24, 0.34)
+      head.add(hatStud)
+    }
+
     // 左右水平展翅金葉帽翅
     for (const side of [-1, 1]) {
       const wing = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.04), clayGold)
@@ -3067,6 +3126,14 @@ export class TempleWorld {
     halo.position.set(0, 1.48, -0.44)
     root.add(halo)
 
+    // Coin-like aureole details frame the official cap without hiding the face.
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2
+      const coin = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.014, 8, 12), brightGold)
+      coin.position.set(Math.cos(angle) * 0.94, 1.48 + Math.sin(angle) * 0.94, -0.455)
+      root.add(coin)
+    }
+
     root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
         obj.castShadow = true
@@ -3084,10 +3151,13 @@ export class TempleWorld {
   private createYueLaoStatue(): THREE.Group {
     const root = new THREE.Group()
 
-    const clayPeach = makeMat('#f29e8e', 0.9, 0.02)
-    const clayPeachLight = makeMat('#fad5cb', 0.9, 0.02)
-    const clayCream = makeMat('#fbf4e8', 0.92, 0.02)
-    const clayGold = makeMat('#e6ba66', 0.78, 0.14)
+    const clayPeach = makeMat('#dd796d', 0.48, 0.14)
+    const clayPeachLight = makeMat('#f3c3aa', 0.52, 0.18)
+    const clayCream = makeMat('#f8efd7', 0.5, 0.2)
+    const clayGold = makeMat('#d8a62e', 0.24, 0.84)
+    const brightGold = makeMat('#ffe6a0', 0.17, 0.92)
+    brightGold.emissive.set('#754808')
+    brightGold.emissiveIntensity = 0.16
     const claySkin = makeMat('#fde6d5', 0.92, 0.01)
     const clayWhiteHair = makeMat('#fcf9f2', 0.94, 0.01)
     const clayDark = makeMat('#3a2720', 0.92, 0.01)
@@ -3126,6 +3196,15 @@ export class TempleWorld {
     collar.position.set(0, 1.18, 0.06)
     root.add(legs, torso, sash, collar)
 
+    // Gilded cloud medallions distinguish Yue Lao's peach robe while keeping its
+    // traditional warm, auspicious palette and red-thread identity.
+    for (const x of [-0.18, 0, 0.18]) {
+      const cloudMedallion = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), brightGold)
+      cloudMedallion.scale.set(1.35, 0.72, 0.36)
+      cloudMedallion.position.set(x, 1.02, 0.356)
+      root.add(cloudMedallion)
+    }
+
     // 雙臂：左手捧「姻緣簿」，雙手間牽發光姻緣紅線
     for (const side of [-1, 1]) {
       const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.38, 14), clayPeach)
@@ -3144,6 +3223,13 @@ export class TempleWorld {
     bookGoldCover.position.copy(book.position)
     bookGoldCover.rotation.copy(book.rotation)
     root.add(book, bookGoldCover)
+
+    const bookSeal = new THREE.Mesh(new THREE.CircleGeometry(0.032, 12), brightGold)
+    bookSeal.position.copy(book.position)
+    bookSeal.position.z += 0.034
+    bookSeal.position.x += 0.02
+    bookSeal.rotation.copy(book.rotation)
+    root.add(bookSeal)
 
     // 雙手之間垂弧發光姻緣紅線與同心紅結
     const redThreadArc = new THREE.Mesh(
@@ -3190,6 +3276,12 @@ export class TempleWorld {
     crownRuby.position.set(0, 0.44, 0.18)
     head.add(hairCap, topBun, crownRing, crownRuby)
 
+    for (let i = -2; i <= 2; i++) {
+      const crownStud = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), brightGold)
+      crownStud.position.set(i * 0.062, 0.42, 0.19)
+      head.add(crownStud)
+    }
+
     // 蓬鬆雪白長眉、溫柔笑眼與粉嫩蜜桃腮紅
     for (const side of [-1, 1]) {
       const whiteBrow = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 10), clayWhiteHair)
@@ -3232,6 +3324,15 @@ export class TempleWorld {
     )
     halo.position.set(0, 1.48, -0.44)
     root.add(halo)
+
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), brightGold)
+      petal.scale.set(1.35, 0.75, 0.4)
+      petal.position.set(Math.cos(angle) * 0.94, 1.48 + Math.sin(angle) * 0.94, -0.455)
+      petal.rotation.z = angle
+      root.add(petal)
+    }
 
     root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
@@ -3562,11 +3663,13 @@ export class TempleWorld {
     // 2. 巨型透明材質立牌（全新 Q 版潮玩手辦風・乘龍白衣觀音聖像）
     const W = 10
     // 依據全新乘龍觀音素材預設計算高度（長寬比 877 / 550 ≈ 1.5945），確保初次建立即維持直式比例
-    let H = W * (877 / 550)
+    // New source image is 1084 × 1451; it includes the complete lotus base.
+    let H = W * (1451 / 1084)
 
     const planeMat = new THREE.MeshBasicMaterial({
       transparent: true,
-      alphaTest: 0.18,
+      // Suppress the faint low-alpha remnants from background extraction.
+      alphaTest: 0.5,
       side: THREE.DoubleSide,
       depthWrite: true,
     })
@@ -3605,17 +3708,11 @@ export class TempleWorld {
       petal.receiveShadow = true
       lotusBase.add(petal)
     }
-    statueSprite.add(lotusBase)
+    // The supplied image carries its own lotus base, so do not render the old
+    // procedural base underneath it. The matching physical collider remains.
     const guanyinMesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), planeMat)
-    // The source body's visible lower contour ends about 2.4 m above its
-    // cropped rectangle edge; the remaining pixels belong to the original
-    // painted pedestal. Sink only that remainder into the 3D top support.
-    // Pixel row 650 is directly below the rendered feet and above the
-    // original painted lotus pedestal. Keeping any lower rows reintroduces a
-    // second (floating) 2D base above the real throne.
-    const bodyCropHeight = 650
-    const feetInset = 2.4
-    guanyinMesh.position.set(0, lotusThroneHeight - feetInset + H / 2, 0)
+    // Pin the bottom of the complete lotus image to the platform surface.
+    guanyinMesh.position.set(0, H / 2, 0)
     guanyinMesh.castShadow = true
     statueSprite.add(guanyinMesh)
     this.dragonGuanyinBillboard = statueSprite
@@ -3626,12 +3723,14 @@ export class TempleWorld {
       // 動態鎖定圖片正確長寬比（直式）：取得圖片原始尺寸動態計算高度 H = W * (height / width)
       const img = tex.image as HTMLImageElement | undefined
       if (img && img.width && img.height) {
-        const cropHeight = Math.min(bodyCropHeight, img.height)
+        const cropHeight = img.height
         const bodyCanvas = document.createElement('canvas')
         bodyCanvas.width = img.width
         bodyCanvas.height = cropHeight
         const bodyCtx = bodyCanvas.getContext('2d')
         if (bodyCtx) {
+          // Keep the supplied full-height image, including its own lotus base.
+          bodyCtx.drawImage(img, 0, 0)
           // Preserve the complete figure above the waist, then taper to the
           // robe and feet. This removes only the painted side petals/base that
           // would otherwise overlap the real 3D lotus throne.
@@ -3660,12 +3759,12 @@ export class TempleWorld {
         guanyinMesh.geometry.dispose()
         guanyinMesh.geometry = new THREE.PlaneGeometry(W, dynamicH)
         // Preserve the bottom-edge anchor when the actual texture ratio arrives.
-        guanyinMesh.position.set(0, lotusThroneHeight - feetInset + dynamicH / 2, 0)
+        guanyinMesh.position.set(0, dynamicH / 2, 0)
       }
     }
 
     const loader = new THREE.TextureLoader()
-    loader.load('./assets/guanyin.webp', applyTexture)
+    loader.load('./assets/dragon-guanyin.png', applyTexture)
 
     // Soft oval contact shadow, horizontally aligned to the platform. It lives in
     // the same anchored group as the sprite, so the contact stays correct when
@@ -4845,6 +4944,15 @@ export class TempleWorld {
     if (this.mainHallGroup) {
       this.mainHallGroup.scale.set(s, s, s)
       this.mainHallGroup.position.set(0, 0, this.mainHallZ)
+    }
+
+    // The hall shell grows to create a larger sanctuary, while the three
+    // consecrated figures keep their approved 1.35x world-space size. Their
+    // local anchors remain in the scaled altar, so they rise with the plinth
+    // rather than floating, and the higher ceiling no longer masks them.
+    const deityLocalScale = MAIN_HALL_DEITY_REFERENCE_SCALE / s
+    for (const deity of [this.guanyinRoot, this.caiShenRoot, this.yueLaoRoot]) {
+      deity?.scale.setScalar(deityLocalScale)
     }
     if (this.roof) {
       this.roof.scale.set(s, s, s)
