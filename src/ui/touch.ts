@@ -9,14 +9,14 @@ export class TouchControls {
   private lookId: number | null = null
   private origin = { x: 0, y: 0 }
   private last = { x: 0, y: 0 }
-  private readonly stick: HTMLElement
-  private readonly knob: HTMLElement
+  private readonly stick: HTMLElement | null
+  private readonly knob: HTMLElement | null
   private readonly radius = 56
 
   constructor(root: HTMLElement, private readonly input: Input, private readonly active: () => boolean, private readonly canMove: () => boolean = active) {
-    const layer = root.querySelector<HTMLElement>('.touch')!
-    this.stick = layer.querySelector('.touch-stick')!
-    this.knob = this.stick.querySelector('i')!
+    const layer = root.querySelector<HTMLElement>('.touch')
+    this.stick = (layer?.querySelector('.touch-stick') as HTMLElement) ?? null
+    this.knob = (this.stick?.querySelector('i') as HTMLElement) ?? null
 
     const enable = () => document.body.classList.add('has-touch')
     if (matchMedia('(pointer: coarse)').matches) enable()
@@ -26,10 +26,10 @@ export class TouchControls {
       if (e.pointerType === 'touch') this.input.method = 'touch'
     }, { capture: true })
 
-    const canvas = document.querySelector<HTMLCanvasElement>('#game')!
-    canvas.addEventListener('pointerdown', e => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#game')
+    canvas?.addEventListener('pointerdown', e => {
       if (e.pointerType !== 'touch' || !this.active()) return
-      if (e.clientX < window.innerWidth * 0.45 && e.clientY > window.innerHeight * 0.45 && this.stickId === null && this.canMove()) {
+      if (this.stick && e.clientX < window.innerWidth * 0.45 && e.clientY > window.innerHeight * 0.45 && this.stickId === null && this.canMove()) {
         // The stick stays anchored bottom-left; the knob offset is measured from its centre.
         const r = this.stick.getBoundingClientRect()
         this.stickId = e.pointerId
@@ -59,8 +59,8 @@ export class TouchControls {
   /** Called when a panel opens or exploration stops so the visitor never keeps walking. */
   releaseStick(): void {
     this.stickId = null
-    this.knob.style.transform = ''
-    this.stick.classList.remove('is-active')
+    if (this.knob?.style) this.knob.style.transform = ''
+    this.stick?.classList.remove('is-active')
     this.input.setTouchMove(0, 0)
   }
 
@@ -72,7 +72,7 @@ export class TouchControls {
       dx = (dx / len) * this.radius
       dy = (dy / len) * this.radius
     }
-    this.knob.style.transform = `translate(${dx}px, ${dy}px)`
+    if (this.knob?.style) this.knob.style.transform = `translate(${dx}px, ${dy}px)`
     this.input.setTouchMove(dx / this.radius, -dy / this.radius)
   }
 }

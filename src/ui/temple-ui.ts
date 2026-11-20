@@ -301,7 +301,8 @@ export class TempleUi {
   get panelOpen(): boolean { return !this.panelHidden }
 
   setBootProgress(v: number): void {
-    this.root.querySelector<HTMLElement>('.boot .bar i')!.style.width = `${Math.round(v * 100)}%`
+    const bar = this.root.querySelector<HTMLElement>('.boot .bar i')
+    if (bar?.style) bar.style.width = `${Math.round(v * 100)}%`
   }
 
   refreshCharacter(): void {

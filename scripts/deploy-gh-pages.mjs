@@ -22,12 +22,15 @@ for (const file of distFiles) {
   cpSync(join(distDir, 'assets', file), join(rootAssetsDir, file), { recursive: true })
 }
 
-// Add cache-busting timestamp/version to dist/index.html
+// Add cache-busting timestamp/version ONLY to index.css in dist/index.html.
+// CRITICAL: NEVER add query parameters (?v=...) to index.js because ES modules
+// require exact specifier matching. Dynamic chunks import from './index.js' (without query params);
+// adding ?v= to the root script creates two separate module instances, which breaks WASM singletons!
 const distIndexPath = join(distDir, 'index.html')
 const distHtml = readFileSync(distIndexPath, 'utf-8')
 const cacheBustedHtml = distHtml
-  .replace(/\.\/assets\/index\.js(\?v=[^"']*)?/g, `./assets/index.js?v=${Date.now()}`)
   .replace(/\.\/assets\/index\.css(\?v=[^"']*)?/g, `./assets/index.css?v=${Date.now()}`)
+  .replace(/<script>\s*\/\/ Fallback for static hosting[\s\S]*?<\/script>/, '')
 writeFileSync(distIndexPath, cacheBustedHtml, 'utf-8')
 
 console.log('[deploy] Preparing .nojekyll and 404.html...')

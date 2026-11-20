@@ -18,7 +18,14 @@ import { TouchControls } from './ui/touch'
 document.documentElement.lang = 'zh-TW'
 ;(window as any).__TEMPLE_LOADED__ = true
 
+let hasBooted = false
 async function boot(): Promise<void> {
+  if (hasBooted || (window as any).__TEMPLE_BOOTING__) {
+    console.warn('[Temple] boot() already initiated, ignoring duplicate call.')
+    return
+  }
+  hasBooted = true
+  ;(window as any).__TEMPLE_BOOTING__ = true
   const canvas = document.querySelector<HTMLCanvasElement>('#game')!
   const firstRun = safeGet(SAVE_KEY) === null
   const save = new SaveStore()
@@ -399,7 +406,9 @@ async function boot(): Promise<void> {
       ui.setWorld(world)
       // The hall-scale tuning panel is irrelevant while the independent market
       // world is active, and otherwise makes the arrival screen look unfinished.
-      gui.domElement.style.display = world === 'market' ? 'none' : ''
+      if (gui?.domElement?.style) {
+        gui.domElement.style.display = world === 'market' ? 'none' : ''
+      }
       if (world === 'temple') game = active as TempleGame
       else game = undefined
       ui.setMode(active.mode)
