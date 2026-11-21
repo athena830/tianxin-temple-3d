@@ -628,15 +628,21 @@ export class MarketWorld {
     this.scene.add(outerBase)
   }
 
-  /** 後方深色低面數台灣公寓剪影與暖黃窗格 */
+  /** 後方深色低面數台灣公寓剪影與暖黃窗格（南北兩側皆具完整 360° 街景天際線） */
   private buildApartmentSkyline(): void {
     const buildings = [
-      { x: -16.5, z: -12.0, w: 6.4, h: 12.5, d: 5.0, color: '#181524' },
-      { x: -10.2, z: -12.6, w: 6.0, h: 15.2, d: 5.2, color: '#1d1a2c' },
-      { x: -3.6, z: -11.8, w: 6.6, h: 11.4, d: 4.8, color: '#161422' },
-      { x: 3.2, z: -12.8, w: 6.4, h: 16.0, d: 5.4, color: '#1f1c30' },
-      { x: 9.8, z: -12.0, w: 6.0, h: 13.0, d: 4.8, color: '#181626' },
-      { x: 16.2, z: -12.4, w: 6.2, h: 14.2, d: 5.0, color: '#1b182a' },
+      // 北側主背景公寓剪影（離街道略遠，確保 360° 旋轉視角清晰不遮擋）
+      { x: -16.5, z: -15.2, w: 6.4, h: 12.5, d: 5.0, color: '#181524', faceSouth: true },
+      { x: -10.2, z: -15.8, w: 6.0, h: 15.2, d: 5.2, color: '#1d1a2c', faceSouth: true },
+      { x: -3.6, z: -15.0, w: 6.6, h: 11.4, d: 4.8, color: '#161422', faceSouth: true },
+      { x: 3.2, z: -16.0, w: 6.4, h: 16.0, d: 5.4, color: '#1f1c30', faceSouth: true },
+      { x: 9.8, z: -15.2, w: 6.0, h: 13.0, d: 4.8, color: '#181626', faceSouth: true },
+      { x: 16.2, z: -15.6, w: 6.2, h: 14.2, d: 5.0, color: '#1b182a', faceSouth: true },
+      // 南側遠景低層老屋剪影（轉 180° 向南望時同樣呈現台灣雨夜街景）
+      { x: -13.0, z: 18.8, w: 6.2, h: 8.6, d: 4.6, color: '#171524', faceSouth: false },
+      { x: -4.2, z: 19.4, w: 6.8, h: 9.4, d: 4.8, color: '#1b182b', faceSouth: false },
+      { x: 4.8, z: 19.0, w: 6.4, h: 8.2, d: 4.6, color: '#161422', faceSouth: false },
+      { x: 13.4, z: 18.8, w: 6.0, h: 9.0, d: 4.8, color: '#1a1729', faceSouth: false },
     ]
 
     const windowLitMat = new THREE.MeshStandardMaterial({
@@ -684,8 +690,9 @@ export class MarketWorld {
           win.position.set(
             (c - 1) * (b.w * 0.28),
             3.4 + r * 2.05,
-            b.d / 2 + 0.04,
+            b.faceSouth ? b.d / 2 + 0.04 : -b.d / 2 - 0.04,
           )
+          if (!b.faceSouth) win.rotation.y = Math.PI
           group.add(win)
         }
       }

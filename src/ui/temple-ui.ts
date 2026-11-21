@@ -194,6 +194,11 @@ export class TempleUi {
             <button type="button" data-act="market-walk" data-market-target="service-desk">市集服務台</button>
             <button type="button" class="ro-return" data-act="market-walk" data-market-target="return-temple">返回天心宮</button>
           </div>
+          <div class="ro-nav-grid" style="padding-top:0;grid-template-columns:1fr 1fr 1fr;">
+            <button type="button" data-act="market-cam" data-market-cam="left" title="向左旋轉視角">↺ 左轉</button>
+            <button type="button" data-act="market-cam" data-market-cam="reset" title="重設視角">◎ 重設</button>
+            <button type="button" data-act="market-cam" data-market-cam="right" title="向右旋轉視角">↻ 右轉</button>
+          </div>
         </section>
       </div>
       <div class="market-panel-wrap" hidden><section class="market-panel ro-dialog" role="dialog" aria-modal="true" aria-label="市集介紹"><header class="ro-dialog-bar"><span data-market-dialog-title>天心靈光市集・攤位資訊</span><button class="panel-x" data-act="market-panel-close" aria-label="關閉">×</button></header><div class="ro-dialog-body" data-market-panel-content></div></section></div>
@@ -1478,6 +1483,10 @@ export class TempleUi {
     else if (act === 'market-walk') {
       const targetId = t.dataset.marketTarget
       if (targetId) window.dispatchEvent(new CustomEvent('market:walk-to', { detail: targetId }))
+    }
+    else if (act === 'market-cam') {
+      const dir = t.dataset.marketCam
+      if (dir) window.dispatchEvent(new CustomEvent('market:camera', { detail: dir }))
     }
     else if (act === 'market-panel-close') {
       this.closeMarketPanel()

@@ -452,6 +452,15 @@ async function boot(): Promise<void> {
     const targetId = (e as CustomEvent<string>).detail
     if (targetId) (sceneManager.current as MarketGame).walkToPoint(targetId as any)
   })
+  window.addEventListener('market:camera', e => {
+    if (sceneManager?.world !== 'market') return
+    const market = sceneManager.current as MarketGame
+    const dir = (e as CustomEvent<string>).detail
+    if (dir === 'left') market.rotateCamera(-Math.PI / 4)
+    else if (dir === 'right') market.rotateCamera(Math.PI / 4)
+    else if (dir === 'reset') market.resetCamera()
+    audio.play('ui')
+  })
   window.addEventListener('market:open-ziwei', () => {
     if (sceneManager?.world !== 'market') return
     ;(sceneManager.current as MarketGame).openPanel()

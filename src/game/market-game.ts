@@ -12,21 +12,23 @@ const HALF_HEIGHT = 0.55
 const RADIUS = 0.36
 const FOOT_OFFSET = HALF_HEIGHT + RADIUS
 const DEFAULT_AZIMUTH = 0.24 // 正交 2.5D 俯視角，完整呈現雨夜霓虹街道與四間獨立攤位
-const CAMERA_ELEVATION = 0.68
+const DEFAULT_ELEVATION = 0.68
+const MIN_ELEVATION = 0.32
+const MAX_ELEVATION = 1.12
 const CAMERA_DISTANCE = 28
 const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 
 /**
  * 台灣雨夜霓虹 × Low-Poly 2.5D「靈光市集」互動遊戲控制層。
- * 具備 OrthographicCamera 正交俯視角、Raycaster + Lerp 點擊地面移動、
+ * 具備 OrthographicCamera 360° 全方位旋轉正交視角、Raycaster + Lerp 點擊地面移動、
  * 攤位點擊熱區（Hotspots）與滑鼠移入高亮回饋，以及 GLTFLoader 角色模型替換介面。
  */
 export class MarketGame {
   mode: MarketMode = 'explore'
   readonly physics = new Physics(-24)
   readonly world = new MarketWorld(this.physics)
-  /** 正交 2.5D 俯視角鏡頭，支援右鍵旋轉與滾輪縮放 */
-  readonly camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.05, 130)
+  /** 正交 2.5D 俯視角鏡頭，支援 360° 自由旋轉、仰角微調與滾輪縮放 */
+  readonly camera = new THREE.OrthographicCamera(-8, 8, 8, -8, -40, 140)
   readonly body: RAPIER.RigidBody
   private readonly collider: RAPIER.Collider
   private readonly controller: RAPIER.KinematicCharacterController
@@ -34,6 +36,9 @@ export class MarketGame {
   private readonly onPointerMoveBound: (e: PointerEvent) => void
   private zoom = 10.6
   private azimuth = DEFAULT_AZIMUTH
+  private targetAzimuth = DEFAULT_AZIMUTH
+  private elevation = DEFAULT_ELEVATION
+  private targetElevation = DEFAULT_ELEVATION
   private cameraTarget = new THREE.Vector3()
   private cameraReady = false
   private verticalVelocity = 0
@@ -73,11 +78,25 @@ export class MarketGame {
     this.body.setNextKinematicTranslation({ x: spawn.x, y: spawn.y, z: spawn.z })
     this.mode = 'explore'
     this.azimuth = DEFAULT_AZIMUTH
+    this.targetAzimuth = DEFAULT_AZIMUTH
+    this.elevation = DEFAULT_ELEVATION
+    this.targetElevation = DEFAULT_ELEVATION
     this.zoom = window.innerHeight > window.innerWidth ? 13.8 : 10.6
     this.cameraReady = false
     this.clearMoveTarget()
     this.world.setHoveredPoint(null)
     this.audio.play('chime')
+  }
+
+  /** 360° 平滑旋轉市集視角（正值逆時針、負值順時針） */
+  rotateCamera(deltaRadians: number): void {
+    this.targetAzimuth += deltaRadians
+  }
+
+  /** 重設市集視角至預設正交 2.5D 角度 */
+  resetCamera(): void {
+    this.targetAzimuth = DEFAULT_AZIMUTH
+    this.targetElevation = DEFAULT_ELEVATION
   }
 
   startExplore(): void { this.mode = 'explore' }
@@ -128,6 +147,11 @@ export class MarketGame {
 
   /** 滑鼠移入攤位熱區時觸發高亮與指標回饋 */
   private handlePointerMove(e: PointerEvent): void {
+    if (this.input.dragging) {
+      this.world.setHoveredPoint(null)
+      this.renderer.gl.domElement.style.cursor = 'grabbing'
+      return
+    }
     if (this.mode !== 'explore') {
       this.clearHover()
       return
@@ -193,16 +217,23 @@ export class MarketGame {
     const zoom = this.input.takeZoom()
     const clicks = this.input.takeClicks()
 
-    if (this.mode === 'explore') {
+    if (this.mode === 'explore' || this.mode === 'browse') {
+      // 360° 全方位旋轉視角（左／右鍵拖曳、觸控拖曳皆可無限制 360° 旋轉，垂直拖曳可微調俯仰角）
       if (Math.abs(look.x) > 0.0001) {
-        this.azimuth -= look.x * 1.1
+        this.targetAzimuth -= look.x * 1.45
+      }
+      if (Math.abs(look.y) > 0.0001) {
+        this.targetElevation = THREE.MathUtils.clamp(
+          this.targetElevation + look.y * 0.75,
+          MIN_ELEVATION,
+          MAX_ELEVATION,
+        )
       }
       this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), 7.2, 16.0)
-
-      if (clicks.length > 0) {
-        const lastClick = clicks[clicks.length - 1]
-        this.handleGroundClick(lastClick.x, lastClick.y)
-      }
+    }
+    if (this.mode === 'explore' && clicks.length > 0) {
+      const lastClick = clicks[clicks.length - 1]
+      this.handleGroundClick(lastClick.x, lastClick.y)
     }
 
     const forward = new THREE.Vector3(-Math.sin(this.azimuth), 0, -Math.cos(this.azimuth))
@@ -270,12 +301,17 @@ export class MarketGame {
   render(_alpha: number, frameSeconds: number): void {
     const feet = this.feet
     this.world.avatar.position.copy(feet)
-    const target = new THREE.Vector3(feet.x, feet.y + 1.15, feet.z - 1.2)
+    const dtClamp = Math.min(frameSeconds, 0.1)
+    const smooth = 1 - Math.exp(-12 * dtClamp)
+    this.azimuth += (this.targetAzimuth - this.azimuth) * smooth
+    this.elevation += (this.targetElevation - this.elevation) * smooth
+
+    const target = new THREE.Vector3(feet.x, feet.y + 1.1, feet.z)
     if (!this.cameraReady) {
       this.cameraTarget.copy(target)
       this.cameraReady = true
     } else {
-      this.cameraTarget.lerp(target, 1 - Math.exp(-10 * Math.min(frameSeconds, 0.1)))
+      this.cameraTarget.lerp(target, 1 - Math.exp(-10 * dtClamp))
     }
     const aspect = Math.max(0.5, window.innerWidth / Math.max(1, window.innerHeight))
     this.camera.top = this.zoom
@@ -284,8 +320,8 @@ export class MarketGame {
     this.camera.left = -this.zoom * aspect
     this.camera.updateProjectionMatrix()
 
-    const horiz = Math.cos(CAMERA_ELEVATION) * CAMERA_DISTANCE
-    const vert = Math.sin(CAMERA_ELEVATION) * CAMERA_DISTANCE
+    const horiz = Math.cos(this.elevation) * CAMERA_DISTANCE
+    const vert = Math.sin(this.elevation) * CAMERA_DISTANCE
     this.camera.position.set(
       this.cameraTarget.x + Math.sin(this.azimuth) * horiz,
       this.cameraTarget.y + vert,
