@@ -144,6 +144,7 @@ export class TempleUi {
             <button class="chip" data-act="time">${initialTimeLabel}</button>
             <button class="chip music-toggle-btn${isPlaying ? '' : ' is-muted'}" data-act="music" aria-label="切換背景音樂">${initialMusicLabel}</button>
             <button class="chip market-entry" data-act="market-enter">進入市集</button>
+            <button class="chip unicorn-entry" data-act="unicorn-enter" title="前往月光森林・獨角獸心安宮聖域">🦄 獨角獸聖域</button>
             <button class="chip" data-act="map">參拜指引</button>
             <button class="chip" data-open="records">祈福紀錄</button>
             <button class="chip" data-open="prayer-wall">祈願牆</button>
@@ -157,6 +158,7 @@ export class TempleUi {
           <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="drum">鼓樓擊鼓</button>
           <button data-go="wishing-pool">蓮花許願池</button><button data-go="prayer-wall">大殿外廣場・祈願牆</button><button data-go="records">祈福紀錄</button>
           <button data-go="market-portal">天心靈光市集</button>
+          <button data-go="unicorn-portal">🦄 獨角獸聖域</button>
         </nav>
         <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact" data-prompt-action>互動</button></div>
         <div class="guide" hidden><span>前往</span><b data-guide-name></b><small data-guide-dist></small><button class="guide-x" data-act="guide-cancel" aria-label="取消指引">×</button></div>
@@ -349,10 +351,10 @@ export class TempleUi {
     // A guided destination should never end on a keyboard-only dead end.
     // Both the temple portal and the market return portal expose a clear CTA.
     const id = (point as { id: string }).id
-    const isPortal = id === 'market-portal' || id === 'return-temple'
+    const isPortal = id === 'market-portal' || id === 'unicorn-portal' || id === 'return-temple'
     const isMarketVenue = ['birth-chart-hall', 'card-house', 'moon-meditation', 'chess-guide', 'service-desk'].includes(id)
     action.classList.toggle('portal-entry', isPortal || isMarketVenue)
-    action.textContent = id === 'market-portal' ? '進入市集' : id === 'return-temple' ? '返回天心宮' : isMarketVenue ? '進入攤位' : '互動'
+    action.textContent = id === 'market-portal' ? '進入市集' : id === 'unicorn-portal' ? '踏入聖域' : id === 'return-temple' ? '返回天心宮' : isMarketVenue ? '進入攤位' : '互動'
   }
 
   openMarketPanel(id: MarketVenueId): void {
@@ -1110,6 +1112,17 @@ export class TempleUi {
           <form class="wish-form"><textarea name="wish" maxlength="120" rows="4" placeholder="例如：願家人平安健康，萬事順心。"></textarea><button class="btn primary" type="submit">送出祈願</button></form>`
       case 'market-portal':
         return `<p class="eyebrow">天心靈光市集</p><h2>靈光時空門</h2><p>正在準備進入市集入口廣場。</p>${note}`
+      case 'unicorn-portal':
+        return `<p class="eyebrow">月光森林・獨角獸心安宮</p>
+          <h2>🦄 獨角獸聖域時空門</h2>
+          <p class="venue-intro">穿越東方靈光星河，前往守護獨角獸心安宮聖域。漫步月光森林、向許願星泉傾訴心事、感受聖壇共鳴，並探索火、水、風三大自然元素領域。</p>
+          ${note}
+          <div class="row" style="margin-top:18px; gap:12px; flex-wrap:wrap;">
+            <a href="https://luvia0902.github.io/unicorn-sanctuary/" target="_blank" rel="noopener noreferrer" class="btn primary" style="background:linear-gradient(135deg,#8e44ad,#2980b9); border-color:#c39bd3; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+              <span>✨ 踏入傳送門（前往獨角獸聖域）</span>
+            </a>
+            <button class="btn" data-act="close">留在天心宮</button>
+          </div>`
       case 'offerings':
         return `<p class="eyebrow">虛擬供奉</p><h2>供花・供果・供茶</h2><p>選擇一份心意，供品會出現在主殿供桌上。</p>${note}
           <div class="tiles">${([['flower', '供花', '清香鮮花，敬表虔心'], ['fruit', '供果', '四時鮮果，感恩豐足'], ['tea', '供茶', '一盞清茶，敬奉清心']] as [OfferingId, string, string][])
@@ -1497,6 +1510,7 @@ export class TempleUi {
     else if (act === 'wish-close') { e.preventDefault(); this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
     else if (act === 'market-enter') this.actions.enterMarket()
+    else if (act === 'unicorn-enter') this.open('unicorn-portal')
     else if (act === 'market-walk') {
       const targetId = t.dataset.marketTarget
       if (targetId) window.dispatchEvent(new CustomEvent('market:walk-to', { detail: targetId }))
