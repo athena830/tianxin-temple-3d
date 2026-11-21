@@ -333,7 +333,7 @@ h3 {
 .ro-stat-bar em { display: block; height: 100%; background: linear-gradient(180deg, #7be08f, #39b562); }
 .ro-stat-bar.sp em { background: linear-gradient(180deg, #7cc6ff, #3e87db); }
 .ro-stat-bar span { text-align: right; font-variant-numeric: tabular-nums; font-size: 10px; color: #46617d; }
-.ro-mini-nav { position: absolute; right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(52px + var(--safe-t)); width: 214px; }
+.ro-mini-nav { position: absolute; right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(68px + var(--safe-t)); width: 214px; }
 .ro-nav-grid { padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .ro-nav-grid button { padding: 6px 6px; border: 1.5px solid #597ea6; border-radius: 4px; background: linear-gradient(180deg, #ffffff, #e3eef9); color: #203b58; font-size: 12px; font-weight: 700; cursor: pointer; transition: transform .1s ease, background .15s ease; }
 .ro-nav-grid button:hover { background: linear-gradient(180deg, #fffdf0, #fce6a6); border-color: #b88a32; color: #54370e; }
@@ -348,23 +348,54 @@ body[data-world="market"] .hud-top {
   pointer-events: none !important;
   z-index: 150 !important;
 }
-body[data-world="market"] .hud-top > :not(.hud-buttons) {
+
+body[data-world="market"] .hud-top> :not(.hud-buttons) {
   display: none !important;
 }
+
 body[data-world="market"] .hud-top .hud-buttons {
   justify-content: flex-end !important;
   pointer-events: none !important;
 }
-body[data-world="market"] .hud-top .hud-buttons > :not([data-act="music"]) {
+
+body[data-world="market"] .hud-top .hud-buttons> :not([data-act="music"]) {
   display: none !important;
 }
+
 body[data-world="market"] .hud-top button[data-act="music"] {
   display: inline-flex !important;
   pointer-events: auto !important;
 }
-.market-panel-wrap { position: absolute; inset: 0; z-index: 260; display: grid; place-items: center; padding: 22px; background: rgba(25,52,72,.44); pointer-events: auto !important; }
-.market-panel-wrap[hidden] { display: none !important; pointer-events: none !important; }
-.market-panel { position: relative; width: min(620px, 100%); max-height: min(720px, calc(100vh - 44px)); overflow: auto; border: 2px solid #2b435c; border-radius: 8px; background: linear-gradient(180deg, #fbfdff, #eef4fb); color: #253b52; box-shadow: 0 6px 0 rgba(36, 58, 82, 0.34), 0 22px 60px rgba(18, 42, 64, 0.42); pointer-events: auto !important; }
+
+.market-panel-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(25, 52, 72, .44);
+  pointer-events: auto !important;
+}
+
+.market-panel-wrap[hidden] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.market-panel {
+  position: relative;
+  width: min(620px, 100%);
+  max-height: min(720px, calc(100vh - 44px));
+  overflow: auto;
+  border: 2px solid #2b435c;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fbfdff, #eef4fb);
+  color: #253b52;
+  box-shadow: 0 6px 0 rgba(36, 58, 82, 0.34), 0 22px 60px rgba(18, 42, 64, 0.42);
+  pointer-events: auto !important;
+}
+
 .market-panel button,
 .market-panel input,
 .market-panel select,
@@ -541,7 +572,7 @@ body[data-world="market"] .hud-top button[data-act="music"] {
 .ro-mini-nav {
   position: absolute;
   right: calc(16px + env(safe-area-inset-right, 0px));
-  top: calc(52px + var(--safe-t));
+  top: calc(68px + var(--safe-t));
   width: 214px;
 }
 

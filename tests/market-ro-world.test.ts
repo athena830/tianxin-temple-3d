@@ -39,11 +39,18 @@ describe('RO-style Aura Market world', () => {
       expect(found?.id).toBe(point.id)
     }
 
-    // Verify RO ground cursor & animation update loop run cleanly
-    world.setGroundCursor(2.5, -1.5, true)
+    // Verify hotspots & hover highlight feedback
+    expect(world.hotspotMeshes.length).toBe(6)
+    world.setHoveredPoint('birth-chart-hall')
+    world.setHoveredPoint('card-house')
+    world.setHoveredPoint(null)
+
+    // Verify ground cursor, rain particles & Q-chibi walk animation update loop run cleanly
+    world.setGroundCursor(2.5, 1.5, true)
     world.update(0.16, 4.2, 0.8)
     world.update(0.16, 0, -0.5)
     world.setGroundCursor(0, 0, false)
+    expect(typeof world.loadCharacterModel).toBe('function')
 
     physics.dispose()
   })

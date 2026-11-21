@@ -11,23 +11,28 @@ export type MarketMode = 'browse' | 'explore' | 'panel'
 const HALF_HEIGHT = 0.55
 const RADIUS = 0.36
 const FOOT_OFFSET = HALF_HEIGHT + RADIUS
-const DEFAULT_AZIMUTH = Math.PI / 4
-const CAMERA_ELEVATION = 0.74 // Classic RO ~42° isometric tilt
+const DEFAULT_AZIMUTH = 0.24 // 正交 2.5D 俯視角，完整呈現雨夜霓虹街道與四間獨立攤位
+const CAMERA_ELEVATION = 0.68
 const CAMERA_DISTANCE = 28
 const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 
-/** Gameplay shell for the RO-style market. Its physics, scene and update loop are independent from TempleGame. */
+/**
+ * 台灣雨夜霓虹 × Low-Poly 2.5D「靈光市集」互動遊戲控制層。
+ * 具備 OrthographicCamera 正交俯視角、Raycaster + Lerp 點擊地面移動、
+ * 攤位點擊熱區（Hotspots）與滑鼠移入高亮回饋，以及 GLTFLoader 角色模型替換介面。
+ */
 export class MarketGame {
   mode: MarketMode = 'explore'
   readonly physics = new Physics(-24)
   readonly world = new MarketWorld(this.physics)
-  /** Fixed-tilt orthographic camera with RO-style 360° azimuth orbit & zoom. */
+  /** 正交 2.5D 俯視角鏡頭，支援右鍵旋轉與滾輪縮放 */
   readonly camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.05, 130)
   readonly body: RAPIER.RigidBody
   private readonly collider: RAPIER.Collider
   private readonly controller: RAPIER.KinematicCharacterController
   private readonly raycaster = new THREE.Raycaster()
-  private zoom = 11.2
+  private readonly onPointerMoveBound: (e: PointerEvent) => void
+  private zoom = 10.6
   private azimuth = DEFAULT_AZIMUTH
   private cameraTarget = new THREE.Vector3()
   private cameraReady = false
@@ -35,18 +40,31 @@ export class MarketGame {
   private moveTarget: THREE.Vector3 | null = null
   private pendingInteractId: MarketPointId | null = null
   private lastMoveSpeed = 0
-  private lastFacingDirX = 0
+  private lastFacingYaw = 0
   active: MarketPoint | null = null
   onNear: (point: MarketPoint | null) => void = () => undefined
 
   constructor(private readonly renderer: Renderer, private readonly input: Input, private readonly audio: Audio) {
     const spawn = this.world.spawn
-    this.body = this.physics.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(spawn.x, spawn.y, spawn.z))
-    this.collider = this.physics.world.createCollider(RAPIER.ColliderDesc.capsule(HALF_HEIGHT, RADIUS).setFriction(0), this.body)
+    this.body = this.physics.world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(spawn.x, spawn.y, spawn.z),
+    )
+    this.collider = this.physics.world.createCollider(
+      RAPIER.ColliderDesc.capsule(HALF_HEIGHT, RADIUS).setFriction(0),
+      this.body,
+    )
     this.controller = this.physics.world.createCharacterController(0.02)
     this.controller.enableAutostep(0.65, 0.15, false)
     this.controller.enableSnapToGround(0.65)
     this.physics.world.step()
+
+    this.onPointerMoveBound = (e: PointerEvent) => this.handlePointerMove(e)
+    this.renderer.gl.domElement.addEventListener('pointermove', this.onPointerMoveBound)
+  }
+
+  /** 預留介面：透過 GLTFLoader 替換真實 3D 角色模型 */
+  loadCharacterModel(url: string, targetHeight = 1.65): Promise<THREE.Object3D> {
+    return this.world.loadCharacterModel(url, targetHeight)
   }
 
   enter(): void {
@@ -55,20 +73,21 @@ export class MarketGame {
     this.body.setNextKinematicTranslation({ x: spawn.x, y: spawn.y, z: spawn.z })
     this.mode = 'explore'
     this.azimuth = DEFAULT_AZIMUTH
-    this.zoom = window.innerHeight > window.innerWidth ? 14.5 : 11.2
+    this.zoom = window.innerHeight > window.innerWidth ? 13.8 : 10.6
     this.cameraReady = false
     this.clearMoveTarget()
+    this.world.setHoveredPoint(null)
     this.audio.play('chime')
   }
 
   startExplore(): void { this.mode = 'explore' }
-  stopExplore(): void { this.mode = 'browse'; this.input.clearHeld(); this.clearMoveTarget() }
-  openPanel(): void { this.mode = 'panel'; this.input.clearHeld(); this.clearMoveTarget() }
+  stopExplore(): void { this.mode = 'browse'; this.input.clearHeld(); this.clearMoveTarget(); this.clearHover() }
+  openPanel(): void { this.mode = 'panel'; this.input.clearHeld(); this.clearMoveTarget(); this.clearHover() }
   closePanel(): void { this.mode = 'explore'; this.input.clearHeld() }
   get feet(): THREE.Vector3 { const p = this.body.translation(); return new THREE.Vector3(p.x, p.y - FOOT_OFFSET, p.z) }
   get worshipping(): boolean { return false }
 
-  /** Walk smoothly to a named venue or portal (used by RO quick-nav HUD). */
+  /** 平滑走往指定攤位或返回天心宮牌樓（供市集導覽按鈕呼叫） */
   walkToPoint(id: MarketPointId): void {
     const target = this.world.points.find(p => p.id === id)
     if (!target) return
@@ -86,9 +105,64 @@ export class MarketGame {
     this.world.setGroundCursor(0, 0, false)
   }
 
+  private clearHover(): void {
+    this.world.setHoveredPoint(null)
+    this.renderer.gl.domElement.style.cursor = ''
+  }
+
+  private raycastHotspot(clientX: number, clientY: number): MarketPointId | null {
+    const rect = this.renderer.gl.domElement.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return null
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    this.raycaster.setFromCamera(ndc, this.camera)
+    const hits = this.raycaster.intersectObjects(this.world.hotspotMeshes, false)
+    if (hits.length > 0) {
+      const id = hits[0].object.userData.marketPointId as MarketPointId | undefined
+      if (id) return id
+    }
+    return null
+  }
+
+  /** 滑鼠移入攤位熱區時觸發高亮與指標回饋 */
+  private handlePointerMove(e: PointerEvent): void {
+    if (this.mode !== 'explore') {
+      this.clearHover()
+      return
+    }
+    const hoveredId = this.raycastHotspot(e.clientX, e.clientY)
+    this.world.setHoveredPoint(hoveredId)
+    this.renderer.gl.domElement.style.cursor = hoveredId ? 'pointer' : ''
+  }
+
+  /** 點擊攤位熱區直接互動／走近開啟彈窗；點擊柏油路地面則透過 Raycaster + Lerp 平滑移動 */
   private handleGroundClick(clientX: number, clientY: number): void {
     const rect = this.renderer.gl.domElement.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
+
+    // 1. 優先偵測是否點擊到任一攤位熱區（Hotspot）
+    const hotspotId = this.raycastHotspot(clientX, clientY)
+    if (hotspotId) {
+      const target = this.world.points.find(p => p.id === hotspotId)
+      if (target) {
+        const cur = this.body.translation()
+        const dist = Math.hypot(target.position.x - cur.x, target.position.z - cur.z)
+        this.audio.play('ui')
+        if (dist <= target.radius + 1.1) {
+          this.clearMoveTarget()
+          window.dispatchEvent(new CustomEvent('market:interact', { detail: target.id }))
+        } else {
+          this.moveTarget = new THREE.Vector3(target.position.x, 0, target.position.z)
+          this.pendingInteractId = target.id
+          this.world.setGroundCursor(target.position.x, target.position.z, true)
+        }
+        return
+      }
+    }
+
+    // 2. 否則進行地面 Raycaster 拾取並設定平滑移動目標
     const ndc = new THREE.Vector2(
       ((clientX - rect.left) / rect.width) * 2 - 1,
       -((clientY - rect.top) / rect.height) * 2 + 1,
@@ -97,11 +171,10 @@ export class MarketGame {
     const hit = new THREE.Vector3()
     if (!this.raycaster.ray.intersectPlane(GROUND_PLANE, hit)) return
 
-    // Clamp click destination within market fence boundaries
-    hit.x = THREE.MathUtils.clamp(hit.x, -15.0, 15.0)
-    hit.z = THREE.MathUtils.clamp(hit.z, -14.0, 11.8)
+    // 限制於雨夜市集街道行走範圍內
+    hit.x = THREE.MathUtils.clamp(hit.x, -15.4, 15.4)
+    hit.z = THREE.MathUtils.clamp(hit.z, -1.35, 9.2)
 
-    // Check if the player clicked directly near a venue stall or return portal
     const clickedPoint = this.world.nearestPoint(hit)
     if (clickedPoint) {
       this.moveTarget = new THREE.Vector3(clickedPoint.position.x, 0, clickedPoint.position.z)
@@ -121,11 +194,10 @@ export class MarketGame {
     const clicks = this.input.takeClicks()
 
     if (this.mode === 'explore') {
-      // Classic RO right-click drag rotates camera azimuth smoothly around the adventurer
       if (Math.abs(look.x) > 0.0001) {
-        this.azimuth -= look.x * 1.15
+        this.azimuth -= look.x * 1.1
       }
-      this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), 7.8, 16.5)
+      this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), 7.2, 16.0)
 
       if (clicks.length > 0) {
         const lastClick = clicks[clicks.length - 1]
@@ -147,7 +219,7 @@ export class MarketGame {
         const dx = this.moveTarget.x - cur.x
         const dz = this.moveTarget.z - cur.z
         const dist = Math.hypot(dx, dz)
-        const stopRadius = this.pendingInteractId ? 1.55 : 0.35
+        const stopRadius = this.pendingInteractId ? 1.55 : 0.28
         if (dist <= stopRadius) {
           const triggerId = this.pendingInteractId
           this.clearMoveTarget()
@@ -155,22 +227,9 @@ export class MarketGame {
             window.dispatchEvent(new CustomEvent('market:interact', { detail: triggerId }))
           }
         } else {
-          wish.set(dx / dist, 0, dz / dist)
-          // Smoothly steer around the Central Fountain at (0, 1.1) when auto-walking across the plaza
-          const fx = cur.x - 0
-          const fz = cur.z - 1.1
-          const fDist = Math.hypot(fx, fz)
-          if (fDist < 3.1 && fDist > 0.01) {
-            const toFountainDot = (-fx / fDist) * wish.x + (-fz / fDist) * wish.z
-            if (toFountainDot > 0.15) {
-              const side = cur.x >= 0 ? 1 : -1
-              const tangentX = (-fz / fDist) * side
-              const tangentZ = (fx / fDist) * side
-              const strength = THREE.MathUtils.clamp((3.1 - fDist) / 1.2, 0.35, 1.35)
-              wish.x += tangentX * strength + (fx / fDist) * 0.45
-              wish.z += tangentZ * strength + (fz / fDist) * 0.45
-            }
-          }
+          // 平滑減速靠近目標（Lerp 感緩停）
+          const easeFactor = THREE.MathUtils.clamp(dist / 1.1, 0.35, 1)
+          wish.set((dx / dist) * easeFactor, 0, (dz / dist) * easeFactor)
         }
       }
     }
@@ -180,18 +239,20 @@ export class MarketGame {
     this.verticalVelocity = grounded ? -1 : Math.max(-30, this.verticalVelocity - 24 * dt)
     const t = this.body.translation()
     const speed = this.input.held('sprint') ? CONFIG.player.sprintSpeed : CONFIG.player.walkSpeed
-    this.controller.computeColliderMovement(this.collider, { x: wish.x * speed * dt, y: this.verticalVelocity * dt, z: wish.z * speed * dt })
+    this.controller.computeColliderMovement(this.collider, {
+      x: wish.x * speed * dt,
+      y: this.verticalVelocity * dt,
+      z: wish.z * speed * dt,
+    })
     const move = this.controller.computedMovement()
     const next = { x: t.x + move.x, y: Math.max(FOOT_OFFSET, t.y + move.y), z: t.z + move.z }
     this.body.setNextKinematicTranslation(next)
     this.physics.step(dt)
 
-    // Track horizontal speed & camera-space left/right direction for RO sprite animation
     const horizDist = Math.hypot(move.x, move.z)
     this.lastMoveSpeed = dt > 0 ? horizDist / dt : 0
     if (horizDist > 0.002) {
-      const moveVec = new THREE.Vector3(move.x, 0, move.z).normalize()
-      this.lastFacingDirX = moveVec.dot(right)
+      this.lastFacingYaw = Math.atan2(move.x, move.z)
     }
 
     const point = this.world.nearestPoint(new THREE.Vector3(next.x, 0, next.z))
@@ -209,12 +270,12 @@ export class MarketGame {
   render(_alpha: number, frameSeconds: number): void {
     const feet = this.feet
     this.world.avatar.position.copy(feet)
-    const target = new THREE.Vector3(feet.x, feet.y + 1.25, feet.z)
+    const target = new THREE.Vector3(feet.x, feet.y + 1.15, feet.z - 1.2)
     if (!this.cameraReady) {
       this.cameraTarget.copy(target)
       this.cameraReady = true
     } else {
-      this.cameraTarget.lerp(target, 1 - Math.exp(-12 * Math.min(frameSeconds, 0.1)))
+      this.cameraTarget.lerp(target, 1 - Math.exp(-10 * Math.min(frameSeconds, 0.1)))
     }
     const aspect = Math.max(0.5, window.innerWidth / Math.max(1, window.innerHeight))
     this.camera.top = this.zoom
@@ -231,11 +292,13 @@ export class MarketGame {
       this.cameraTarget.z + Math.cos(this.azimuth) * horiz,
     )
     this.camera.lookAt(this.cameraTarget)
-    this.world.update(frameSeconds, this.lastMoveSpeed, this.lastFacingDirX)
+    this.world.update(frameSeconds, this.lastMoveSpeed, this.lastFacingYaw)
     this.renderer.render(this.world.scene, this.camera)
   }
 
   dispose(): void {
+    this.renderer.gl.domElement.removeEventListener('pointermove', this.onPointerMoveBound)
+    this.clearHover()
     this.input.clearHeld()
     this.clearMoveTarget()
     this.controller.free()

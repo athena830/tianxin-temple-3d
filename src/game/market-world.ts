@@ -1,77 +1,81 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { Physics } from '../engine/physics'
 
-/** Warm, vibrant Prontera-inspired sunlit palette for the 2.5D RO-style Aura Market. */
+/** 台灣雨夜霓虹 × Low-Poly 市集配色（純市集版本） */
 const PALETTE = {
-  sky: '#9ad6eb',
-  grass: '#74ab57',
-  grassLight: '#89be66',
-  grassDark: '#5b8e45',
-  stone: '#d9cbb0',
-  stoneLight: '#ede1c8',
-  stoneDark: '#b2a082',
-  stoneBorder: '#8d7d65',
-  wood: '#7d5438',
-  woodLight: '#a6744e',
-  woodDark: '#4a3123',
-  roof: '#a65d47',
-  ink: '#2d221c',
-  cream: '#fff6de',
-  gold: '#f0c45d',
-  portal: '#6ee5d8',
-  portalLight: '#dcfff9',
-  water: '#5cc4dc',
-  waterLight: '#b9f3ff',
-  cloud: '#fffaf0',
+  nightSky: '#1f1c2c',
+  asphalt: '#1c1a27',
+  sidewalk: '#2e2b3d',
+  curb: '#443f57',
+  wood: '#6b4735',
+  woodDark: '#3f2920',
+  woodLight: '#8c6048',
+  metalRoof: '#3b4154',
+  metalRoofRust: '#4a3d49',
+  poleConcrete: '#48455a',
+  buildingDark: '#161422',
+  buildingMid: '#1e1b2e',
+  windowWarm: '#ffda7b',
+  lanternRed: '#ff4838',
+  neonPink: '#f26ee8',
+  neonGold: '#ffd36e',
+  neonReiki: '#72f2c8',
+  neonViolet: '#a77dff',
+  neonAmber: '#ffcf5c',
+  coneOrange: '#f06428',
+  stoolRed: '#c93a3a',
+  stoolBlue: '#356bb3',
 }
 
 export type MarketVenueId = 'birth-chart-hall' | 'card-house' | 'moon-meditation' | 'chess-guide' | 'service-desk'
 export type MarketPointId = 'return-temple' | MarketVenueId
 export type MarketPoint = { id: MarketPointId; title: string; subtitle: string; position: THREE.Vector3; radius: number }
 
-type VenueSpec = {
+type StallStyle = 'ziwei' | 'reiki' | 'tarot' | 'consultation' | 'info'
+
+type StallSpec = {
   id: MarketVenueId
   title: string
   subtitle: string
-  chatTag: string
+  signZh: string
+  signEn: string
   x: number
   z: number
+  interactX: number
+  interactZ: number
   rotY: number
-  accent: string
-  npcStyle: 'sage' | 'oracle' | 'priestess' | 'taoist' | 'kafra'
+  accentHex: string
+  secondaryHex: string
+  style: StallStyle
 }
 
-type AnimatedNpc = {
-  sprite: THREE.Sprite
-  baseY: number
-  phase: number
-  emote?: THREE.Sprite
-  emoteBaseY?: number
-  emoteTimer: number
+type StallVisualRef = {
+  id: MarketPointId
+  signMaterial?: THREE.MeshStandardMaterial
+  baseEmissiveIntensity: number
+  ring: THREE.Mesh
+  ringMaterial: THREE.MeshBasicMaterial
+  glowHalo?: THREE.Sprite
+  baseHaloOpacity: number
+  pointLight?: THREE.PointLight
+  baseLightIntensity: number
 }
 
-type AuraSlime = {
+type SwayingLantern = {
   group: THREE.Group
-  sprite: THREE.Sprite
-  shadow: THREE.Mesh
-  homeX: number
-  homeZ: number
-  radius: number
-  speed: number
   phase: number
-  hopPhase: number
+  amp: number
 }
 
-type Stroller = {
-  group: THREE.Group
-  sprite: THREE.Sprite
-  orbitRadius: number
-  angle: number
+type RainRipple = {
+  mesh: THREE.Mesh
+  mat: THREE.MeshBasicMaterial
+  phase: number
   speed: number
-  bobPhase: number
 }
 
-function makePixelTexture(
+function makeCanvasTexture(
   width: number,
   height: number,
   draw: (ctx: CanvasRenderingContext2D) => void,
@@ -82,12 +86,9 @@ function makePixelTexture(
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')!
-  ctx.imageSmoothingEnabled = false
   draw(ctx)
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
-  texture.magFilter = THREE.NearestFilter
-  texture.minFilter = THREE.NearestFilter
   if (repeatX > 1 || repeatY > 1) {
     texture.wrapS = THREE.RepeatWrapping
     texture.wrapT = THREE.RepeatWrapping
@@ -96,1246 +97,1381 @@ function makePixelTexture(
   return texture
 }
 
-function spriteFromCanvas(width: number, height: number, draw: (ctx: CanvasRenderingContext2D) => void): THREE.Sprite {
-  const texture = makePixelTexture(width, height, draw)
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, alphaTest: 0.08, depthWrite: true })
-  return new THREE.Sprite(material)
-}
+/** 繪製發光霓虹／燈箱招牌貼圖（繁體中文 + 英文） */
+function makeNeonSignTexture(
+  zh: string,
+  en: string,
+  style: StallStyle | 'return',
+): THREE.CanvasTexture {
+  return makeCanvasTexture(512, 160, ctx => {
+    if (style === 'ziwei') {
+      // 粉紫與暖金霓虹招牌
+      ctx.fillStyle = '#1b0f26'
+      ctx.fillRect(0, 0, 512, 160)
+      ctx.strokeStyle = '#f26ee8'
+      ctx.lineWidth = 10
+      ctx.strokeRect(10, 10, 492, 140)
+      ctx.strokeStyle = '#ffd36e'
+      ctx.lineWidth = 3
+      ctx.strokeRect(22, 22, 468, 116)
 
-/** Classic RO floating chatroom / shop signboard bubble. */
-function roChatSignSprite(title: string, subtitle: string, accent: string): THREE.Sprite {
-  return spriteFromCanvas(512, 128, ctx => {
-    // Outer pixel border
-    ctx.fillStyle = '#24303c'
-    ctx.fillRect(10, 8, 492, 98)
-    // Inner parchment / pale blue RO window fill
-    ctx.fillStyle = '#f6f9ff'
-    ctx.fillRect(16, 14, 480, 86)
-    // Classic RO top accent bar
-    ctx.fillStyle = accent
-    ctx.fillRect(16, 14, 480, 26)
-    // Highlight line
-    ctx.fillStyle = 'rgba(255,255,255,0.45)'
-    ctx.fillRect(16, 14, 480, 5)
-    // Pointer triangle at bottom
-    ctx.fillStyle = '#24303c'
-    ctx.beginPath()
-    ctx.moveTo(240, 106)
-    ctx.lineTo(272, 106)
-    ctx.lineTo(256, 124)
-    ctx.closePath()
-    ctx.fill()
-    ctx.fillStyle = '#f6f9ff'
-    ctx.beginPath()
-    ctx.moveTo(246, 100)
-    ctx.lineTo(266, 100)
-    ctx.lineTo(256, 115)
-    ctx.closePath()
-    ctx.fill()
-    // Subtitle in header bar
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '700 20px "Microsoft JhengHei", sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(subtitle, 256, 28)
-    // Main venue title
-    ctx.fillStyle = '#223142'
-    ctx.font = '700 42px "Microsoft JhengHei", sans-serif'
-    ctx.fillText(title, 256, 70)
-  })
-}
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.shadowColor = '#f26ee8'
+      ctx.shadowBlur = 18
+      ctx.fillStyle = '#fff0c8'
+      ctx.font = '700 58px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
+      ctx.fillText(zh, 256, 68)
 
-/** Classic RO small overhead name tag. */
-function roNameTagSprite(text: string, color = '#fff7d6'): THREE.Sprite {
-  return spriteFromCanvas(256, 56, ctx => {
-    ctx.font = '700 30px "Microsoft JhengHei", sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.lineWidth = 7
-    ctx.strokeStyle = 'rgba(24, 32, 42, 0.88)'
-    ctx.strokeText(text, 128, 28)
-    ctx.fillStyle = color
-    ctx.fillText(text, 128, 28)
-  })
-}
+      ctx.shadowColor = '#ffd36e'
+      ctx.shadowBlur = 12
+      ctx.fillStyle = '#ff9ef6'
+      ctx.font = '700 28px "Segoe UI", sans-serif'
+      ctx.fillText(en, 256, 120)
+    } else if (style === 'reiki') {
+      // 紫綠色柔和霓虹招牌
+      ctx.fillStyle = '#101f26'
+      ctx.fillRect(0, 0, 512, 160)
+      ctx.strokeStyle = '#72f2c8'
+      ctx.lineWidth = 9
+      ctx.strokeRect(10, 10, 492, 140)
+      ctx.strokeStyle = '#b488ff'
+      ctx.lineWidth = 3
+      ctx.strokeRect(22, 22, 468, 116)
 
-/** Classic RO emote bubble (/lv, /!, /music). */
-function roEmoteSprite(kind: 'heart' | 'sparkle' | 'music'): THREE.Sprite {
-  return spriteFromCanvas(64, 64, ctx => {
-    // White rounded speech bubble
-    ctx.fillStyle = '#263445'
-    ctx.fillRect(10, 8, 44, 38)
-    ctx.fillRect(6, 12, 52, 30)
-    ctx.fillRect(26, 46, 10, 8)
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(12, 10, 40, 34)
-    ctx.fillRect(8, 14, 48, 26)
-    ctx.fillRect(28, 44, 6, 7)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.shadowColor = '#72f2c8'
+      ctx.shadowBlur = 18
+      ctx.fillStyle = '#dcfff4'
+      ctx.font = '700 56px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
+      ctx.fillText(zh, 256, 68)
 
-    if (kind === 'heart') {
-      ctx.fillStyle = '#ee5a74'
-      ctx.fillRect(18, 18, 10, 10)
-      ctx.fillRect(36, 18, 10, 10)
-      ctx.fillRect(16, 22, 32, 10)
-      ctx.fillRect(22, 32, 20, 6)
-      ctx.fillRect(28, 38, 8, 4)
-    } else if (kind === 'sparkle') {
-      ctx.fillStyle = '#f2b830'
-      ctx.fillRect(30, 14, 4, 24)
-      ctx.fillRect(20, 24, 24, 4)
-      ctx.fillRect(26, 20, 12, 12)
-      ctx.fillStyle = '#fff5c2'
-      ctx.fillRect(29, 23, 6, 6)
+      ctx.shadowColor = '#b488ff'
+      ctx.shadowBlur = 12
+      ctx.fillStyle = '#d3b8ff'
+      ctx.font = '700 28px "Segoe UI", sans-serif'
+      ctx.fillText(en, 256, 120)
+    } else if (style === 'tarot') {
+      // 深紫底配暖金招牌
+      ctx.fillStyle = '#1c112b'
+      ctx.fillRect(0, 0, 512, 160)
+      ctx.strokeStyle = '#ffd36e'
+      ctx.lineWidth = 9
+      ctx.strokeRect(10, 10, 492, 140)
+      ctx.strokeStyle = '#9c73ff'
+      ctx.lineWidth = 3
+      ctx.strokeRect(22, 22, 468, 116)
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.shadowColor = '#ffd36e'
+      ctx.shadowBlur = 18
+      ctx.fillStyle = '#ffeab0'
+      ctx.font = '700 56px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
+      ctx.fillText(zh, 256, 68)
+
+      ctx.shadowColor = '#b694ff'
+      ctx.shadowBlur = 12
+      ctx.fillStyle = '#ffd36e'
+      ctx.font = '700 28px "Segoe UI", sans-serif'
+      ctx.fillText(en, 256, 120)
+    } else if (style === 'consultation') {
+      // 傳統暖黃發光燈箱
+      ctx.fillStyle = '#ffdf85'
+      ctx.fillRect(0, 0, 512, 160)
+      ctx.strokeStyle = '#9e2a22'
+      ctx.lineWidth = 10
+      ctx.strokeRect(10, 10, 492, 140)
+      ctx.strokeStyle = '#5c2416'
+      ctx.lineWidth = 3
+      ctx.strokeRect(22, 22, 468, 116)
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#7a1914'
+      ctx.font = '700 48px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
+      ctx.fillText(zh, 256, 68)
+
+      ctx.fillStyle = '#472518'
+      ctx.font = '700 24px "Segoe UI", sans-serif'
+      ctx.fillText(en, 256, 120)
+    } else if (style === 'info') {
+      // 市集服務台燈箱
+      ctx.fillStyle = '#182436'
+      ctx.fillRect(0, 0, 512, 160)
+      ctx.strokeStyle = '#79c6ff'
+      ctx.lineWidth = 9
+      ctx.strokeRect(10, 10, 492, 140)
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.shadowColor = '#79c6ff'
+      ctx.shadowBlur = 14
+      ctx.fillStyle = '#e8f6ff'
+      ctx.font = '700 52px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
+      ctx.fillText(zh, 256, 68)
+
+      ctx.fillStyle = '#9fd8ff'
+      ctx.font = '700 25px "Segoe UI", sans-serif'
+      ctx.fillText(en, 256, 120)
     } else {
-      ctx.fillStyle = '#4c8cd8'
-      ctx.fillRect(24, 16, 4, 20)
-      ctx.fillRect(40, 14, 4, 20)
-      ctx.fillRect(24, 16, 20, 5)
-      ctx.fillRect(18, 32, 10, 8)
-      ctx.fillRect(34, 30, 10, 8)
+      // 返回天心宮牌樓招牌
+      ctx.fillStyle = '#2b1218'
+      ctx.fillRect(0, 0, 512, 160)
+      ctx.strokeStyle = '#ffcf66'
+      ctx.lineWidth = 10
+      ctx.strokeRect(10, 10, 492, 140)
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.shadowColor = '#ff8c52'
+      ctx.shadowBlur = 16
+      ctx.fillStyle = '#ffe9a8'
+      ctx.font = '700 54px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
+      ctx.fillText(zh, 256, 68)
+
+      ctx.fillStyle = '#ffbe78'
+      ctx.font = '700 26px "Segoe UI", sans-serif'
+      ctx.fillText(en, 256, 120)
     }
   })
 }
 
-/** Draw a 4-frame RO Novice/Adventurer pixel-art character texture. */
-function makeAdventurerFrameTexture(frame: number): THREE.CanvasTexture {
-  // frame 0: idle, 1: left step, 2: neutral stride, 3: right step
-  const bob = frame === 1 || frame === 3 ? -2 : 0
-  const leftLegY = frame === 1 ? 47 : frame === 3 ? 50 : 49
-  const rightLegY = frame === 3 ? 47 : frame === 1 ? 50 : 49
-  const capeShift = frame === 1 ? -2 : frame === 3 ? 2 : 0
-
-  return makePixelTexture(48, 64, ctx => {
-    // Flowing adventurer cloak behind body
-    ctx.fillStyle = PALETTE.ink
-    ctx.fillRect(10 + capeShift, 28 + bob, 28, 22)
-    ctx.fillStyle = '#3f6f8f'
-    ctx.fillRect(12 + capeShift, 30 + bob, 24, 18)
-    ctx.fillStyle = '#5c94b8'
-    ctx.fillRect(14 + capeShift, 31 + bob, 8, 14)
-
-    // Hair & cute RO chibi head outline
-    ctx.fillStyle = PALETTE.ink
-    ctx.fillRect(12, 5 + bob, 24, 23)
-    ctx.fillRect(10, 9 + bob, 28, 16)
-    // Chestnut hair
-    ctx.fillStyle = '#593d2e'
-    ctx.fillRect(14, 7 + bob, 20, 12)
-    ctx.fillRect(12, 11 + bob, 24, 8)
-    // Hair highlight
-    ctx.fillStyle = '#805943'
-    ctx.fillRect(16, 8 + bob, 14, 3)
-    // Headband (classic RO novice ribbon)
-    ctx.fillStyle = '#f2c85b'
-    ctx.fillRect(12, 12 + bob, 24, 3)
-    ctx.fillStyle = '#e25959'
-    ctx.fillRect(21, 11 + bob, 6, 4)
-
-    // Face
-    ctx.fillStyle = '#fad2b0'
-    ctx.fillRect(15, 16 + bob, 18, 11)
-    // Rosy cheeks
-    ctx.fillStyle = '#f59fa0'
-    ctx.fillRect(16, 22 + bob, 3, 2)
-    ctx.fillRect(29, 22 + bob, 3, 2)
-    // Crisp RO eyes
-    ctx.fillStyle = '#241b17'
-    ctx.fillRect(18, 19 + bob, 3, 4)
-    ctx.fillRect(27, 19 + bob, 3, 4)
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(19, 19 + bob, 1, 2)
-    ctx.fillRect(28, 19 + bob, 1, 2)
-
-    // Tunic & scarf
-    ctx.fillStyle = PALETTE.ink
-    ctx.fillRect(13, 27 + bob, 22, 22)
-    ctx.fillStyle = '#fff5dc'
-    ctx.fillRect(15, 29 + bob, 18, 18)
-    // Blue novice vest + gold trim
-    ctx.fillStyle = '#4d87aa'
-    ctx.fillRect(16, 31 + bob, 16, 13)
-    ctx.fillStyle = PALETTE.gold
-    ctx.fillRect(15, 42 + bob, 18, 3)
-    // Red neck scarf
-    ctx.fillStyle = '#df5b57'
-    ctx.fillRect(15, 28 + bob, 18, 4)
-
-    // Arms swinging
-    ctx.fillStyle = PALETTE.ink
-    ctx.fillRect(9, 31 + bob + (frame === 1 ? -2 : 0), 5, 12)
-    ctx.fillRect(34, 31 + bob + (frame === 3 ? -2 : 0), 5, 12)
-    ctx.fillStyle = '#fad2b0'
-    ctx.fillRect(10, 39 + bob + (frame === 1 ? -2 : 0), 3, 3)
-    ctx.fillRect(35, 39 + bob + (frame === 3 ? -2 : 0), 3, 3)
-
-    // Boots
-    ctx.fillStyle = PALETTE.ink
-    ctx.fillRect(14, leftLegY, 8, 12)
-    ctx.fillRect(26, rightLegY, 8, 12)
-    ctx.fillStyle = '#734a34'
-    ctx.fillRect(15, leftLegY + 2, 6, 8)
-    ctx.fillRect(27, rightLegY + 2, 6, 8)
-    ctx.fillStyle = '#a6744e'
-    ctx.fillRect(16, leftLegY + 3, 4, 2)
-    ctx.fillRect(28, rightLegY + 3, 4, 2)
-  })
-}
-
-/** Job-inspired RO pixel-art NPCs for each venue. */
-function makeNpcSprite(style: VenueSpec['npcStyle'], accent: string): THREE.Sprite {
-  return spriteFromCanvas(48, 64, ctx => {
-    // Outline
-    ctx.fillStyle = PALETTE.ink
-    ctx.fillRect(13, 8, 22, 20)
-    ctx.fillRect(11, 28, 26, 22)
-    ctx.fillRect(14, 50, 8, 10)
-    ctx.fillRect(26, 50, 8, 10)
-
-    // Hair color by job
-    const hair = style === 'kafra' ? '#3f5a99' : style === 'priestess' ? '#6c5a99' : style === 'oracle' ? '#8c3d4f' : style === 'taoist' ? '#3a3430' : '#5e4332'
-    ctx.fillStyle = hair
-    ctx.fillRect(15, 10, 18, 11)
-    ctx.fillRect(13, 14, 22, 10)
-
-    // Job headgear
-    if (style === 'kafra') {
-      // Classic Kafra white frilly maid headband
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(12, 8, 24, 5)
-      ctx.fillRect(16, 5, 16, 4)
-      ctx.fillStyle = '#76b5e8'
-      ctx.fillRect(18, 9, 12, 2)
-    } else if (style === 'sage') {
-      // Scholar beret with gold tassel
-      ctx.fillStyle = '#3c7a5e'
-      ctx.fillRect(11, 5, 26, 7)
-      ctx.fillStyle = PALETTE.gold
-      ctx.fillRect(32, 9, 4, 8)
-    } else if (style === 'oracle') {
-      // Starry headband with ruby gem
-      ctx.fillStyle = PALETTE.gold
-      ctx.fillRect(13, 11, 22, 3)
-      ctx.fillStyle = '#f25c78'
-      ctx.fillRect(22, 9, 4, 5)
-    } else if (style === 'priestess') {
-      // Crescent moon circlet
-      ctx.fillStyle = '#e9f0ff'
-      ctx.fillRect(19, 4, 10, 4)
-      ctx.fillRect(21, 8, 6, 3)
-    } else if (style === 'taoist') {
-      // Traditional gold hair crown
-      ctx.fillStyle = PALETTE.gold
-      ctx.fillRect(18, 4, 12, 7)
-      ctx.fillStyle = '#d44c3c'
-      ctx.fillRect(22, 6, 4, 3)
-    }
-
-    // Face
-    ctx.fillStyle = '#fbe0c4'
-    ctx.fillRect(16, 17, 16, 10)
-    ctx.fillStyle = '#241b17'
-    ctx.fillRect(19, 20, 2, 3)
-    ctx.fillRect(27, 20, 2, 3)
-    ctx.fillStyle = '#f5a6a6'
-    ctx.fillRect(17, 23, 2, 2)
-    ctx.fillRect(29, 23, 2, 2)
-
-    // Outfit
-    ctx.fillStyle = accent
-    ctx.fillRect(13, 30, 22, 18)
-    // Apron / robe front trim
-    ctx.fillStyle = style === 'kafra' ? '#ffffff' : PALETTE.cream
-    ctx.fillRect(18, 31, 12, 17)
-    ctx.fillStyle = PALETTE.gold
-    ctx.fillRect(14, 36, 20, 3)
-
-    // Shoes
-    ctx.fillStyle = '#5c3c2c'
-    ctx.fillRect(15, 51, 6, 7)
-    ctx.fillRect(27, 51, 6, 7)
-  })
-}
-
-/** Cute RO Poring-inspired translucent Aura Slime pixel sprite. */
-function makeAuraSlimeSprite(bodyColor: string, lightColor: string, darkColor: string): THREE.Sprite {
-  return spriteFromCanvas(48, 40, ctx => {
-    // Pixel outline
-    ctx.fillStyle = darkColor
-    ctx.fillRect(12, 8, 24, 28)
-    ctx.fillRect(8, 14, 32, 20)
-    ctx.fillRect(6, 20, 36, 12)
-    // Top cute drop tip
-    ctx.fillRect(20, 3, 8, 7)
-    // Main jelly body
-    ctx.fillStyle = bodyColor
-    ctx.fillRect(14, 10, 20, 24)
-    ctx.fillRect(10, 16, 28, 16)
-    ctx.fillRect(8, 21, 32, 10)
-    ctx.fillRect(22, 5, 4, 6)
-    // Glossy specular highlight
-    ctx.fillStyle = lightColor
-    ctx.fillRect(14, 13, 8, 4)
-    ctx.fillRect(12, 17, 4, 4)
-    // Cute dot eyes & smile
-    ctx.fillStyle = '#2d1c22'
-    ctx.fillRect(16, 21, 3, 4)
-    ctx.fillRect(29, 21, 3, 4)
-    ctx.fillRect(22, 25, 4, 2)
-    // Blush cheeks
-    ctx.fillStyle = '#ff8ba0'
-    ctx.fillRect(12, 24, 3, 2)
-    ctx.fillRect(33, 24, 3, 2)
-  })
-}
-
-/** Lush RO-style 2.5D layered pixel tree. */
-function treeSprite(tint = '#478b4d', highlight = '#7cc26b'): THREE.Sprite {
-  return spriteFromCanvas(96, 136, ctx => {
-    // Trunk
-    ctx.fillStyle = PALETTE.ink
-    ctx.fillRect(40, 78, 16, 52)
-    ctx.fillStyle = '#7c5036'
-    ctx.fillRect(43, 80, 10, 48)
-    ctx.fillStyle = '#a16b4a'
-    ctx.fillRect(44, 82, 4, 44)
-    // Layered foliage puffs
-    for (const [x, y, w, h] of [
-      [14, 54, 42, 34],
-      [42, 52, 40, 36],
-      [20, 26, 56, 40],
-      [30, 12, 36, 26],
-    ] as const) {
-      ctx.fillStyle = PALETTE.ink
-      ctx.fillRect(x - 3, y - 3, w + 6, h + 6)
-      ctx.fillStyle = tint
-      ctx.fillRect(x, y, w, h)
-      ctx.fillStyle = highlight
-      ctx.fillRect(x + 5, y + 4, Math.max(10, w - 16), 9)
-    }
-    // Tiny sunlit blossoms
-    ctx.fillStyle = '#fff0a8'
-    ctx.fillRect(28, 38, 4, 4)
-    ctx.fillRect(58, 34, 4, 4)
-    ctx.fillRect(44, 60, 4, 4)
-  })
-}
-
-/** Procedural pixel-art sunlit grass tile with clover & wildflowers. */
-function makeGrassTexture(): THREE.CanvasTexture {
-  return makePixelTexture(
-    64,
-    64,
-    ctx => {
-      ctx.fillStyle = PALETTE.grass
-      ctx.fillRect(0, 0, 64, 64)
-      // Subtle pixel turf dithering
-      ctx.fillStyle = PALETTE.grassLight
-      for (const [x, y] of [[6, 8], [22, 14], [44, 6], [54, 28], [14, 38], [34, 48], [50, 56], [8, 54]] as const) {
-        ctx.fillRect(x, y, 4, 2)
-        ctx.fillRect(x + 2, y - 2, 2, 2)
-      }
-      ctx.fillStyle = PALETTE.grassDark
-      for (const [x, y] of [[16, 22], [38, 18], [28, 34], [56, 44], [20, 58]] as const) {
-        ctx.fillRect(x, y, 4, 2)
-      }
-      // Tiny RO wildflowers
-      ctx.fillStyle = '#fff6b8'
-      ctx.fillRect(10, 26, 2, 2)
-      ctx.fillRect(48, 16, 2, 2)
-      ctx.fillStyle = '#ffbdd0'
-      ctx.fillRect(36, 42, 2, 2)
-    },
-    18,
-    18,
-  )
-}
-
-/** Procedural Prontera-style warm cobblestone plaza tile texture. */
-function makeCobbleTexture(repeatX = 6, repeatY = 6): THREE.CanvasTexture {
-  return makePixelTexture(
-    64,
-    64,
-    ctx => {
-      ctx.fillStyle = PALETTE.stoneDark
-      ctx.fillRect(0, 0, 64, 64)
-      const bricks = [
-        [2, 2, 28, 13], [32, 2, 30, 13],
-        [2, 17, 14, 13], [18, 17, 28, 13], [48, 17, 14, 13],
-        [2, 32, 30, 13], [34, 32, 28, 13],
-        [2, 47, 18, 15], [22, 47, 26, 15], [50, 47, 12, 15],
-      ] as const
-      for (let i = 0; i < bricks.length; i += 1) {
-        const [x, y, w, h] = bricks[i]
-        ctx.fillStyle = i % 3 === 0 ? PALETTE.stoneLight : PALETTE.stone
-        ctx.fillRect(x, y, w, h)
-        ctx.fillStyle = 'rgba(255,255,255,0.32)'
-        ctx.fillRect(x, y, w, 2)
-      }
-    },
-    repeatX,
-    repeatY,
-  )
-}
-
-/** Procedural striped canvas awning texture for RO market stalls. */
-function makeAwningTexture(accent: string): THREE.CanvasTexture {
-  return makePixelTexture(64, 32, ctx => {
-    for (let i = 0; i < 8; i += 1) {
-      ctx.fillStyle = i % 2 === 0 ? accent : PALETTE.cream
-      ctx.fillRect(i * 8, 0, 8, 28)
-      ctx.fillStyle = i % 2 === 0 ? PALETTE.ink : '#d9ccb0'
-      ctx.fillRect(i * 8, 28, 8, 4)
-    }
-  })
-}
-
-/** Procedural spinning magic warp circle texture (RO blue/cyan portal rune). */
-function makeWarpRuneTexture(): THREE.CanvasTexture {
-  return makePixelTexture(128, 128, ctx => {
-    const cx = 64
-    const cy = 64
-    // Soft cyan glow
-    const grad = ctx.createRadialGradient(cx, cy, 8, cx, cy, 60)
-    grad.addColorStop(0, 'rgba(220, 255, 250, 0.95)')
-    grad.addColorStop(0.55, 'rgba(110, 229, 216, 0.55)')
-    grad.addColorStop(1, 'rgba(110, 229, 216, 0)')
+/** 建立柔和發光光暈貼圖（搭配 Bloom 強化霓虹泛光感） */
+function makeGlowHaloTexture(colorHex: string): THREE.CanvasTexture {
+  return makeCanvasTexture(128, 128, ctx => {
+    const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 62)
+    grad.addColorStop(0, colorHex)
+    grad.addColorStop(0.38, `${colorHex}99`)
+    grad.addColorStop(1, `${colorHex}00`)
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, 128, 128)
+  })
+}
 
-    // Outer rune ring
-    ctx.strokeStyle = '#ffffff'
-    ctx.lineWidth = 4
-    ctx.beginPath()
-    ctx.arc(cx, cy, 52, 0, Math.PI * 2)
-    ctx.stroke()
+/** 繪製雨後微濕柏油路貼圖（含斑馬線與微弱水窪細節） */
+function makeWetAsphaltTexture(): THREE.CanvasTexture {
+  return makeCanvasTexture(1024, 512, ctx => {
+    ctx.fillStyle = '#1d1b28'
+    ctx.fillRect(0, 0, 1024, 512)
 
-    ctx.strokeStyle = '#f2d06b'
-    ctx.lineWidth = 2.5
-    ctx.beginPath()
-    ctx.arc(cx, cy, 42, 0, Math.PI * 2)
-    ctx.stroke()
-
-    // 6-point magic star
-    ctx.strokeStyle = '#d8fff8'
-    ctx.lineWidth = 2.5
-    for (let t = 0; t < 2; t += 1) {
-      ctx.beginPath()
-      for (let i = 0; i <= 3; i += 1) {
-        const ang = (i * 2 * Math.PI) / 3 + (t * Math.PI) / 3
-        const px = cx + Math.cos(ang) * 40
-        const py = cy + Math.sin(ang) * 40
-        if (i === 0) ctx.moveTo(px, py)
-        else ctx.lineTo(px, py)
-      }
-      ctx.stroke()
+    // 細緻柏油顆粒
+    for (let i = 0; i < 4200; i += 1) {
+      const x = (i * 197) % 1024
+      const y = (i * 313) % 512
+      ctx.fillStyle = i % 3 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(10,8,16,0.14)'
+      ctx.fillRect(x, y, 2, 2)
     }
+
+    // 微濕反光水漬區塊
+    const puddles = [
+      [180, 160, 110, 42],
+      [420, 290, 130, 48],
+      [670, 180, 125, 45],
+      [850, 320, 105, 38],
+      [290, 380, 95, 34],
+    ]
+    for (const [px, py, rx, ry] of puddles) {
+      const g = ctx.createRadialGradient(px, py, 8, px, py, rx)
+      g.addColorStop(0, 'rgba(110, 104, 155, 0.16)')
+      g.addColorStop(1, 'rgba(30, 27, 42, 0)')
+      ctx.fillStyle = g
+      ctx.beginPath()
+      ctx.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // 中央雙黃／淡黃虛線
+    ctx.fillStyle = 'rgba(225, 190, 95, 0.45)'
+    for (let x = 20; x < 1024; x += 92) {
+      ctx.fillRect(x, 250, 52, 8)
+    }
+
+    // 斑馬線（左右兩組，具台灣街道感）
+    ctx.fillStyle = 'rgba(228, 224, 240, 0.62)'
+    for (const baseX of [190, 745]) {
+      for (let y = 48; y < 464; y += 54) {
+        ctx.fillRect(baseX, y, 92, 28)
+      }
+    }
+
+    // 路緣排水線
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.16)'
+    ctx.fillRect(0, 18, 1024, 4)
+    ctx.fillRect(0, 490, 1024, 4)
   })
 }
 
-/** Classic RO emerald/cyan ground tile click cursor texture. */
-function makeGroundCursorTexture(): THREE.CanvasTexture {
-  return makePixelTexture(64, 64, ctx => {
-    ctx.strokeStyle = '#34ff9a'
-    ctx.lineWidth = 6
-    ctx.strokeRect(5, 5, 54, 54)
-    ctx.fillStyle = 'rgba(84, 255, 180, 0.24)'
-    ctx.fillRect(8, 8, 48, 48)
-    ctx.fillStyle = '#eafff5'
-    ctx.fillRect(28, 28, 8, 8)
-  })
+/** 繪製人行道石板地磚貼圖 */
+function makeSidewalkTexture(): THREE.CanvasTexture {
+  return makeCanvasTexture(256, 256, ctx => {
+    ctx.fillStyle = '#302d40'
+    ctx.fillRect(0, 0, 256, 256)
+    ctx.strokeStyle = '#201d2c'
+    ctx.lineWidth = 4
+    for (let x = 0; x <= 256; x += 64) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke()
+    }
+    for (let y = 0; y <= 256; y += 64) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke()
+    }
+    for (let r = 0; r < 4; r += 1) {
+      for (let c = 0; c < 4; c += 1) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.06)'
+        ctx.fillRect(c * 64 + 3, r * 64 + 3, 58, 58)
+      }
+    }
+  }, 12, 3)
 }
 
-/** Independent, authentic 2.5D RO-style market world (3D painted architecture + animated 2D pixel sprites). */
+/**
+ * 台灣雨夜霓虹 × Low-Poly 2.5D「靈光市集」世界模組（純市集版本）。
+ * 包含獨立台式攤位、霓虹燈箱、雨夜濕潤反光柏油路、細雨粒子、街景細節、
+ * 低面數 Q 版角色（預留 GLTFLoader 替換介面）與攤位點擊熱區高亮。
+ */
 export class MarketWorld {
   readonly scene = new THREE.Scene()
-  readonly spawn = new THREE.Vector3(0, 0.92, 4.9)
-  readonly returnPoint: MarketPoint = {
-    id: 'return-temple',
-    title: '返回天心宮',
-    subtitle: '踏入藍色傳送陣，回到主殿',
-    position: new THREE.Vector3(0, 0, 9.6),
-    radius: 2.6,
-  }
-  readonly venuePoints: MarketPoint[] = [
-    { id: 'birth-chart-hall', title: '命盤探索館', subtitle: '人類圖・紫微斗數介紹', position: new THREE.Vector3(-9.2, 0, 0.6), radius: 3.3 },
-    { id: 'card-house', title: '牌卡靈感屋', subtitle: '每日一張牌・三張牌問事預告', position: new THREE.Vector3(-7.4, 0, -7.8), radius: 3.3 },
-    { id: 'moon-meditation', title: '月光靜心所', subtitle: '呼吸・靜心・自我關照', position: new THREE.Vector3(7.4, 0, -7.8), radius: 3.3 },
-    { id: 'chess-guide', title: '東方問事指引亭', subtitle: '連結天心仙姑象棋卜卦', position: new THREE.Vector3(9.2, 0, 0.6), radius: 3.3 },
-    { id: 'service-desk', title: '市集服務台', subtitle: '服務資訊與 LINE 預約入口', position: new THREE.Vector3(0, 0, -3.1), radius: 3.0 },
-  ]
-  readonly points: MarketPoint[] = [...this.venuePoints, this.returnPoint]
+  readonly spawn = new THREE.Vector3(0, 0.91, 4.4)
   readonly avatar = new THREE.Group()
+  readonly venuePoints: MarketPoint[]
+  readonly returnPoint: MarketPoint
+  readonly points: MarketPoint[]
+  /** 攤位與入口點擊熱區網格清單（供 MarketGame Raycaster 偵測懸停與點擊） */
+  readonly hotspotMeshes: THREE.Mesh[] = []
 
-  private avatarSprite!: THREE.Sprite
-  private readonly avatarFrames: THREE.CanvasTexture[] = []
-  private avatarAnimTimer = 0
-  private avatarFrameIndex = 0
+  private readonly stallSpecs: StallSpec[] = [
+    {
+      id: 'birth-chart-hall',
+      title: '紫微斗數 Ziwei',
+      subtitle: '紫微排盤與命理探索',
+      signZh: '紫微斗數',
+      signEn: 'Ziwei',
+      x: -9.6,
+      z: -4.1,
+      interactX: -9.6,
+      interactZ: -0.9,
+      rotY: 0,
+      accentHex: PALETTE.neonPink,
+      secondaryHex: PALETTE.neonGold,
+      style: 'ziwei',
+    },
+    {
+      id: 'moon-meditation',
+      title: '靈氣療癒 Reiki',
+      subtitle: '能量調頻與靜心療癒',
+      signZh: '靈氣療癒',
+      signEn: 'Reiki',
+      x: -3.2,
+      z: -4.1,
+      interactX: -3.2,
+      interactZ: -0.9,
+      rotY: 0,
+      accentHex: PALETTE.neonReiki,
+      secondaryHex: PALETTE.neonViolet,
+      style: 'reiki',
+    },
+    {
+      id: 'card-house',
+      title: '塔羅占卜 Tarot',
+      subtitle: '水晶球指引與牌卡占卜',
+      signZh: '塔羅占卜',
+      signEn: 'Tarot',
+      x: 3.2,
+      z: -4.1,
+      interactX: 3.2,
+      interactZ: -0.9,
+      rotY: 0,
+      accentHex: PALETTE.neonGold,
+      secondaryHex: PALETTE.neonViolet,
+      style: 'tarot',
+    },
+    {
+      id: 'chess-guide',
+      title: '問事／心靈諮詢',
+      subtitle: '傳統問事與心靈對話',
+      signZh: '問事／心靈諮詢',
+      signEn: 'Consultation',
+      x: 9.6,
+      z: -4.1,
+      interactX: 9.6,
+      interactZ: -0.9,
+      rotY: 0,
+      accentHex: PALETTE.neonAmber,
+      secondaryHex: PALETTE.lanternRed,
+      style: 'consultation',
+    },
+    {
+      id: 'service-desk',
+      title: '市集服務台 Info',
+      subtitle: '導覽資訊與預約備忘',
+      signZh: '市集服務台',
+      signEn: 'Info Desk',
+      x: 12.6,
+      z: 6.4,
+      interactX: 11.4,
+      interactZ: 4.4,
+      rotY: Math.PI,
+      accentHex: '#79c6ff',
+      secondaryHex: '#d8f0ff',
+      style: 'info',
+    },
+  ]
 
-  private groundCursor!: THREE.Mesh
+  private readonly visualRefs = new Map<MarketPointId, StallVisualRef>()
+  private readonly swayingLanterns: SwayingLantern[] = []
+  private readonly rainRipples: RainRipple[] = []
+  private crystalBall?: THREE.Mesh
+  private crystalHalo?: THREE.Sprite
+  private rainLines!: THREE.LineSegments
+  private rainPositions!: Float32Array
+  private readonly rainCount = 340
+
+  private groundCursor!: THREE.Group
+  private groundCursorRing!: THREE.Mesh
   private groundCursorActive = false
+  private hoveredId: MarketPointId | null = null
 
-  private readonly warpCircles: THREE.Mesh[] = []
-  private readonly warpPillars: THREE.Mesh[] = []
-  private readonly floatingProps: { obj: THREE.Object3D; baseY: number; spin: number; phase: number }[] = []
-  private readonly fountainRipples: THREE.Mesh[] = []
-  private readonly animatedNpcs: AnimatedNpc[] = []
-  private readonly auraSlimes: AuraSlime[] = []
-  private readonly strollers: Stroller[] = []
-  private readonly clouds: { sprite: THREE.Sprite; speed: number; minX: number; maxX: number }[] = []
+  // Q 版低面數角色與 GLTFLoader 佔位節點
+  private avatarVisualRoot = new THREE.Group()
+  private avatarBodyGroup?: THREE.Group
+  private avatarLeftLeg?: THREE.Mesh
+  private avatarRightLeg?: THREE.Mesh
+  private avatarLeftArm?: THREE.Mesh
+  private avatarRightArm?: THREE.Mesh
+  private avatarHasCustomModel = false
+  private avatarYaw = 0
+  private walkCycle = 0
   private time = 0
 
   constructor(private readonly physics: Physics) {
-    this.scene.background = new THREE.Color(PALETTE.sky)
-    this.scene.fog = new THREE.Fog(PALETTE.sky, 34, 72)
+    this.venuePoints = this.stallSpecs.map(spec => ({
+      id: spec.id,
+      title: spec.title,
+      subtitle: spec.subtitle,
+      position: new THREE.Vector3(spec.interactX, 0, spec.interactZ),
+      radius: 2.35,
+    }))
+    this.returnPoint = {
+      id: 'return-temple',
+      title: '返回天心宮',
+      subtitle: '沿街口牌樓回到天心玉皇宮',
+      position: new THREE.Vector3(-12.2, 0, 5.2),
+      radius: 2.4,
+    }
+    this.points = [...this.venuePoints, this.returnPoint]
 
-    // Warm Prontera daylight lighting
-    this.scene.add(new THREE.HemisphereLight('#fffbe3', '#6b8e53', 1.45))
-    const sun = new THREE.DirectionalLight('#fff2c4', 1.55)
-    sun.position.set(-14, 26, 16)
-    this.scene.add(sun)
-    const rim = new THREE.DirectionalLight('#b4e2ff', 0.45)
-    rim.position.set(16, 12, -16)
-    this.scene.add(rim)
-
-    this.addTileMap()
-    this.addCentralFountain()
-    this.addPlazaFurniture()
-    this.addStalls()
-    this.addServiceDesk()
-    this.addArrivalGate()
-    this.addReturnPortal()
-    this.addPerimeterAndTrees()
-    this.addBuntingGarlands()
-    this.addAuraSlimes()
-    this.addStrollingVisitors()
-    this.addGroundCursor()
-    this.addAvatar()
+    this.setupAtmosphere()
+    this.buildStreetGround()
+    this.buildApartmentSkyline()
+    for (const spec of this.stallSpecs) {
+      this.buildStall(spec)
+    }
+    this.buildReturnArch()
+    this.buildStreetDetails()
+    this.buildRainSystem()
+    this.buildGroundCursor()
+    this.buildChibiAvatar()
   }
 
-  private addTileMap(): void {
-    const grassMat = new THREE.MeshLambertMaterial({ map: makeGrassTexture() })
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(54, 54), grassMat)
-    ground.rotation.x = -Math.PI / 2
-    this.scene.add(ground)
-
-    const cobblePlazaMat = new THREE.MeshLambertMaterial({ map: makeCobbleTexture(8, 8) })
-    const cobblePathMat = new THREE.MeshLambertMaterial({ map: makeCobbleTexture(2, 10) })
-    const curbMat = new THREE.MeshLambertMaterial({ color: PALETTE.stoneBorder })
-
-    // Outer stone curb ring for the central plaza
-    const plazaCurb = new THREE.Mesh(new THREE.CylinderGeometry(8.15, 8.28, 0.08, 32), curbMat)
-    plazaCurb.position.set(0, 0.02, 0.6)
-    this.scene.add(plazaCurb)
-
-    // Main sunlit cobblestone plaza
-    const plaza = new THREE.Mesh(new THREE.CylinderGeometry(7.85, 7.85, 0.09, 32), cobblePlazaMat)
-    plaza.position.set(0, 0.03, 0.6)
-    this.scene.add(plaza)
-
-    // Radiating stone avenues (North-South & East-West + diagonals to upper stalls)
-    const paths: [number, number, number, number, number][] = [
-      [0, 0.5, 3.0, 23.0, 0],          // Main N-S road
-      [0, 0.6, 20.5, 2.8, 0],          // E-W avenue
-      [-4.2, -4.4, 2.2, 11.5, 0.58],   // NW path to Card House
-      [4.2, -4.4, 2.2, 11.5, -0.58],   // NE path to Moon Meditation
-    ]
-    for (const [px, pz, w, d, rotY] of paths) {
-      const curb = new THREE.Mesh(new THREE.BoxGeometry(w + 0.34, 0.05, d + 0.34), curbMat)
-      curb.position.set(px, 0.02, pz)
-      curb.rotation.y = rotY
-      const road = new THREE.Mesh(new THREE.BoxGeometry(w, 0.07, d), cobblePathMat)
-      road.position.set(px, 0.032, pz)
-      road.rotation.y = rotY
-      this.scene.add(curb, road)
-    }
-
-    // Solid ground floor collider + invisible outer boundary walls
-    this.physics.addStaticBox(new THREE.Vector3(0, -0.2, 0), new THREE.Vector3(54, 0.4, 54))
-    this.physics.addStaticBox(new THREE.Vector3(0, 1.5, -17.5), new THREE.Vector3(38, 3, 1))
-    this.physics.addStaticBox(new THREE.Vector3(0, 1.5, 14.5), new THREE.Vector3(38, 3, 1))
-    this.physics.addStaticBox(new THREE.Vector3(-17.5, 1.5, 0), new THREE.Vector3(1, 3, 34))
-    this.physics.addStaticBox(new THREE.Vector3(17.5, 1.5, 0), new THREE.Vector3(1, 3, 34))
-  }
-
-  /** Prontera-style Central Stone Fountain with animated sparkling ripples. */
-  private addCentralFountain(): void {
-    const group = new THREE.Group()
-    group.position.set(0, 0, 1.1)
-
-    const stoneMat = new THREE.MeshLambertMaterial({ color: '#ece3d0' })
-    const trimMat = new THREE.MeshLambertMaterial({ color: '#b7a88e' })
-    const goldMat = new THREE.MeshLambertMaterial({ color: PALETTE.gold })
-    const waterMat = new THREE.MeshBasicMaterial({ color: PALETTE.water, transparent: true, opacity: 0.88 })
-
-    // Stepped octagonal base
-    const baseStep = new THREE.Mesh(new THREE.CylinderGeometry(2.05, 2.2, 0.22, 8), trimMat)
-    baseStep.position.y = 0.11
-    const basinOuter = new THREE.Mesh(new THREE.CylinderGeometry(1.78, 1.88, 0.56, 8), stoneMat)
-    basinOuter.position.y = 0.46
-    const basinRim = new THREE.Mesh(new THREE.TorusGeometry(1.74, 0.11, 8, 8), stoneMat)
-    basinRim.rotation.x = Math.PI / 2
-    basinRim.rotation.z = Math.PI / 8
-    basinRim.position.y = 0.74
-    const waterDisc = new THREE.Mesh(new THREE.CylinderGeometry(1.64, 1.64, 0.08, 16), waterMat)
-    waterDisc.position.y = 0.64
-
-    // Center pillar & upper bowl
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, 1.45, 10), stoneMat)
-    pillar.position.y = 1.15
-    const upperBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.84, 0.36, 0.28, 12), stoneMat)
-    upperBowl.position.y = 1.72
-    const upperWater = new THREE.Mesh(new THREE.CylinderGeometry(0.76, 0.76, 0.06, 12), waterMat)
-    upperWater.position.y = 1.84
-    const finial = new THREE.Mesh(new THREE.OctahedronGeometry(0.26, 0), goldMat)
-    finial.position.y = 2.26
-    this.floatingProps.push({ obj: finial, baseY: 2.26, spin: 1.4, phase: 0 })
-
-    // Translucent water stream arcs
-    const jetMat = new THREE.MeshBasicMaterial({ color: PALETTE.waterLight, transparent: true, opacity: 0.72 })
-    for (let i = 0; i < 4; i += 1) {
-      const ang = (i * Math.PI) / 2 + Math.PI / 4
-      const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.09, 1.18, 6), jetMat)
-      jet.position.set(Math.cos(ang) * 0.72, 1.24, Math.sin(ang) * 0.72)
-      jet.rotation.z = -Math.cos(ang) * 0.28
-      jet.rotation.x = Math.sin(ang) * 0.28
-      group.add(jet)
-    }
-
-    // Animated expanding ripple rings
-    for (let i = 0; i < 2; i += 1) {
-      const ripple = new THREE.Mesh(
-        new THREE.RingGeometry(0.5, 0.64, 24),
-        new THREE.MeshBasicMaterial({ color: '#e6fdff', transparent: true, opacity: 0.7, side: THREE.DoubleSide }),
-      )
-      ripple.rotation.x = -Math.PI / 2
-      ripple.position.y = 0.7
-      group.add(ripple)
-      this.fountainRipples.push(ripple)
-    }
-
-    group.add(baseStep, basinOuter, basinRim, waterDisc, pillar, upperBowl, upperWater, finial)
-    this.scene.add(group)
-    this.physics.addStaticCylinder(new THREE.Vector3(0, 1.0, 1.1), 1.92, 2.0)
-  }
-
-  /** Wooden benches, flower planters, and cast-iron RO streetlamps around the plaza. */
-  private addPlazaFurniture(): void {
-    const woodMat = new THREE.MeshLambertMaterial({ color: PALETTE.woodLight })
-    const darkWoodMat = new THREE.MeshLambertMaterial({ color: PALETTE.woodDark })
-    const ironMat = new THREE.MeshLambertMaterial({ color: '#39464f' })
-    const lampGlowMat = new THREE.MeshBasicMaterial({ color: '#fff3b8' })
-
-    // 4 street lamps flanking the plaza corners
-    for (const [lx, lz] of [[-5.6, 5.2], [5.6, 5.2], [-5.8, -3.8], [5.8, -3.8]] as const) {
-      const lamp = new THREE.Group()
-      lamp.position.set(lx, 0, lz)
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 0.45, 8), ironMat)
-      base.position.y = 0.22
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.2, 8), ironMat)
-      pole.position.y = 1.85
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.07, 0.07), ironMat)
-      arm.position.set(lx < 0 ? 0.26 : -0.26, 3.35, 0)
-      const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.34, 6), lampGlowMat)
-      lantern.position.set(lx < 0 ? 0.48 : -0.48, 3.12, 0)
-      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.18, 6), ironMat)
-      cap.position.set(lx < 0 ? 0.48 : -0.48, 3.36, 0)
-      lamp.add(base, pole, arm, lantern, cap)
-      this.scene.add(lamp)
-      this.physics.addStaticCylinder(new THREE.Vector3(lx, 1.6, lz), 0.22, 3.2)
-    }
-
-    // 4 wooden benches around the fountain ring
-    const benchSpecs: [number, number, number][] = [
-      [-4.2, 3.6, 0.72],
-      [4.2, 3.6, -0.72],
-      [-4.5, -1.3, 2.35],
-      [4.5, -1.3, -2.35],
-    ]
-    for (const [bx, bz, rotY] of benchSpecs) {
-      const bench = new THREE.Group()
-      bench.position.set(bx, 0, bz)
-      bench.rotation.y = rotY
-      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.12, 0.52), woodMat)
-      seat.position.y = 0.44
-      const back = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.36, 0.08), woodMat)
-      back.position.set(0, 0.72, -0.22)
-      for (const sx of [-0.68, 0.68]) {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.44, 0.46), darkWoodMat)
-        leg.position.set(sx, 0.22, 0)
-        bench.add(leg)
+  /** 設定滑鼠懸停高亮回饋（由 MarketGame Raycaster 呼叫） */
+  setHoveredPoint(id: MarketPointId | null): void {
+    if (this.hoveredId === id) return
+    this.hoveredId = id
+    for (const [key, ref] of this.visualRefs.entries()) {
+      const active = key === id
+      if (ref.signMaterial) {
+        ref.signMaterial.emissiveIntensity = active ? ref.baseEmissiveIntensity * 1.48 : ref.baseEmissiveIntensity
       }
-      bench.add(seat, back)
-      this.scene.add(bench)
-    }
-
-    // Flower beds beside the main road
-    const bushMat = new THREE.MeshLambertMaterial({ color: '#4d924d' })
-    const flowerColors = ['#ff8ca8', '#ffe47a', '#a5d8ff', '#ffd08a']
-    for (const [fx, fz] of [[-2.4, 7.2], [2.4, 7.2], [-2.4, -7.2], [2.4, -7.2]] as const) {
-      const planter = new THREE.Group()
-      planter.position.set(fx, 0, fz)
-      const box = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.36, 0.8), darkWoodMat)
-      box.position.y = 0.18
-      const soil = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.38, 0.66), bushMat)
-      soil.position.y = 0.24
-      planter.add(box, soil)
-      for (let i = 0; i < 4; i += 1) {
-        const bloom = new THREE.Mesh(
-          new THREE.DodecahedronGeometry(0.12, 0),
-          new THREE.MeshLambertMaterial({ color: flowerColors[i % flowerColors.length] }),
-        )
-        bloom.position.set(-0.45 + i * 0.3, 0.48 + (i % 2) * 0.06, (i % 2 ? 0.1 : -0.1))
-        planter.add(bloom)
+      if (ref.glowHalo) {
+        ref.glowHalo.material.opacity = active ? Math.min(0.95, ref.baseHaloOpacity * 1.65) : ref.baseHaloOpacity
       }
-      this.scene.add(planter)
-    }
-  }
-
-  private addStalls(): void {
-    const venues: VenueSpec[] = [
-      {
-        id: 'birth-chart-hall',
-        title: '命盤探索館',
-        subtitle: '紫微斗數・命盤解析',
-        chatTag: '命盤探索館',
-        x: -10.2,
-        z: -1.6,
-        rotY: Math.PI / 6,
-        accent: '#4e9a78',
-        npcStyle: 'sage',
-      },
-      {
-        id: 'card-house',
-        title: '牌卡靈感屋',
-        subtitle: '每日一張・三張牌反思',
-        chatTag: '牌卡靈感屋',
-        x: -7.8,
-        z: -10.0,
-        rotY: Math.PI / 8,
-        accent: '#c85a64',
-        npcStyle: 'oracle',
-      },
-      {
-        id: 'moon-meditation',
-        title: '月光靜心所',
-        subtitle: '60 秒呼吸・靜心關照',
-        chatTag: '月光靜心所',
-        x: 7.8,
-        z: -10.0,
-        rotY: -Math.PI / 8,
-        accent: '#6a72b8',
-        npcStyle: 'priestess',
-      },
-      {
-        id: 'chess-guide',
-        title: '東方問事指引亭',
-        subtitle: '天心仙姑・象棋卜卦',
-        chatTag: '東方問事指引亭',
-        x: 10.2,
-        z: -1.6,
-        rotY: -Math.PI / 6,
-        accent: '#d89c38',
-        npcStyle: 'taoist',
-      },
-    ]
-    for (const venue of venues) this.addRoStall(venue, 1.0)
-  }
-
-  private addServiceDesk(): void {
-    this.addRoStall(
-      {
-        id: 'service-desk',
-        title: '市集服務台',
-        subtitle: '卡普拉導覽・LINE 預約',
-        chatTag: '市集服務台',
-        x: 0,
-        z: -5.2,
-        rotY: 0,
-        accent: '#4a8eb2',
-        npcStyle: 'kafra',
-      },
-      0.84,
-    )
-  }
-
-  /** Builds a 3D half-timbered RO-style market pavilion + striped awning + themed counter prop + 2D pixel NPC. */
-  private addRoStall(venue: VenueSpec, scale: number): void {
-    const group = new THREE.Group()
-    group.position.set(venue.x, 0, venue.z)
-    group.rotation.y = venue.rotY
-
-    const stoneMat = new THREE.MeshLambertMaterial({ color: '#d5c7ab' })
-    const woodMat = new THREE.MeshLambertMaterial({ color: PALETTE.wood })
-    const woodLightMat = new THREE.MeshLambertMaterial({ color: PALETTE.woodLight })
-    const woodDarkMat = new THREE.MeshLambertMaterial({ color: PALETTE.woodDark })
-    const creamWallMat = new THREE.MeshLambertMaterial({ color: '#f7edd4' })
-    const accentMat = new THREE.MeshLambertMaterial({ color: venue.accent })
-    const awningMat = new THREE.MeshLambertMaterial({ map: makeAwningTexture(venue.accent) })
-    const goldMat = new THREE.MeshLambertMaterial({ color: PALETTE.gold })
-
-    const w = 4.6 * scale
-    const d = 3.0 * scale
-    const h = 3.1 * scale
-
-    // 1. Raised stone foundation
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(w + 0.35, 0.24, d + 0.35), stoneMat)
-    plinth.position.y = 0.12
-    group.add(plinth)
-
-    // 2. Back half-timbered wall (cream plaster + timber frame)
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(w - 0.12, h * 0.85, 0.22), creamWallMat)
-    backWall.position.set(0, 0.24 + h * 0.425, -d / 2 + 0.15)
-    group.add(backWall)
-
-    // Decorative back wall timber crossbeams
-    const midBeam = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, 0.28), woodDarkMat)
-    midBeam.position.set(0, 0.24 + h * 0.45, -d / 2 + 0.16)
-    group.add(midBeam)
-
-    // 4 Corner timber pillars
-    for (const sx of [-w / 2 + 0.16, w / 2 - 0.16]) {
-      for (const sz of [-d / 2 + 0.16, d / 2 - 0.16]) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.22 * scale, h, 0.22 * scale), woodDarkMat)
-        post.position.set(sx, 0.24 + h / 2, sz)
-        group.add(post)
+      if (ref.pointLight) {
+        ref.pointLight.intensity = active ? ref.baseLightIntensity * 1.45 : ref.baseLightIntensity
       }
-    }
-
-    // 3. Front service counter with colored cloth runner
-    const counter = new THREE.Mesh(new THREE.BoxGeometry(w - 0.3, 0.92 * scale, 0.78 * scale), woodMat)
-    counter.position.set(0, 0.24 + 0.46 * scale, d / 2 - 0.45 * scale)
-    const counterTop = new THREE.Mesh(new THREE.BoxGeometry(w - 0.18, 0.12 * scale, 0.92 * scale), woodLightMat)
-    counterTop.position.set(0, 0.24 + 0.95 * scale, d / 2 - 0.45 * scale)
-    const cloth = new THREE.Mesh(new THREE.BoxGeometry(w * 0.42, 0.76 * scale, 0.06), accentMat)
-    cloth.position.set(0, 0.24 + 0.48 * scale, d / 2 - 0.04 * scale)
-    group.add(counter, counterTop, cloth)
-
-    // 4. Slanted striped canvas awning roof
-    const awning = new THREE.Mesh(new THREE.BoxGeometry(w + 0.65, 0.18 * scale, d + 0.95), awningMat)
-    awning.position.set(0, 0.24 + h + 0.08 * scale, 0.16 * scale)
-    awning.rotation.x = 0.24
-    group.add(awning)
-
-    // Roof ridge beam + gold finials
-    const ridge = new THREE.Mesh(new THREE.BoxGeometry(w + 0.72, 0.16 * scale, 0.18 * scale), woodDarkMat)
-    ridge.position.set(0, 0.24 + h + 0.36 * scale, -d / 2 + 0.15)
-    group.add(ridge)
-
-    // Warm hanging corner lantern on front-right eave
-    const lanternCord = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.45 * scale, 5), woodDarkMat)
-    lanternCord.position.set(w / 2 - 0.05, 0.24 + h - 0.35 * scale, d / 2 + 0.28 * scale)
-    const lanternGlobe = new THREE.Mesh(
-      new THREE.SphereGeometry(0.18 * scale, 10, 8),
-      new THREE.MeshBasicMaterial({ color: '#ffea9c' }),
-    )
-    lanternGlobe.position.set(w / 2 - 0.05, 0.24 + h - 0.62 * scale, d / 2 + 0.28 * scale)
-    group.add(lanternCord, lanternGlobe)
-
-    // 5. Unique 3D themed counter prop
-    const propY = 0.24 + 1.04 * scale
-    const propZ = d / 2 - 0.45 * scale
-    if (venue.id === 'birth-chart-hall') {
-      // Rotating golden armillary sphere
-      const astro = new THREE.Group()
-      astro.position.set(-0.75 * scale, propY + 0.42 * scale, propZ)
-      const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.32 * scale, 0.035, 8, 20), goldMat)
-      const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.26 * scale, 0.03, 8, 20), goldMat)
-      r2.rotation.y = Math.PI / 2
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.1 * scale, 10, 8), new THREE.MeshBasicMaterial({ color: '#9cf5d8' }))
-      astro.add(r1, r2, core)
-      group.add(astro)
-      this.floatingProps.push({ obj: astro, baseY: astro.position.y, spin: 1.1, phase: 0.4 })
-    } else if (venue.id === 'card-house') {
-      // Floating fan of glowing oracle cards
-      const fan = new THREE.Group()
-      fan.position.set(-0.7 * scale, propY + 0.42 * scale, propZ)
-      for (const i of [-1, 0, 1]) {
-        const card = new THREE.Mesh(
-          new THREE.BoxGeometry(0.24 * scale, 0.36 * scale, 0.03),
-          new THREE.MeshBasicMaterial({ color: i === 0 ? '#ffe79e' : '#ffd1dc' }),
-        )
-        card.position.set(i * 0.22 * scale, Math.abs(i) * -0.05, i * 0.02)
-        card.rotation.z = -i * 0.28
-        fan.add(card)
-      }
-      group.add(fan)
-      this.floatingProps.push({ obj: fan, baseY: fan.position.y, spin: 0.7, phase: 1.2 })
-    } else if (venue.id === 'moon-meditation') {
-      // Glowing lavender moon crystal
-      const crystal = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.28 * scale, 0),
-        new THREE.MeshBasicMaterial({ color: '#d4dcff' }),
-      )
-      crystal.scale.set(0.75, 1.35, 0.75)
-      crystal.position.set(-0.7 * scale, propY + 0.44 * scale, propZ)
-      group.add(crystal)
-      this.floatingProps.push({ obj: crystal, baseY: crystal.position.y, spin: 1.3, phase: 2.1 })
-    } else if (venue.id === 'chess-guide') {
-      // Mini Xiangqi board with red/black pieces
-      const board = new THREE.Mesh(new THREE.BoxGeometry(0.85 * scale, 0.07, 0.65 * scale), woodLightMat)
-      board.position.set(-0.65 * scale, propY + 0.04, propZ)
-      group.add(board)
-      for (const [cx, cz, col] of [[-0.2, 0.1, '#d6453a'], [0, 0, '#d6453a'], [0.22, -0.1, '#2d2d2d'], [-0.1, -0.14, '#2d2d2d']] as const) {
-        const piece = new THREE.Mesh(new THREE.CylinderGeometry(0.08 * scale, 0.08 * scale, 0.05, 10), new THREE.MeshLambertMaterial({ color: col }))
-        piece.position.set(-0.65 * scale + cx * scale, propY + 0.1, propZ + cz * scale)
-        group.add(piece)
-      }
-    } else {
-      // Service desk golden bell & open guestbook
-      const bell = new THREE.Mesh(new THREE.SphereGeometry(0.14 * scale, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), goldMat)
-      bell.position.set(-0.6 * scale, propY + 0.02, propZ)
-      const book = new THREE.Mesh(new THREE.BoxGeometry(0.55 * scale, 0.06, 0.38 * scale), creamWallMat)
-      book.position.set(0.15 * scale, propY + 0.03, propZ)
-      group.add(bell, book)
-    }
-
-    // 6. Crisp 2D RO pixel NPC standing beside/in front of counter + occasional emote bubble
-    const npc = makeNpcSprite(venue.npcStyle, venue.accent)
-    const npcBaseY = 1.02
-    npc.position.set(0.75 * scale, npcBaseY, d / 2 + 0.55 * scale)
-    npc.scale.set(1.32, 1.76, 1)
-    group.add(npc)
-
-    const emoteKind = venue.npcStyle === 'kafra' ? 'heart' : venue.npcStyle === 'priestess' ? 'music' : 'sparkle'
-    const emote = roEmoteSprite(emoteKind)
-    emote.position.set(0.75 * scale, npcBaseY + 1.15, d / 2 + 0.55 * scale)
-    emote.scale.set(0.72, 0.72, 1)
-    emote.visible = false
-    group.add(emote)
-
-    this.animatedNpcs.push({
-      sprite: npc,
-      baseY: npcBaseY,
-      phase: venue.x * 0.5 + venue.z * 0.3,
-      emote,
-      emoteBaseY: npcBaseY + 1.15,
-      emoteTimer: 2 + Math.abs(venue.x * 0.3),
-    })
-
-    // 7. Classic RO floating chatroom / shop signboard
-    const sign = roChatSignSprite(venue.chatTag, venue.subtitle, venue.accent)
-    sign.position.set(0, 0.24 + h + 1.25 * scale, 0.1)
-    sign.scale.set(4.1 * Math.max(0.9, scale), 1.02 * Math.max(0.9, scale), 1)
-    group.add(sign)
-
-    this.scene.add(group)
-    this.physics.addStaticBox(new THREE.Vector3(venue.x, 1.4, venue.z), new THREE.Vector3(w + 0.2, 2.8, d + 0.2))
-  }
-
-  /** North town archway framing the entrance of Tianxin Aura Market. */
-  private addArrivalGate(): void {
-    const group = new THREE.Group()
-    group.position.set(0, 0, -13.6)
-
-    const stoneMat = new THREE.MeshLambertMaterial({ color: '#ddd1b8' })
-    const darkWoodMat = new THREE.MeshLambertMaterial({ color: PALETTE.woodDark })
-    const roofMat = new THREE.MeshLambertMaterial({ color: '#456f63' })
-    const goldMat = new THREE.MeshLambertMaterial({ color: PALETTE.gold })
-
-    for (const sx of [-2.4, 2.4]) {
-      const base = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.1, 0.95), stoneMat)
-      base.position.set(sx, 0.55, 0)
-      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 4.2, 10), darkWoodMat)
-      pillar.position.set(sx, 2.6, 0)
-      const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffe89c' }))
-      lantern.position.set(sx * 0.82, 3.6, 0.45)
-      group.add(base, pillar, lantern)
-    }
-
-    const lintel = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.55, 0.65), darkWoodMat)
-    lintel.position.set(0, 4.55, 0)
-    const roofLeft = new THREE.Mesh(new THREE.BoxGeometry(6.9, 0.24, 1.6), roofMat)
-    roofLeft.position.set(0, 5.15, -0.45)
-    roofLeft.rotation.x = -0.32
-    const roofRight = new THREE.Mesh(new THREE.BoxGeometry(6.9, 0.24, 1.6), roofMat)
-    roofRight.position.set(0, 5.15, 0.45)
-    roofRight.rotation.x = 0.32
-    const crest = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), goldMat)
-    crest.position.set(0, 5.75, 0)
-
-    const sign = roChatSignSprite('天心靈光市集', 'RO 風格・奇幻靈感廣場', '#3f7b6d')
-    sign.position.set(0, 6.45, 0.2)
-    sign.scale.set(4.8, 1.2, 1)
-
-    group.add(lintel, roofLeft, roofRight, crest, sign)
-    this.scene.add(group)
-    this.physics.addStaticBox(new THREE.Vector3(-2.4, 2, -13.6), new THREE.Vector3(1.0, 4, 1.0))
-    this.physics.addStaticBox(new THREE.Vector3(2.4, 2, -13.6), new THREE.Vector3(1.0, 4, 1.0))
-  }
-
-  /** Classic RO Warp Portal: spinning blue-cyan rune circle + rising translucent light pillar. */
-  private addReturnPortal(): void {
-    const group = new THREE.Group()
-    group.position.copy(this.returnPoint.position)
-
-    // Spinning ground rune circle
-    const rune = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.5, 3.5),
-      new THREE.MeshBasicMaterial({
-        map: makeWarpRuneTexture(),
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    )
-    rune.rotation.x = -Math.PI / 2
-    rune.position.y = 0.09
-    group.add(rune)
-    this.warpCircles.push(rune)
-
-    // Rising translucent cyan light column (classic RO warp beam)
-    const outerPillar = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.18, 1.35, 4.4, 20, 1, true),
-      new THREE.MeshBasicMaterial({
-        color: PALETTE.portal,
-        transparent: true,
-        opacity: 0.28,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    )
-    outerPillar.position.y = 2.25
-    const innerPillar = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.62, 0.78, 4.8, 16, 1, true),
-      new THREE.MeshBasicMaterial({
-        color: PALETTE.portalLight,
-        transparent: true,
-        opacity: 0.36,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
-    )
-    innerPillar.position.y = 2.45
-    group.add(outerPillar, innerPillar)
-    this.warpPillars.push(outerPillar, innerPillar)
-
-    // 4 low stone rune markers around the warp
-    const stoneMat = new THREE.MeshLambertMaterial({ color: '#cfc4ad' })
-    for (let i = 0; i < 4; i += 1) {
-      const ang = (i * Math.PI) / 2 + Math.PI / 4
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.72, 0.32), stoneMat)
-      post.position.set(Math.cos(ang) * 1.75, 0.36, Math.sin(ang) * 1.75)
-      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.13, 0), new THREE.MeshBasicMaterial({ color: '#9cfcf0' }))
-      gem.position.set(Math.cos(ang) * 1.75, 0.88, Math.sin(ang) * 1.75)
-      group.add(post, gem)
-    }
-
-    const sign = roChatSignSprite('返回天心宮', '傳送陣・Warp Portal', '#3c8f88')
-    sign.position.set(0, 4.65, 0)
-    sign.scale.set(3.8, 0.95, 1)
-    group.add(sign)
-
-    this.scene.add(group)
-  }
-
-  /** Surrounding rustic wooden fences, lush RO pixel trees, and drifting clouds. */
-  private addPerimeterAndTrees(): void {
-    const woodMat = new THREE.MeshLambertMaterial({ color: PALETTE.woodLight })
-    const darkWoodMat = new THREE.MeshLambertMaterial({ color: PALETTE.wood })
-
-    const addFenceRun = (x1: number, z1: number, x2: number, z2: number) => {
-      const len = Math.hypot(x2 - x1, z2 - z1)
-      const count = Math.max(2, Math.round(len / 2.2))
-      const ang = Math.atan2(x2 - x1, z2 - z1)
-      for (let i = 0; i <= count; i += 1) {
-        const t = i / count
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.92, 0.16), darkWoodMat)
-        post.position.set(THREE.MathUtils.lerp(x1, x2, t), 0.46, THREE.MathUtils.lerp(z1, z2, t))
-        this.scene.add(post)
-      }
-      for (const ry of [0.34, 0.7]) {
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, len), woodMat)
-        rail.position.set((x1 + x2) / 2, ry, (z1 + z2) / 2)
-        rail.rotation.y = ang
-        this.scene.add(rail)
-      }
-    }
-
-    // Perimeter wooden fences framing the market green
-    addFenceRun(-15.5, -14.5, -4.0, -14.5)
-    addFenceRun(4.0, -14.5, 15.5, -14.5)
-    addFenceRun(-15.5, 12.2, -3.5, 12.2)
-    addFenceRun(3.5, 12.2, 15.5, 12.2)
-    addFenceRun(-15.5, -14.5, -15.5, 12.2)
-    addFenceRun(15.5, -14.5, 15.5, 12.2)
-
-    // Lush RO 2.5D trees around the border
-    const trees = [
-      [-17.2, -13.5, 5.4], [-14.2, -15.8, 4.9], [-17.6, -5.2, 5.1],
-      [-16.8, 5.2, 4.8], [-14.2, 13.4, 5.5], [-7.5, 13.8, 4.5],
-      [17.2, -13.2, 5.6], [14.2, -15.8, 4.8], [17.8, -4.8, 5.0],
-      [16.8, 5.6, 5.2], [14.4, 13.4, 5.4], [7.8, 13.8, 4.6],
-      [-5.6, -15.8, 4.6], [5.6, -15.8, 4.8],
-    ] as const
-    for (const [x, z, height] of trees) {
-      const alt = Math.abs(Math.round(x + z)) % 2 === 0
-      const tree = treeSprite(alt ? '#46874c' : '#53944e', alt ? '#7ec46c' : '#94cf73')
-      tree.position.set(x, height / 2, z)
-      tree.scale.set(height * 0.74, height, 1)
-      this.scene.add(tree)
-    }
-
-    // Drifting pixel clouds
-    for (const [x, y, z, scale, speed] of [
-      [-18, 13, -18, 4.2, 0.35],
-      [6, 14.5, -20, 4.8, 0.26],
-      [18, 12.5, -14, 3.6, 0.3],
-    ] as const) {
-      const cloud = spriteFromCanvas(128, 52, ctx => {
-        ctx.fillStyle = PALETTE.cloud
-        ctx.fillRect(14, 24, 100, 16)
-        ctx.fillRect(28, 14, 36, 20)
-        ctx.fillRect(60, 8, 38, 26)
-      })
-      cloud.position.set(x, y, z)
-      cloud.scale.set(scale, scale * 0.42, 1)
-      this.scene.add(cloud)
-      this.clouds.push({ sprite: cloud, speed, minX: -26, maxX: 26 })
+      ref.ringMaterial.opacity = active ? 0.92 : 0.34
+      ref.ring.scale.setScalar(active ? 1.12 : 1.0)
     }
   }
 
-  /** Festive RO town triangular bunting flags strung between plaza lamp posts. */
-  private addBuntingGarlands(): void {
-    const flagColors = ['#ee6c6c', '#f5cb5c', '#69b89c', '#6da8dc', '#c38be0']
-    const spans: [[number, number], [number, number]][] = [
-      [[-5.6, 5.2], [5.6, 5.2]],
-      [[-5.8, -3.8], [5.8, -3.8]],
-      [[-5.6, 5.2], [-5.8, -3.8]],
-      [[5.6, 5.2], [5.8, -3.8]],
-    ]
-    for (const [[x1, z1], [x2, z2]] of spans) {
-      const count = 9
-      for (let i = 1; i < count; i += 1) {
-        const t = i / count
-        const sag = Math.sin(t * Math.PI) * 0.55
-        const flag = new THREE.Mesh(
-          new THREE.ConeGeometry(0.18, 0.34, 3),
-          new THREE.MeshLambertMaterial({ color: flagColors[i % flagColors.length] }),
-        )
-        flag.rotation.x = Math.PI
-        flag.position.set(
-          THREE.MathUtils.lerp(x1, x2, t),
-          3.35 - sag,
-          THREE.MathUtils.lerp(z1, z2, t),
-        )
-        this.scene.add(flag)
-      }
-    }
-  }
-
-  /** Cute pastel Poring-inspired Aura Slimes hopping around the grassy outskirts. */
-  private addAuraSlimes(): void {
-    const specs: [number, number, string, string, string][] = [
-      [-11.8, 7.2, '#ffa3b8', '#ffdce5', '#a64d63'],  // Rose Aura Slime
-      [11.4, 6.8, '#8ad8ff', '#d9f4ff', '#3c7da6'],    // Sky Aura Slime
-      [-12.6, -6.5, '#9ce8b6', '#dcffea', '#43855d'],  // Mint Aura Slime
-      [12.4, -6.2, '#ffe082', '#fff7cc', '#a68232'],   // Gold Aura Slime
-    ]
-    for (let i = 0; i < specs.length; i += 1) {
-      const [hx, hz, body, light, dark] = specs[i]
-      const group = new THREE.Group()
-      group.position.set(hx, 0, hz)
-      const shadow = new THREE.Mesh(
-        new THREE.CircleGeometry(0.42, 14),
-        new THREE.MeshBasicMaterial({ color: '#2b4228', transparent: true, opacity: 0.34, depthWrite: false }),
-      )
-      shadow.rotation.x = -Math.PI / 2
-      shadow.position.y = 0.04
-      const sprite = makeAuraSlimeSprite(body, light, dark)
-      sprite.position.y = 0.45
-      sprite.scale.set(0.95, 0.8, 1)
-      group.add(shadow, sprite)
-      this.scene.add(group)
-      this.auraSlimes.push({
-        group,
-        sprite,
-        shadow,
-        homeX: hx,
-        homeZ: hz,
-        radius: 1.5,
-        speed: 0.55 + i * 0.1,
-        phase: i * 1.7,
-        hopPhase: i * 1.1,
-      })
-    }
-  }
-
-  /** Leisurely pixel-art market visitors strolling around the central fountain plaza. */
-  private addStrollingVisitors(): void {
-    const accents = ['#e08264', '#6d9ec8', '#89b36b']
-    for (let i = 0; i < accents.length; i += 1) {
-      const group = new THREE.Group()
-      const shadow = new THREE.Mesh(
-        new THREE.CircleGeometry(0.38, 12),
-        new THREE.MeshBasicMaterial({ color: '#383024', transparent: true, opacity: 0.3, depthWrite: false }),
-      )
-      shadow.rotation.x = -Math.PI / 2
-      shadow.position.y = 0.09
-      const sprite = makeNpcSprite(i === 0 ? 'sage' : i === 1 ? 'oracle' : 'priestess', accents[i])
-      sprite.position.y = 0.88
-      sprite.scale.set(1.12, 1.5, 1)
-      group.add(shadow, sprite)
-      this.scene.add(group)
-      this.strollers.push({
-        group,
-        sprite,
-        orbitRadius: 4.9 + i * 0.85,
-        angle: (i * Math.PI * 2) / accents.length,
-        speed: (i % 2 === 0 ? 1 : -1) * (0.2 + i * 0.04),
-        bobPhase: i * 2.1,
-      })
-    }
-  }
-
-  /** Classic RO glowing green tile cursor for click-to-move destination. */
-  private addGroundCursor(): void {
-    const mat = new THREE.MeshBasicMaterial({
-      map: makeGroundCursorTexture(),
-      transparent: true,
-      depthWrite: false,
-    })
-    this.groundCursor = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 1.05), mat)
-    this.groundCursor.rotation.x = -Math.PI / 2
-    this.groundCursor.position.y = 0.11
-    this.groundCursor.visible = false
-    this.scene.add(this.groundCursor)
-  }
-
+  /** 控制點擊地面後的目標波紋光環 */
   setGroundCursor(x: number, z: number, visible: boolean): void {
     this.groundCursorActive = visible
     this.groundCursor.visible = visible
     if (visible) {
-      this.groundCursor.position.set(x, 0.11, z)
+      this.groundCursor.position.set(x, 0.03, z)
     }
   }
 
-  private addAvatar(): void {
-    for (let f = 0; f < 4; f += 1) {
-      this.avatarFrames.push(makeAdventurerFrameTexture(f))
+  /**
+   * 預留 GLTFLoader 替換真實 3D 角色模型的介面。
+   * 載入完成後會自動替換低面數 Q 版佔位幾何體，並維持既有移動與陰影設定。
+   */
+  async loadCharacterModel(url: string, targetHeight = 1.65): Promise<THREE.Object3D> {
+    const loader = new GLTFLoader()
+    const gltf = await loader.loadAsync(url)
+    const model = gltf.scene
+
+    model.traverse(node => {
+      if (node instanceof THREE.Mesh) {
+        node.castShadow = true
+        node.receiveShadow = true
+      }
+    })
+
+    // 自動校正模型高度與腳底貼地
+    const box = new THREE.Box3().setFromObject(model)
+    const size = new THREE.Vector3()
+    box.getSize(size)
+    if (size.y > 0.001) {
+      const scale = targetHeight / size.y
+      model.scale.setScalar(scale)
+      const scaledBox = new THREE.Box3().setFromObject(model)
+      model.position.y -= scaledBox.min.y
     }
+
+    this.avatarVisualRoot.clear()
+    this.avatarVisualRoot.add(model)
+    this.avatarBodyGroup = undefined
+    this.avatarLeftLeg = undefined
+    this.avatarRightLeg = undefined
+    this.avatarLeftArm = undefined
+    this.avatarRightArm = undefined
+    this.avatarHasCustomModel = true
+    return model
+  }
+
+  private setupAtmosphere(): void {
+    this.scene.background = new THREE.Color(PALETTE.nightSky)
+    this.scene.fog = new THREE.FogExp2(PALETTE.nightSky, 0.0115)
+
+    // 柔和深紫灰夜色環境光，讓 Low-Poly 啞光材質與街景層次清晰溫潤
+    const hemi = new THREE.HemisphereLight('#9489c4', '#332d47', 1.38)
+    this.scene.add(hemi)
+
+    // 月色斜向主光（營造低面數建築立體層次）
+    const moon = new THREE.DirectionalLight('#d2d6ff', 1.05)
+    moon.position.set(12, 24, 15)
+    moon.castShadow = true
+    moon.shadow.mapSize.set(1024, 1024)
+    moon.shadow.camera.left = -22
+    moon.shadow.camera.right = 22
+    moon.shadow.camera.top = 18
+    moon.shadow.camera.bottom = -18
+    moon.shadow.camera.near = 2
+    moon.shadow.camera.far = 55
+    moon.shadow.bias = -0.0005
+    this.scene.add(moon)
+
+    // 街口暖紫補光
+    const fill = new THREE.DirectionalLight('#ffcaa0', 0.45)
+    fill.position.set(-14, 12, 14)
+    this.scene.add(fill)
+  }
+
+  private buildStreetGround(): void {
+    // 1. 物理地面與邊界牆
+    this.physics.addStaticBox(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(44, 1, 30))
+    // 街道四側透明碰撞邊界，防止角色走出街道
+    this.physics.addStaticBox(new THREE.Vector3(-16.5, 1.5, 1.5), new THREE.Vector3(0.8, 3, 18))
+    this.physics.addStaticBox(new THREE.Vector3(16.5, 1.5, 1.5), new THREE.Vector3(0.8, 3, 18))
+    this.physics.addStaticBox(new THREE.Vector3(0, 1.5, -7.2), new THREE.Vector3(34, 3, 0.8))
+    this.physics.addStaticBox(new THREE.Vector3(0, 1.5, 10.2), new THREE.Vector3(34, 3, 0.8))
+
+    // 2. 深色微反光雨夜柏油路（低粗糙度模擬雨後濕潤倒影）
+    const asphaltTex = makeWetAsphaltTexture()
+    const asphaltMat = new THREE.MeshStandardMaterial({
+      map: asphaltTex,
+      color: '#ffffff',
+      roughness: 0.2,
+      metalness: 0.3,
+    })
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(36, 9.2), asphaltMat)
+    road.rotation.x = -Math.PI / 2
+    road.position.set(0, 0.005, 3.2)
+    road.receiveShadow = true
+    this.scene.add(road)
+
+    // 3. 北側人行道（石板路，承載 4 間主攤位）
+    const sidewalkTex = makeSidewalkTexture()
+    const sidewalkMat = new THREE.MeshLambertMaterial({ map: sidewalkTex })
+    const curbMat = new THREE.MeshLambertMaterial({ color: PALETTE.curb })
+
+    const northSidewalk = new THREE.Mesh(new THREE.BoxGeometry(36, 0.1, 6.4), sidewalkMat)
+    northSidewalk.position.set(0, 0.04, -4.5)
+    northSidewalk.receiveShadow = true
+    this.scene.add(northSidewalk)
+
+    const northCurb = new THREE.Mesh(new THREE.BoxGeometry(36, 0.12, 0.24), curbMat)
+    northCurb.position.set(0, 0.05, -1.3)
+    northCurb.receiveShadow = true
+    this.scene.add(northCurb)
+
+    // 4. 南側人行道（街角服務台與路燈）
+    const southSidewalk = new THREE.Mesh(new THREE.BoxGeometry(36, 0.1, 4.4), sidewalkMat)
+    southSidewalk.position.set(0, 0.04, 9.9)
+    southSidewalk.receiveShadow = true
+    this.scene.add(southSidewalk)
+
+    const southCurb = new THREE.Mesh(new THREE.BoxGeometry(36, 0.12, 0.24), curbMat)
+    southCurb.position.set(0, 0.05, 7.7)
+    southCurb.receiveShadow = true
+    this.scene.add(southCurb)
+
+    // 5. 遠景暗色地基（避免邊緣露空）
+    const outerBase = new THREE.Mesh(
+      new THREE.PlaneGeometry(90, 70),
+      new THREE.MeshLambertMaterial({ color: '#171522' }),
+    )
+    outerBase.rotation.x = -Math.PI / 2
+    outerBase.position.y = -0.02
+    this.scene.add(outerBase)
+  }
+
+  /** 後方深色低面數台灣公寓剪影與暖黃窗格 */
+  private buildApartmentSkyline(): void {
+    const buildings = [
+      { x: -16.5, z: -12.0, w: 6.4, h: 12.5, d: 5.0, color: '#181524' },
+      { x: -10.2, z: -12.6, w: 6.0, h: 15.2, d: 5.2, color: '#1d1a2c' },
+      { x: -3.6, z: -11.8, w: 6.6, h: 11.4, d: 4.8, color: '#161422' },
+      { x: 3.2, z: -12.8, w: 6.4, h: 16.0, d: 5.4, color: '#1f1c30' },
+      { x: 9.8, z: -12.0, w: 6.0, h: 13.0, d: 4.8, color: '#181626' },
+      { x: 16.2, z: -12.4, w: 6.2, h: 14.2, d: 5.0, color: '#1b182a' },
+    ]
+
+    const windowLitMat = new THREE.MeshStandardMaterial({
+      color: PALETTE.windowWarm,
+      emissive: PALETTE.windowWarm,
+      emissiveIntensity: 1.45,
+      roughness: 0.4,
+    })
+    const windowDimMat = new THREE.MeshLambertMaterial({ color: '#272338' })
+    const tankMat = new THREE.MeshLambertMaterial({ color: '#39374c' })
+
+    buildings.forEach((b, bIdx) => {
+      const group = new THREE.Group()
+      group.position.set(b.x, 0, b.z)
+
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(b.w, b.h, b.d),
+        new THREE.MeshLambertMaterial({ color: b.color }),
+      )
+      body.position.y = b.h / 2
+      group.add(body)
+
+      // 頂樓女兒牆與台式水塔剪影
+      const roofRim = new THREE.Mesh(
+        new THREE.BoxGeometry(b.w + 0.2, 0.35, b.d + 0.2),
+        new THREE.MeshLambertMaterial({ color: '#252136' }),
+      )
+      roofRim.position.y = b.h + 0.15
+      group.add(roofRim)
+
+      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 8), tankMat)
+      tank.position.set(-b.w * 0.25, b.h + 0.85, 0.4)
+      group.add(tank)
+
+      // 公寓暖黃窗格（交錯點亮，營造台灣夜色生活感）
+      const cols = 3
+      const rows = Math.floor((b.h - 3.2) / 2.1)
+      for (let r = 0; r < rows; r += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          const lit = ((bIdx * 7 + r * 5 + c * 3) % 5) < 2
+          const win = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.95, 1.15),
+            lit ? windowLitMat : windowDimMat,
+          )
+          win.position.set(
+            (c - 1) * (b.w * 0.28),
+            3.4 + r * 2.05,
+            b.d / 2 + 0.04,
+          )
+          group.add(win)
+        }
+      }
+
+      this.scene.add(group)
+    })
+  }
+
+  /** 建立單一獨立台式雨夜市集攤位 */
+  private buildStall(spec: StallSpec): void {
+    const group = new THREE.Group()
+    group.position.set(spec.x, 0.08, spec.z)
+    group.rotation.y = spec.rotY
+
+    const isInfo = spec.style === 'info'
+    const width = isInfo ? 3.2 : 4.5
+    const depth = isInfo ? 2.2 : 2.9
+    const height = isInfo ? 2.5 : 2.95
+
+    const woodMat = new THREE.MeshLambertMaterial({ color: PALETTE.wood })
+    const woodDarkMat = new THREE.MeshLambertMaterial({ color: PALETTE.woodDark })
+    const metalMat = new THREE.MeshLambertMaterial({
+      color: spec.style === 'consultation' ? PALETTE.metalRoofRust : PALETTE.metalRoof,
+      flatShading: true,
+    })
+
+    // 1. 攤位底台與四根木柱
+    const base = new THREE.Mesh(new THREE.BoxGeometry(width + 0.2, 0.14, depth + 0.2), woodDarkMat)
+    base.position.y = 0.07
+    base.receiveShadow = true
+    group.add(base)
+
+    const postGeo = new THREE.BoxGeometry(0.16, height, 0.16)
+    for (const [px, pz] of [
+      [-width / 2 + 0.12, -depth / 2 + 0.12],
+      [width / 2 - 0.12, -depth / 2 + 0.12],
+      [-width / 2 + 0.12, depth / 2 - 0.12],
+      [width / 2 - 0.12, depth / 2 - 0.12],
+    ]) {
+      const post = new THREE.Mesh(postGeo, woodDarkMat)
+      post.position.set(px, height / 2, pz)
+      post.castShadow = true
+      group.add(post)
+    }
+
+    // 2. 後牆與側牆
+    const backWallColor =
+      spec.style === 'reiki' ? '#243540' : spec.style === 'tarot' ? '#2b1b3d' : spec.style === 'ziwei' ? '#361f2d' : '#3a2b24'
+    const wallMat = new THREE.MeshLambertMaterial({ color: backWallColor })
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(width - 0.12, height - 0.1, 0.16), wallMat)
+    backWall.position.set(0, height / 2, -depth / 2 + 0.1)
+    backWall.castShadow = true
+    backWall.receiveShadow = true
+    group.add(backWall)
+
+    for (const side of [-1, 1]) {
+      const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.14, height - 0.1, depth - 0.2), wallMat)
+      sideWall.position.set(side * (width / 2 - 0.08), height / 2, 0)
+      sideWall.castShadow = true
+      group.add(sideWall)
+    }
+
+    // 3. 台式斜坡浪板鐵皮屋頂（Low-Poly 條紋波浪板）
+    const roofGroup = new THREE.Group()
+    roofGroup.position.set(0, height + 0.18, 0.15)
+    roofGroup.rotation.x = 0.16
+    const roofPlate = new THREE.Mesh(new THREE.BoxGeometry(width + 0.65, 0.12, depth + 0.9), metalMat)
+    roofPlate.castShadow = true
+    roofGroup.add(roofPlate)
+    // 鐵皮浪板凸條
+    const ridgeCount = isInfo ? 7 : 10
+    for (let i = 0; i < ridgeCount; i += 1) {
+      const rx = -width / 2 - 0.15 + (i / (ridgeCount - 1)) * (width + 0.3)
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, depth + 0.88), metalMat)
+      ridge.position.set(rx, 0.08, 0)
+      roofGroup.add(ridge)
+    }
+    group.add(roofGroup)
+
+    // 4. 屋頂上方發光霓虹／燈箱招牌（CanvasTexture 繁體中文 + 英文）
+    const signTex = makeNeonSignTexture(spec.signZh, spec.signEn, spec.style)
+    const baseEmissive = spec.style === 'consultation' ? 0.92 : 1.18
+    const signMat = new THREE.MeshStandardMaterial({
+      map: signTex,
+      emissiveMap: signTex,
+      emissive: new THREE.Color('#ffffff'),
+      emissiveIntensity: baseEmissive,
+      roughness: 0.32,
+      metalness: 0.08,
+    })
+    const signFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(width - 0.3, 1.05, 0.24),
+      new THREE.MeshLambertMaterial({ color: '#1b1924' }),
+    )
+    signFrame.position.set(0, height + 0.92, depth / 2 - 0.05)
+    signFrame.castShadow = true
+    group.add(signFrame)
+
+    const signFace = new THREE.Mesh(new THREE.PlaneGeometry(width - 0.44, 0.94), signMat)
+    signFace.position.set(0, height + 0.92, depth / 2 + 0.08)
+    group.add(signFace)
+
+    // 招牌霓虹柔光光暈（置於招牌後方，維持繁體中英文字體銳利清晰）
+    const haloTex = makeGlowHaloTexture(spec.accentHex)
+    const haloMat = new THREE.SpriteMaterial({
+      map: haloTex,
+      transparent: true,
+      opacity: 0.28,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+    const halo = new THREE.Sprite(haloMat)
+    halo.position.set(0, height + 0.92, depth / 2 - 0.22)
+    halo.scale.set(width + 1.6, 2.5, 1)
+    group.add(halo)
+
+    // 5. 各攤位專屬台式特色裝潢與道具
+    this.decorateStallByStyle(group, spec, width, depth, height, woodMat, woodDarkMat)
+
+    // 6. 攤位專屬暖色／霓虹點光源（照亮雨夜濕潤街道）
+    const lightIntensity = spec.style === 'reiki' ? 4.4 : 4.0
+    const stallLight = new THREE.PointLight(spec.accentHex, lightIntensity, 9.5, 1.7)
+    stallLight.position.set(0, height - 0.2, depth / 2 + 0.85)
+    group.add(stallLight)
+
+    // 7. 濕潤柏油路上的霓虹倒影貼花
+    const puddleRefMat = new THREE.MeshBasicMaterial({
+      map: haloTex,
+      transparent: true,
+      opacity: 0.24,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+    const puddleRef = new THREE.Mesh(new THREE.PlaneGeometry(width * 1.15, 3.6), puddleRefMat)
+    puddleRef.rotation.x = -Math.PI / 2
+    puddleRef.position.set(0, 0.014, depth / 2 + 2.35)
+    group.add(puddleRef)
+
+    this.scene.add(group)
+
+    // 8. 物理碰撞體（防止角色穿過攤位）
+    this.physics.addStaticBox(
+      new THREE.Vector3(spec.x, height / 2, spec.z),
+      new THREE.Vector3(width + 0.2, height, depth + 0.2),
+    )
+
+    // 9. 點擊熱區（Hotspot）與地面互動高亮環
+    const hotspot = new THREE.Mesh(
+      new THREE.BoxGeometry(width + 0.4, height + 1.6, depth + 0.8),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    )
+    hotspot.position.set(spec.x, (height + 1.6) / 2, spec.z)
+    hotspot.userData.marketPointId = spec.id
+    this.scene.add(hotspot)
+    this.hotspotMeshes.push(hotspot)
+
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: spec.accentHex,
+      transparent: true,
+      opacity: 0.34,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.68, 0.88, 28), ringMat)
+    ring.rotation.x = -Math.PI / 2
+    ring.position.set(spec.interactX, 0.025, spec.interactZ)
+    this.scene.add(ring)
+
+    this.visualRefs.set(spec.id, {
+      id: spec.id,
+      signMaterial: signMat,
+      baseEmissiveIntensity: baseEmissive,
+      ring,
+      ringMaterial: ringMat,
+      glowHalo: halo,
+      baseHaloOpacity: 0.42,
+      pointLight: stallLight,
+      baseLightIntensity: lightIntensity,
+    })
+  }
+
+  /** 為每間攤位打造專屬的低面數家具、燈籠、玻璃門面、布簾或水晶球 */
+  private decorateStallByStyle(
+    group: THREE.Group,
+    spec: StallSpec,
+    width: number,
+    depth: number,
+    height: number,
+    woodMat: THREE.MeshLambertMaterial,
+    woodDarkMat: THREE.MeshLambertMaterial,
+  ): void {
+    // 共用木櫃台／占卜桌
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(width - 0.9, 0.86, 0.78), woodMat)
+    counter.position.set(0, 0.48, depth / 2 - 0.52)
+    counter.castShadow = true
+    counter.receiveShadow = true
+    group.add(counter)
+
+    if (spec.style === 'ziwei') {
+      // 紫微斗數：兩盞垂掛暖紅燈籠 + 捲軸古籍 + 暖黃檯燈
+      for (const sx of [-width / 2 + 0.5, width / 2 - 0.5]) {
+        const lantern = this.createLantern(PALETTE.lanternRed, 0.26, 0.38)
+        lantern.position.set(sx, height - 0.38, depth / 2 + 0.16)
+        group.add(lantern)
+        this.swayingLanterns.push({ group: lantern, phase: sx * 1.3, amp: 0.05 })
+      }
+      // 桌上的古籍與暖光小檯燈
+      const book = new THREE.Mesh(
+        new THREE.BoxGeometry(0.52, 0.09, 0.36),
+        new THREE.MeshLambertMaterial({ color: '#9c2d3a' }),
+      )
+      book.position.set(-0.65, 0.95, depth / 2 - 0.5)
+      book.rotation.y = 0.18
+      group.add(book)
+
+      const lampShade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.22, 0.24, 6),
+        new THREE.MeshStandardMaterial({
+          color: '#ffe39c',
+          emissive: '#ffbe55',
+          emissiveIntensity: 1.8,
+        }),
+      )
+      lampShade.position.set(0.85, 1.24, depth / 2 - 0.55)
+      group.add(lampShade)
+
+      // 攤前兩張紅色台式小板凳
+      group.add(this.createStool(-0.85, 0.24, depth / 2 + 0.55, PALETTE.stoolRed))
+      group.add(this.createStool(0.85, 0.24, depth / 2 + 0.55, PALETTE.stoolRed))
+    } else if (spec.style === 'reiki') {
+      // 靈氣療癒：玻璃門面 + 紫綠色柔和室內光
+      const glassMat = new THREE.MeshStandardMaterial({
+        color: '#8cf7dc',
+        emissive: '#47b89c',
+        emissiveIntensity: 0.45,
+        transparent: true,
+        opacity: 0.36,
+        roughness: 0.12,
+        metalness: 0.2,
+      })
+      const glassLeft = new THREE.Mesh(new THREE.BoxGeometry(1.55, height - 0.35, 0.08), glassMat)
+      glassLeft.position.set(-width / 2 + 0.92, height / 2, depth / 2 - 0.06)
+      group.add(glassLeft)
+
+      const glassRight = new THREE.Mesh(new THREE.BoxGeometry(1.55, height - 0.35, 0.08), glassMat)
+      glassRight.position.set(width / 2 - 0.92, height / 2, depth / 2 - 0.06)
+      group.add(glassRight)
+
+      // 室內紫綠柔和光壁板
+      const innerGlow = new THREE.Mesh(
+        new THREE.PlaneGeometry(width - 0.6, height - 0.5),
+        new THREE.MeshStandardMaterial({
+          color: '#8e74e8',
+          emissive: '#6ef2c4',
+          emissiveIntensity: 1.15,
+          transparent: true,
+          opacity: 0.68,
+        }),
+      )
+      innerGlow.position.set(0, height / 2, -depth / 2 + 0.22)
+      group.add(innerGlow)
+
+      // 門口盆栽
+      for (const sx of [-width / 2 + 0.35, width / 2 - 0.35]) {
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.16, 0.32, 7), woodDarkMat)
+        pot.position.set(sx, 0.22, depth / 2 + 0.35)
+        const plant = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.28, 0),
+          new THREE.MeshLambertMaterial({ color: '#3b8c6e', flatShading: true }),
+        )
+        plant.position.set(sx, 0.52, depth / 2 + 0.35)
+        group.add(pot, plant)
+      }
+    } else if (spec.style === 'tarot') {
+      // 塔羅占卜：深紫色布簾 + 桌上發光水晶球 + 塔羅牌桌巾
+      const curtainMat = new THREE.MeshLambertMaterial({ color: '#3e1e5c', flatShading: true })
+      for (const side of [-1, 1]) {
+        const curtain = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.44, height - 0.2, 6), curtainMat)
+        curtain.position.set(side * (width / 2 - 0.48), height / 2, depth / 2 - 0.14)
+        curtain.scale.set(1.1, 1, 0.45)
+        group.add(curtain)
+      }
+      const valance = new THREE.Mesh(new THREE.BoxGeometry(width - 0.3, 0.36, 0.22), curtainMat)
+      valance.position.set(0, height - 0.24, depth / 2 - 0.1)
+      group.add(valance)
+
+      // 深紫桌巾
+      const cloth = new THREE.Mesh(
+        new THREE.BoxGeometry(width - 0.8, 0.08, 0.86),
+        new THREE.MeshLambertMaterial({ color: '#4c2670' }),
+      )
+      cloth.position.set(0, 0.92, depth / 2 - 0.52)
+      group.add(cloth)
+
+      // 桌上發光水晶球
+      const crystalStand = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.14, 0.2, 0.14, 8),
+        new THREE.MeshLambertMaterial({ color: PALETTE.neonGold }),
+      )
+      crystalStand.position.set(0, 1.02, depth / 2 - 0.48)
+      group.add(crystalStand)
+
+      const crystal = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.24, 1),
+        new THREE.MeshStandardMaterial({
+          color: '#e5dcff',
+          emissive: '#9f82ff',
+          emissiveIntensity: 2.2,
+          roughness: 0.15,
+        }),
+      )
+      crystal.position.set(0, 1.32, depth / 2 - 0.48)
+      group.add(crystal)
+      this.crystalBall = crystal
+
+      const cHalo = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeGlowHaloTexture('#b89aff'),
+          transparent: true,
+          opacity: 0.72,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        }),
+      )
+      cHalo.position.set(0, 1.32, depth / 2 - 0.42)
+      cHalo.scale.set(1.15, 1.15, 1)
+      group.add(cHalo)
+      this.crystalHalo = cHalo
+
+      // 兩張木質小圓凳
+      group.add(this.createStool(-0.75, 0.24, depth / 2 + 0.55, PALETTE.woodLight))
+      group.add(this.createStool(0.75, 0.24, depth / 2 + 0.55, PALETTE.woodLight))
+    } else if (spec.style === 'consultation') {
+      // 問事／心靈諮詢：傳統暖黃吊燈 + 茶壺與象棋盤 + 台式小板凳
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 8, 8),
+        new THREE.MeshStandardMaterial({
+          color: '#fff3c4',
+          emissive: '#ffc94d',
+          emissiveIntensity: 2.0,
+        }),
+      )
+      bulb.position.set(0, height - 0.48, depth / 2 - 0.3)
+      group.add(bulb)
+
+      // 側掛傳統暖黃小直式燈箱
+      const sideBox = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.95, 0.42),
+        new THREE.MeshStandardMaterial({
+          color: '#ffe082',
+          emissive: '#ffbf3f',
+          emissiveIntensity: 1.5,
+        }),
+      )
+      sideBox.position.set(width / 2 + 0.18, height - 0.4, depth / 2 - 0.2)
+      group.add(sideBox)
+
+      // 桌上茶壺與棋盤
+      const board = new THREE.Mesh(
+        new THREE.BoxGeometry(0.68, 0.06, 0.5),
+        new THREE.MeshLambertMaterial({ color: '#c48f56' }),
+      )
+      board.position.set(-0.3, 0.94, depth / 2 - 0.5)
+      const teapot = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.14, 0.16, 7),
+        new THREE.MeshLambertMaterial({ color: '#8a3928' }),
+      )
+      teapot.position.set(0.65, 1.0, depth / 2 - 0.52)
+      group.add(board, teapot)
+
+      group.add(this.createStool(-0.85, 0.24, depth / 2 + 0.55, PALETTE.stoolBlue))
+      group.add(this.createStool(0.85, 0.24, depth / 2 + 0.55, PALETTE.stoolRed))
+    } else {
+      // 市集服務台：藍白小檯燈
+      const deskLamp = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.16, 0.24, 7),
+        new THREE.MeshStandardMaterial({
+          color: '#d6f0ff',
+          emissive: '#6ec4ff',
+          emissiveIntensity: 1.6,
+        }),
+      )
+      deskLamp.position.set(0, 1.04, depth / 2 - 0.5)
+      group.add(deskLamp)
+    }
+  }
+
+  /** 街口「返回天心宮」傳統燈籠霓虹牌樓 */
+  private buildReturnArch(): void {
+    const pos = this.returnPoint.position
+    const group = new THREE.Group()
+    group.position.set(pos.x, 0.06, pos.z)
+    group.rotation.y = Math.PI / 5
+
+    const pillarMat = new THREE.MeshLambertMaterial({ color: '#7a2520' })
+    for (const sx of [-1.45, 1.45]) {
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 3.4, 8), pillarMat)
+      pillar.position.set(sx, 1.7, 0)
+      pillar.castShadow = true
+      group.add(pillar)
+
+      const lantern = this.createLantern(PALETTE.lanternRed, 0.24, 0.36)
+      lantern.position.set(sx, 2.85, 0.34)
+      group.add(lantern)
+      this.swayingLanterns.push({ group: lantern, phase: sx * 2.1, amp: 0.06 })
+    }
+
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.26, 0.32), pillarMat)
+    beam.position.y = 3.35
+    group.add(beam)
+
+    const signTex = makeNeonSignTexture('返回天心宮', 'Back to Temple', 'return')
+    const signMat = new THREE.MeshStandardMaterial({
+      map: signTex,
+      emissiveMap: signTex,
+      emissive: new THREE.Color('#ffffff'),
+      emissiveIntensity: 1.65,
+      roughness: 0.3,
+    })
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.85, 0.18), signMat)
+    sign.position.set(0, 3.85, 0)
+    group.add(sign)
+
+    const archLight = new THREE.PointLight('#ff9a52', 3.4, 8.5, 1.8)
+    archLight.position.set(0, 2.8, 0.5)
+    group.add(archLight)
+
+    this.scene.add(group)
+
+    // 點擊熱區與地面互動環
+    const hotspot = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4, 4.4, 1.6),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    )
+    hotspot.position.set(pos.x, 2.2, pos.z)
+    hotspot.rotation.y = Math.PI / 5
+    hotspot.userData.marketPointId = 'return-temple'
+    this.scene.add(hotspot)
+    this.hotspotMeshes.push(hotspot)
+
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: '#ffcf66',
+      transparent: true,
+      opacity: 0.42,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.98, 28), ringMat)
+    ring.rotation.x = -Math.PI / 2
+    ring.position.set(pos.x, 0.025, pos.z)
+    this.scene.add(ring)
+
+    this.visualRefs.set('return-temple', {
+      id: 'return-temple',
+      signMaterial: signMat,
+      baseEmissiveIntensity: 1.65,
+      ring,
+      ringMaterial: ringMat,
+      baseHaloOpacity: 0.4,
+      pointLight: archLight,
+      baseLightIntensity: 3.4,
+    })
+  }
+
+  /** 街道低面數細節：電線桿、垂弧電線、復古紅燈籠串、三角錐、小板凳 */
+  private buildStreetDetails(): void {
+    const poleMat = new THREE.MeshLambertMaterial({ color: PALETTE.poleConcrete })
+    const bulbMat = new THREE.MeshStandardMaterial({
+      color: '#ffebb5',
+      emissive: '#ffcb6b',
+      emissiveIntensity: 2.1,
+    })
+    const polePositions: [number, number][] = [
+      [-13.8, -1.6],
+      [0.0, -1.6],
+      [13.8, -1.6],
+      [-6.5, 8.1],
+      [6.5, 8.1],
+    ]
+
+    const poleTops: THREE.Vector3[] = []
+    for (const [px, pz] of polePositions) {
+      const poleGroup = new THREE.Group()
+      poleGroup.position.set(px, 0, pz)
+
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 6.8, 7), poleMat)
+      pole.position.y = 3.4
+      pole.castShadow = true
+      poleGroup.add(pole)
+
+      const crossBar = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.1, 0.1), poleMat)
+      crossBar.position.set(0, 6.2, 0)
+      poleGroup.add(crossBar)
+
+      // 路燈燈臂與暖黃路燈
+      const armDir = pz < 0 ? 1 : -1
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 1.15), poleMat)
+      arm.position.set(0, 5.4, armDir * 0.55)
+      poleGroup.add(arm)
+
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.1, 0.42), bulbMat)
+      lamp.position.set(0, 5.32, armDir * 1.05)
+      poleGroup.add(lamp)
+
+      const streetLight = new THREE.PointLight('#ffd285', 2.4, 11.5, 1.8)
+      streetLight.position.set(0, 5.0, armDir * 1.05)
+      poleGroup.add(streetLight)
+
+      this.scene.add(poleGroup)
+      poleTops.push(new THREE.Vector3(px, 6.2, pz))
+      this.physics.addStaticCylinder(new THREE.Vector3(px, 1.4, pz), 0.28, 2.8)
+    }
+
+    // 垂弧黑色電線連接電線桿
+    const wireMat = new THREE.LineBasicMaterial({ color: '#110f1a' })
+    const wirePairs: [number, number][] = [
+      [0, 1],
+      [1, 2],
+      [0, 3],
+      [1, 3],
+      [1, 4],
+      [2, 4],
+      [3, 4],
+    ]
+    for (const [a, b] of wirePairs) {
+      const start = poleTops[a]
+      const end = poleTops[b]
+      const mid = start.clone().lerp(end, 0.5)
+      mid.y -= 0.72
+      const curve = new THREE.QuadraticBezierCurve3(start, mid, end)
+      const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(16))
+      this.scene.add(new THREE.Line(geo, wireMat))
+    }
+
+    // 跨街復古紅燈籠串
+    const lanternSpan = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(-13.8, 5.0, -1.6),
+      new THREE.Vector3(0, 4.15, -1.6),
+      new THREE.Vector3(13.8, 5.0, -1.6),
+    )
+    this.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lanternSpan.getPoints(20)), wireMat))
+    for (let i = 1; i <= 9; i += 1) {
+      const p = lanternSpan.getPoint(i / 10)
+      const lantern = this.createLantern(PALETTE.lanternRed, 0.2, 0.3)
+      lantern.position.set(p.x, p.y - 0.18, p.z)
+      this.scene.add(lantern)
+      this.swayingLanterns.push({ group: lantern, phase: i * 0.75, amp: 0.065 })
+    }
+
+    // 路邊橘白反光三角錐（Traffic Cones）
+    const conePositions: [number, number][] = [
+      [-13.0, -0.75],
+      [-6.4, -0.85],
+      [6.4, -0.85],
+      [13.4, -0.75],
+      [-4.2, 7.25],
+      [8.2, 7.25],
+    ]
+    for (const [cx, cz] of conePositions) {
+      this.scene.add(this.createTrafficCone(cx, cz))
+    }
+
+    // 街角散落的台式塑膠小板凳
+    this.scene.add(this.createStool(-5.8, 0.24, 8.6, PALETTE.stoolRed))
+    this.scene.add(this.createStool(-5.1, 0.24, 8.9, PALETTE.stoolBlue))
+    this.scene.add(this.createStool(5.4, 0.24, 8.7, PALETTE.stoolRed))
+  }
+
+  private createLantern(colorHex: string, radius: number, height: number): THREE.Group {
+    const g = new THREE.Group()
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.72, radius * 0.72, height, 8),
+      new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 1.9,
+        roughness: 0.45,
+      }),
+    )
+    const capMat = new THREE.MeshLambertMaterial({ color: '#1b1414' })
+    const topCap = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.5, radius * 0.65, 0.06, 8), capMat)
+    topCap.position.y = height / 2 + 0.02
+    const botCap = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.6, radius * 0.45, 0.06, 8), capMat)
+    botCap.position.y = -height / 2 - 0.02
+    const tassel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.04, 0.16, 5),
+      new THREE.MeshLambertMaterial({ color: PALETTE.neonGold }),
+    )
+    tassel.position.y = -height / 2 - 0.12
+    g.add(body, topCap, botCap, tassel)
+    return g
+  }
+
+  private createStool(x: number, y: number, z: number, colorHex: string): THREE.Group {
+    const g = new THREE.Group()
+    g.position.set(x, y, z)
+    const mat = new THREE.MeshLambertMaterial({ color: colorHex, flatShading: true })
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.07, 0.38), mat)
+    seat.position.y = 0.2
+    seat.castShadow = true
+    g.add(seat)
+    const legGeo = new THREE.BoxGeometry(0.06, 0.4, 0.06)
+    for (const [lx, lz] of [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.14], [0.14, 0.14]]) {
+      const leg = new THREE.Mesh(legGeo, mat)
+      leg.position.set(lx, 0, lz)
+      g.add(leg)
+    }
+    return g
+  }
+
+  private createTrafficCone(x: number, z: number): THREE.Group {
+    const g = new THREE.Group()
+    g.position.set(x, 0.02, z)
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(0.38, 0.05, 0.38),
+      new THREE.MeshLambertMaterial({ color: '#1b1924' }),
+    )
+    base.position.y = 0.025
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.56, 7),
+      new THREE.MeshLambertMaterial({ color: PALETTE.coneOrange, flatShading: true }),
+    )
+    cone.position.y = 0.32
+    cone.castShadow = true
+    const stripe = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.085, 0.115, 0.12, 7),
+      new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        emissive: '#e8e8ff',
+        emissiveIntensity: 0.55,
+      }),
+    )
+    stripe.position.y = 0.34
+    g.add(base, cone, stripe)
+    return g
+  }
+
+  /** 微弱細雨粒子與地面雨滴漣漪特效 */
+  private buildRainSystem(): void {
+    this.rainPositions = new Float32Array(this.rainCount * 2 * 3)
+    for (let i = 0; i < this.rainCount; i += 1) {
+      const x = (Math.random() - 0.5) * 38
+      const y = Math.random() * 14 + 0.5
+      const z = (Math.random() - 0.5) * 24 + 1
+      const idx = i * 6
+      this.rainPositions[idx] = x
+      this.rainPositions[idx + 1] = y
+      this.rainPositions[idx + 2] = z
+      this.rainPositions[idx + 3] = x - 0.06
+      this.rainPositions[idx + 4] = y - 0.52
+      this.rainPositions[idx + 5] = z + 0.03
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(this.rainPositions, 3))
+    const mat = new THREE.LineBasicMaterial({
+      color: '#b8c4ff',
+      transparent: true,
+      opacity: 0.26,
+      depthWrite: false,
+    })
+    this.rainLines = new THREE.LineSegments(geo, mat)
+    this.scene.add(this.rainLines)
+
+    // 柏油路微弱雨滴擴散漣漪
+    const rippleGeo = new THREE.RingGeometry(0.04, 0.08, 12)
+    for (let i = 0; i < 16; i += 1) {
+      const rMat = new THREE.MeshBasicMaterial({
+        color: '#a9b8ff',
+        transparent: true,
+        opacity: 0.22,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+      const rMesh = new THREE.Mesh(rippleGeo, rMat)
+      rMesh.rotation.x = -Math.PI / 2
+      rMesh.position.set((Math.random() - 0.5) * 28, 0.018, (Math.random() - 0.1) * 7.5)
+      this.scene.add(rMesh)
+      this.rainRipples.push({
+        mesh: rMesh,
+        mat: rMat,
+        phase: Math.random(),
+        speed: 0.8 + Math.random() * 0.6,
+      })
+    }
+  }
+
+  /** 點擊地面移動的霓虹目標游標 */
+  private buildGroundCursor(): void {
+    this.groundCursor = new THREE.Group()
+    this.groundCursor.visible = false
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: PALETTE.neonReiki,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    this.groundCursorRing = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.42, 24), ringMat)
+    this.groundCursorRing.rotation.x = -Math.PI / 2
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.11, 16),
+      new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, depthWrite: false }),
+    )
+    dot.rotation.x = -Math.PI / 2
+    dot.position.y = 0.01
+    this.groundCursor.add(this.groundCursorRing, dot)
+    this.scene.add(this.groundCursor)
+  }
+
+  /** 低面數 Q 版幾何佔位角色（預留 loadCharacterModel 替換 GLTF 模型） */
+  private buildChibiAvatar(): void {
+    // 腳底柔和陰影圓盤
     const shadow = new THREE.Mesh(
-      new THREE.CircleGeometry(0.48, 16),
-      new THREE.MeshBasicMaterial({ color: '#263626', transparent: true, opacity: 0.38, depthWrite: false }),
+      new THREE.CircleGeometry(0.42, 16),
+      new THREE.MeshBasicMaterial({ color: '#090710', transparent: true, opacity: 0.45, depthWrite: false }),
     )
     shadow.rotation.x = -Math.PI / 2
-    shadow.position.y = 0.09
-    const mat = new THREE.SpriteMaterial({
-      map: this.avatarFrames[0],
-      transparent: true,
-      alphaTest: 0.08,
-      depthWrite: true,
-    })
-    this.avatarSprite = new THREE.Sprite(mat)
-    this.avatarSprite.position.y = 0.96
-    this.avatarSprite.scale.set(1.36, 1.82, 1)
+    shadow.position.y = 0.02
+    this.avatar.add(shadow)
 
-    const nameTag = roNameTagSprite('靈光旅人')
-    nameTag.position.y = 2.08
-    nameTag.scale.set(1.9, 0.42, 1)
+    const bodyGroup = new THREE.Group()
+    const skinMat = new THREE.MeshLambertMaterial({ color: '#f7d3b5' })
+    const hairMat = new THREE.MeshLambertMaterial({ color: '#2b2236', flatShading: true })
+    const coatMat = new THREE.MeshLambertMaterial({ color: '#3b6d96', flatShading: true })
+    const scarfMat = new THREE.MeshLambertMaterial({ color: '#f2b857' })
+    const bootMat = new THREE.MeshLambertMaterial({ color: '#2d242a' })
+    const eyeMat = new THREE.MeshBasicMaterial({ color: '#1b1520' })
 
-    this.avatar.add(shadow, this.avatarSprite, nameTag)
+    // 雙腳
+    const legGeo = new THREE.BoxGeometry(0.16, 0.34, 0.16)
+    const leftLeg = new THREE.Mesh(legGeo, bootMat)
+    leftLeg.position.set(-0.13, 0.17, 0)
+    leftLeg.castShadow = true
+    const rightLeg = new THREE.Mesh(legGeo, bootMat)
+    rightLeg.position.set(0.13, 0.17, 0)
+    rightLeg.castShadow = true
+    bodyGroup.add(leftLeg, rightLeg)
+
+    // 外套身體
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 0.58, 7), coatMat)
+    torso.position.y = 0.62
+    torso.castShadow = true
+    bodyGroup.add(torso)
+
+    // 暖黃圍巾
+    const scarf = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.27, 0.12, 8), scarfMat)
+    scarf.position.y = 0.9
+    bodyGroup.add(scarf)
+
+    // 雙手
+    const armGeo = new THREE.BoxGeometry(0.12, 0.34, 0.12)
+    const leftArm = new THREE.Mesh(armGeo, coatMat)
+    leftArm.position.set(-0.33, 0.66, 0)
+    leftArm.castShadow = true
+    const rightArm = new THREE.Mesh(armGeo, coatMat)
+    rightArm.position.set(0.33, 0.66, 0)
+    rightArm.castShadow = true
+    bodyGroup.add(leftArm, rightArm)
+
+    // Q 版大頭與髮型
+    const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.34, 1), skinMat)
+    head.position.y = 1.24
+    head.castShadow = true
+    bodyGroup.add(head)
+
+    const hair = new THREE.Mesh(new THREE.DodecahedronGeometry(0.36, 1), hairMat)
+    hair.position.set(0, 1.32, -0.05)
+    hair.scale.set(1.02, 0.88, 1.02)
+    bodyGroup.add(hair)
+
+    // 眼睛
+    const eyeGeo = new THREE.BoxGeometry(0.05, 0.07, 0.04)
+    const leftEye = new THREE.Mesh(eyeGeo, eyeMat)
+    leftEye.position.set(-0.11, 1.24, 0.31)
+    const rightEye = new THREE.Mesh(eyeGeo, eyeMat)
+    rightEye.position.set(0.11, 1.24, 0.31)
+    bodyGroup.add(leftEye, rightEye)
+
+    this.avatarBodyGroup = bodyGroup
+    this.avatarLeftLeg = leftLeg
+    this.avatarRightLeg = rightLeg
+    this.avatarLeftArm = leftArm
+    this.avatarRightArm = rightArm
+
+    this.avatarVisualRoot.add(bodyGroup)
+    this.avatar.add(this.avatarVisualRoot)
     this.scene.add(this.avatar)
   }
 
@@ -1352,103 +1488,88 @@ export class MarketWorld {
     return nearest
   }
 
-  update(dt: number, moveSpeed = 0, facingDirX = 0): void {
+  /** 每幀更新細雨粒子、燈籠微擺、水晶球脈動與角色走路動畫 */
+  update(dt: number, moveSpeed = 0, facingYaw?: number): void {
     this.time += dt
 
-    // 1. Player sprite 4-frame RO walk cycle & left/right flip
-    const isMoving = moveSpeed > 0.25
-    if (isMoving) {
-      this.avatarAnimTimer += dt * Math.min(11, 5.5 + moveSpeed * 0.9)
-      const nextFrame = Math.floor(this.avatarAnimTimer) % 4
-      if (nextFrame !== this.avatarFrameIndex) {
-        this.avatarFrameIndex = nextFrame
-        ;(this.avatarSprite.material as THREE.SpriteMaterial).map = this.avatarFrames[nextFrame]
-      }
-      this.avatarSprite.position.y = 0.96 + Math.abs(Math.sin(this.avatarAnimTimer * Math.PI * 0.5)) * 0.07
-    } else {
-      if (this.avatarFrameIndex !== 0) {
-        this.avatarFrameIndex = 0
-        ;(this.avatarSprite.material as THREE.SpriteMaterial).map = this.avatarFrames[0]
-      }
-      this.avatarSprite.position.y = 0.96 + Math.sin(this.time * 2.8) * 0.025
-    }
-    if (Math.abs(facingDirX) > 0.15) {
-      const sign = facingDirX < 0 ? -1 : 1
-      this.avatarSprite.scale.x = 1.36 * sign
+    // 1. Q 版角色走路循環與面向平滑轉向
+    const isMoving = moveSpeed > 0.2
+    if (facingYaw !== undefined && isMoving) {
+      const diff = Math.atan2(Math.sin(facingYaw - this.avatarYaw), Math.cos(facingYaw - this.avatarYaw))
+      this.avatarYaw += diff * Math.min(1, dt * 12)
+      this.avatarVisualRoot.rotation.y = this.avatarYaw
     }
 
-    // 2. RO ground click cursor pulse
+    if (!this.avatarHasCustomModel && this.avatarBodyGroup) {
+      if (isMoving) {
+        this.walkCycle += dt * Math.min(12, 6 + moveSpeed * 1.1)
+        const swing = Math.sin(this.walkCycle) * 0.55
+        if (this.avatarLeftLeg) this.avatarLeftLeg.rotation.x = swing
+        if (this.avatarRightLeg) this.avatarRightLeg.rotation.x = -swing
+        if (this.avatarLeftArm) this.avatarLeftArm.rotation.x = -swing * 0.8
+        if (this.avatarRightArm) this.avatarRightArm.rotation.x = swing * 0.8
+        this.avatarBodyGroup.position.y = Math.abs(Math.sin(this.walkCycle)) * 0.06
+      } else {
+        if (this.avatarLeftLeg) this.avatarLeftLeg.rotation.x *= 0.82
+        if (this.avatarRightLeg) this.avatarRightLeg.rotation.x *= 0.82
+        if (this.avatarLeftArm) this.avatarLeftArm.rotation.x *= 0.82
+        if (this.avatarRightArm) this.avatarRightArm.rotation.x *= 0.82
+        this.avatarBodyGroup.position.y = Math.sin(this.time * 2.5) * 0.02
+      }
+    }
+
+    // 2. 點擊地面游標脈動
     if (this.groundCursorActive) {
-      const s = 0.95 + Math.sin(this.time * 8) * 0.08
-      this.groundCursor.scale.set(s, s, 1)
+      const s = 0.92 + Math.sin(this.time * 7.5) * 0.1
+      this.groundCursorRing.scale.set(s, s, 1)
     }
 
-    // 3. RO Warp Portal spinning runes & glowing light column
-    for (const rune of this.warpCircles) {
-      rune.rotation.z = this.time * 1.15
-    }
-    const pulse = 1 + Math.sin(this.time * 3.2) * 0.08
-    for (const pillar of this.warpPillars) {
-      pillar.scale.set(pulse, 1, pulse)
-    }
-
-    // 4. Fountain expanding ripples
-    for (let i = 0; i < this.fountainRipples.length; i += 1) {
-      const prog = (this.time * 0.65 + i * 0.5) % 1
-      const scale = 0.55 + prog * 1.75
-      this.fountainRipples[i].scale.set(scale, scale, 1)
-      ;(this.fountainRipples[i].material as THREE.MeshBasicMaterial).opacity = (1 - prog) * 0.65
-    }
-
-    // 5. Floating themed stall props
-    for (const prop of this.floatingProps) {
-      prop.obj.rotation.y += dt * prop.spin
-      prop.obj.position.y = prop.baseY + Math.sin(this.time * 2.4 + prop.phase) * 0.08
-    }
-
-    // 6. Venue NPCs idle breathing & periodic RO emote bubbles
-    for (const npc of this.animatedNpcs) {
-      npc.sprite.position.y = npc.baseY + Math.sin(this.time * 2.6 + npc.phase) * 0.03
-      if (npc.emote && npc.emoteBaseY !== undefined) {
-        npc.emoteTimer -= dt
-        if (npc.emoteTimer <= -2.4) {
-          npc.emoteTimer = 5.5 + (Math.abs(Math.sin(this.time + npc.phase)) * 4)
-        }
-        const show = npc.emoteTimer <= 0
-        npc.emote.visible = show
-        if (show) {
-          npc.emote.position.y = npc.emoteBaseY + Math.sin(this.time * 6) * 0.06
-        }
+    // 3. 懸停攤位高亮環呼吸動畫
+    if (this.hoveredId) {
+      const ref = this.visualRefs.get(this.hoveredId)
+      if (ref) {
+        const pulse = 1.1 + Math.sin(this.time * 6.5) * 0.07
+        ref.ring.scale.setScalar(pulse)
       }
     }
 
-    // 7. Cute bouncing Aura Slimes (squash & stretch!)
-    for (const slime of this.auraSlimes) {
-      const ang = this.time * slime.speed + slime.phase
-      slime.group.position.x = slime.homeX + Math.cos(ang) * slime.radius
-      slime.group.position.z = slime.homeZ + Math.sin(ang) * slime.radius
-      const hop = Math.abs(Math.sin(this.time * 4.2 + slime.hopPhase))
-      slime.sprite.position.y = 0.42 + hop * 0.52
-      // Squish when landing, stretch when jumping
-      const stretchY = 0.72 + hop * 0.24
-      const squishX = 1.06 - hop * 0.16
-      slime.sprite.scale.set(squishX, stretchY, 1)
-      const shadowScale = 1 - hop * 0.35
-      slime.shadow.scale.set(shadowScale, shadowScale, 1)
+    // 4. 塔羅發光水晶球緩慢呼吸
+    if (this.crystalBall && this.crystalHalo) {
+      const pulse = 1 + Math.sin(this.time * 2.8) * 0.08
+      this.crystalBall.rotation.y += dt * 0.7
+      this.crystalHalo.scale.set(1.15 * pulse, 1.15 * pulse, 1)
     }
 
-    // 8. Strolling plaza visitors
-    for (const stroller of this.strollers) {
-      stroller.angle += dt * stroller.speed
-      stroller.group.position.x = Math.cos(stroller.angle) * stroller.orbitRadius
-      stroller.group.position.z = 1.1 + Math.sin(stroller.angle) * stroller.orbitRadius
-      stroller.sprite.position.y = 0.88 + Math.abs(Math.sin(this.time * 5.2 + stroller.bobPhase)) * 0.07
+    // 5. 復古紅燈籠微風搖曳
+    for (const item of this.swayingLanterns) {
+      item.group.rotation.z = Math.sin(this.time * 1.9 + item.phase) * item.amp
     }
 
-    // 9. Drifting clouds
-    for (const cloud of this.clouds) {
-      cloud.sprite.position.x += dt * cloud.speed
-      if (cloud.sprite.position.x > cloud.maxX) cloud.sprite.position.x = cloud.minX
+    // 6. 微弱細雨粒子下落
+    const fallSpeed = 12.5 * dt
+    const windDrift = -1.4 * dt
+    for (let i = 0; i < this.rainCount; i += 1) {
+      const idx = i * 6
+      let y = this.rainPositions[idx + 1] - fallSpeed
+      let x = this.rainPositions[idx] + windDrift
+      if (y < 0.1) {
+        y = 13.5 + Math.random() * 2.5
+        x = (Math.random() - 0.5) * 38
+      }
+      this.rainPositions[idx] = x
+      this.rainPositions[idx + 1] = y
+      this.rainPositions[idx + 3] = x - 0.06
+      this.rainPositions[idx + 4] = y - 0.52
+    }
+    const posAttr = this.rainLines.geometry.getAttribute('position') as THREE.BufferAttribute
+    posAttr.needsUpdate = true
+
+    // 7. 濕潤柏油路細雨漣漪
+    for (const r of this.rainRipples) {
+      r.phase = (r.phase + dt * r.speed) % 1
+      const s = 0.6 + r.phase * 2.4
+      r.mesh.scale.set(s, s, 1)
+      r.mat.opacity = (1 - r.phase) * 0.24
     }
   }
 }

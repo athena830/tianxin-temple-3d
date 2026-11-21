@@ -177,20 +177,20 @@ export class TempleUi {
       <div class="toast" hidden></div>
       <div class="market-ro-hud" hidden>
         <section class="ro-window ro-basic-info" aria-label="旅人狀態">
-          <header class="ro-win-bar"><span>✦ 天心靈光市集</span><small>中央廣場</small></header>
+          <header class="ro-win-bar"><span>✦ 天心靈光市集</span><small>雨夜霓虹街</small></header>
           <div class="ro-win-body">
-            <div class="ro-char-row"><b>靈光旅人</b><span>Lv.1 初心探索者</span></div>
+            <div class="ro-char-row"><b>靈光旅人</b><span>雨夜漫步模式</span></div>
             <div class="ro-stat-bar"><label>靜心</label><i><em style="width:100%"></em></i><span>100%</span></div>
             <div class="ro-stat-bar sp"><label>靈光</label><i><em style="width:100%"></em></i><span>100%</span></div>
           </div>
         </section>
         <section class="ro-window ro-mini-nav" aria-label="市集快速導覽">
-          <header class="ro-win-bar"><span>🗺 市集導覽</span><small>點擊走動</small></header>
+          <header class="ro-win-bar"><span>🏮 攤位導覽</span><small>點擊走動</small></header>
           <div class="ro-nav-grid">
-            <button type="button" data-act="market-walk" data-market-target="birth-chart-hall">命盤探索館</button>
-            <button type="button" data-act="market-walk" data-market-target="card-house">牌卡靈感屋</button>
-            <button type="button" data-act="market-walk" data-market-target="moon-meditation">月光靜心所</button>
-            <button type="button" data-act="market-walk" data-market-target="chess-guide">問事指引亭</button>
+            <button type="button" data-act="market-walk" data-market-target="birth-chart-hall">紫微斗數 Ziwei</button>
+            <button type="button" data-act="market-walk" data-market-target="moon-meditation">靈氣療癒 Reiki</button>
+            <button type="button" data-act="market-walk" data-market-target="card-house">塔羅占卜 Tarot</button>
+            <button type="button" data-act="market-walk" data-market-target="chess-guide">問事／心靈諮詢</button>
             <button type="button" data-act="market-walk" data-market-target="service-desk">市集服務台</button>
             <button type="button" class="ro-return" data-act="market-walk" data-market-target="return-temple">返回天心宮</button>
           </div>
