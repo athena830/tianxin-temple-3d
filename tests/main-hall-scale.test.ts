@@ -178,4 +178,24 @@ describe('main hall scale & collision avoidance', () => {
     })
     expect(indoorRoofMeshes).toBe(0)
   })
+
+  it('dynamically shifts Rear Hall (Lingxiao Palace) backwards at large scales (up to 2.0x) so its plaque and facade never overlap Main Hall deities', () => {
+    const physics = new Physics()
+    const world = new TempleWorld(physics)
+
+    for (const s of [1.0, 1.35, 1.6, 1.8, 2.0]) {
+      world.setMainHallScale(s)
+      const guanyinZ = world.getGuanyinStatueWorldPos().z
+      const mainHallZ = (world as any).mainHallZ as number
+      const mainHallBackWallZ = mainHallZ - 6.7 * s
+      const rearGroupZ = (world as any).rearHallGroup.position.z as number
+      const rearFrontFacadeZ = rearGroupZ + 6.78 // front of Lingxiao plaque
+      const rearLowerRoofFrontZ = rearGroupZ - 0.65 + 8.2 // front edge of lower roof
+
+      // Rear Hall front plaque & facade must always be strictly behind Main Hall back wall and Guanyin
+      expect(rearFrontFacadeZ).toBeLessThan(mainHallBackWallZ - 1.5)
+      expect(rearFrontFacadeZ).toBeLessThan(guanyinZ - 3.0)
+      expect(rearLowerRoofFrontZ).toBeLessThan(mainHallBackWallZ)
+    }
+  })
 })

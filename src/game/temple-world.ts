@@ -392,6 +392,8 @@ export class TempleWorld {
   private readonly roof = new THREE.Group()
   private readonly rearRoof = new THREE.Group()
   private mainHallGroup!: THREE.Group
+  private rearHallGroup!: THREE.Group
+  private readonly rearHallColliders: { collider: RAPIER.Collider; x: number; y: number; origZ: number }[] = []
   private mainHallScale = 1.35
   private mainHallZ = -7.28
   private mainHallColliders: RAPIER.Collider[] = []
@@ -663,10 +665,10 @@ export class TempleWorld {
     backCenter.receiveShadow = true
     hall.add(backCenter)
 
-    // Left & Right Outer Back Walls (左右外側背牆與寬闊連通御門，通道寬達 3.3 公尺、通高 4.25 公尺)
+    // Left & Right Outer Back Walls (左右外側背牆與寬闊連通御門，通道寬達 3.3 公尺、通高 4.25 公尺，上方背牆同樣通高 8.0m 封頂)
     for (const side of [-1, 1]) {
-      const outerWall = new THREE.Mesh(new THREE.BoxGeometry(2.2, 5.1, 0.6), makeMat('#543b2f'))
-      outerWall.position.set(side * 8.5, 2.55, -6.4)
+      const outerWall = new THREE.Mesh(new THREE.BoxGeometry(2.2, 8.0, 0.6), makeMat('#543b2f'))
+      outerWall.position.set(side * 8.5, 4.0, -6.4)
       outerWall.castShadow = true
       outerWall.receiveShadow = true
       hall.add(outerWall)
@@ -675,6 +677,13 @@ export class TempleWorld {
       const doorLintel = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.85, 0.6), redDark)
       doorLintel.position.set(side * 5.75, 4.68, -6.4)
       hall.add(doorLintel)
+
+      // Upper wall above door lintel up to y = 8.0m ceiling
+      const doorUpperWall = new THREE.Mesh(new THREE.BoxGeometry(3.3, 2.9, 0.6), makeMat('#543b2f'))
+      doorUpperWall.position.set(side * 5.75, 6.55, -6.4)
+      doorUpperWall.castShadow = true
+      doorUpperWall.receiveShadow = true
+      hall.add(doorUpperWall)
 
       // Front & Rear Door Plaques: 「通 天」 / 「達 地」
       const doorSignFront = new THREE.Mesh(
@@ -1155,8 +1164,17 @@ export class TempleWorld {
    */
   private addRearHall(): void {
     const rear = new THREE.Group()
+    this.rearHallGroup = rear
     rear.position.set(0, 0, -25.0)
     this.scene.add(rear)
+    const addRearBox = (pos: THREE.Vector3, size: THREE.Vector3) => {
+      const collider = this.physics.addStaticBox(pos, size)
+      this.rearHallColliders.push({ collider, x: pos.x, y: pos.y, origZ: pos.z })
+    }
+    const addRearCylinder = (pos: THREE.Vector3, radius: number, height: number) => {
+      const collider = this.physics.addStaticCylinder(pos, radius, height)
+      this.rearHallColliders.push({ collider, x: pos.x, y: pos.y, origZ: pos.z })
+    }
 
     const red = makeMat(C.vermilion)
     const redDark = makeMat('#792a20', 0.85)
@@ -1172,7 +1190,7 @@ export class TempleWorld {
     podium.position.set(0, 0.14, 0)
     podium.receiveShadow = true
     rear.add(podium)
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.14, -25.0), new THREE.Vector3(24.0, 0.28, 16.5))
+    addRearBox(new THREE.Vector3(0, 0.14, -25.0), new THREE.Vector3(24.0, 0.28, 16.5))
 
     // Courtyard Atrium Stone Paving & Seamless Connecting Covered Walkways (天井與左右連通穿堂迴廊，無障礙平整銜接)
     for (const side of [-1, 1]) {
@@ -1181,13 +1199,13 @@ export class TempleWorld {
       corridorFloor.position.set(side * 5.85, 0.14, 8.5)
       corridorFloor.receiveShadow = true
       rear.add(corridorFloor)
-      this.physics.addStaticBox(new THREE.Vector3(side * 5.85, 0.14, -16.5), new THREE.Vector3(3.6, 0.28, 1.2))
+      addRearBox(new THREE.Vector3(side * 5.85, 0.14, -16.5), new THREE.Vector3(3.6, 0.28, 1.2))
 
       // Walkway Pillars placed on outer edges in the courtyard (立柱位於天井通道外側，通道中央寬敞通暢，不侵入大殿)
       const cPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 4.4, 10), red)
       cPillar.position.set(side * 7.6, 2.2, 8.8)
       rear.add(cPillar)
-      this.physics.addStaticCylinder(new THREE.Vector3(side * 7.6, 2.2, 8.8 - 25.0), 0.22, 4.4)
+      addRearCylinder(new THREE.Vector3(side * 7.6, 2.2, 8.8 - 25.0), 0.22, 4.4)
 
       // Notice: Main Hall roof (depth 21.87m, extending back past z = -18.2m) and Rear Hall roof (reaching z = -15.75m)
       // already span and overlap seamlessly by over 2.4m above the walkway, so no intermediate miniature roof is needed
@@ -1238,13 +1256,13 @@ export class TempleWorld {
     step1.position.set(0, 0.07, 8.65)
     step1.receiveShadow = true
     rear.add(step1)
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.07, -16.35), new THREE.Vector3(9.2, 0.14, 0.8))
+    addRearBox(new THREE.Vector3(0, 0.07, -16.35), new THREE.Vector3(9.2, 0.14, 0.8))
 
     const step2 = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.14, 0.6), stonePlinth)
     step2.position.set(0, 0.21, 8.1)
     step2.receiveShadow = true
     rear.add(step2)
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.21, -16.9), new THREE.Vector3(8.6, 0.14, 0.6))
+    addRearBox(new THREE.Vector3(0, 0.21, -16.9), new THREE.Vector3(8.6, 0.14, 0.6))
 
     // White Stone Balustrade (僅配置於外側端緣，通道完全暢通無阻)
     for (const side of [-1, 1]) {
@@ -1269,7 +1287,7 @@ export class TempleWorld {
       col.position.set(x, 3.2, frontZ)
       col.castShadow = true
       rear.add(col)
-      this.physics.addStaticCylinder(new THREE.Vector3(x, 3.2, frontZ - 25.0), 0.44, 6.4)
+      addRearCylinder(new THREE.Vector3(x, 3.2, frontZ - 25.0), 0.44, 6.4)
       const colCap = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.22, 14), gold)
       colCap.position.set(x, 6.3, frontZ)
       rear.add(colCap)
@@ -1286,7 +1304,7 @@ export class TempleWorld {
       wallPanel.position.set(side * 7.8, 2.86, frontZ)
       wallPanel.castShadow = true
       rear.add(wallPanel)
-      this.physics.addStaticBox(new THREE.Vector3(side * 7.8, 2.86, frontZ - 25.0), new THREE.Vector3(6.8, 5.2, 0.4))
+      addRearBox(new THREE.Vector3(side * 7.8, 2.86, frontZ - 25.0), new THREE.Vector3(6.8, 5.2, 0.4))
 
       // Carved Gilded Window Screen (金雕花鳥連雲格扇窗)
       const windowScreen = new THREE.Mesh(
@@ -1366,7 +1384,7 @@ export class TempleWorld {
     backWall.position.set(0, 3.4, -7.8)
     backWall.castShadow = true
     rear.add(backWall)
-    this.physics.addStaticBox(new THREE.Vector3(0, 3.4, -32.8), new THREE.Vector3(23.2, 6.8, 0.65))
+    addRearBox(new THREE.Vector3(0, 3.4, -32.8), new THREE.Vector3(23.2, 6.8, 0.65))
 
     for (const side of [-1, 1]) {
       const sx = side * 11.6
@@ -1374,7 +1392,7 @@ export class TempleWorld {
       sideWall.position.set(sx, 3.4, -0.65)
       sideWall.castShadow = true
       rear.add(sideWall)
-      this.physics.addStaticBox(new THREE.Vector3(sx, 3.4, -25.65), new THREE.Vector3(0.65, 6.8, 14.5))
+      addRearBox(new THREE.Vector3(sx, 3.4, -25.65), new THREE.Vector3(0.65, 6.8, 14.5))
     }
 
     // 6. Inner Imperial Pillars (殿內四大通天金柱與金龍盤繞)
@@ -1384,7 +1402,7 @@ export class TempleWorld {
         inCol.position.set(x, 3.2, z)
         inCol.castShadow = true
         rear.add(inCol)
-        this.physics.addStaticCylinder(new THREE.Vector3(x, 3.2, z - 25.0), 0.46, 6.4)
+        addRearCylinder(new THREE.Vector3(x, 3.2, z - 25.0), 0.46, 6.4)
         const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.2, 14), gold)
         cap.position.set(x, 6.3, z)
         rear.add(cap)
@@ -1523,7 +1541,7 @@ export class TempleWorld {
     jadeAltar.castShadow = true
     jadeAltar.receiveShadow = true
     rear.add(jadeAltar)
-    this.physics.addStaticBox(new THREE.Vector3(0, 0.88, altarZ - 25.0), new THREE.Vector3(7.8, 1.25, 2.4))
+    addRearBox(new THREE.Vector3(0, 0.88, altarZ - 25.0), new THREE.Vector3(7.8, 1.25, 2.4))
 
     // Altar ritual props (大金香爐、雙燭台)
     const goldCenser = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, 0.6, 16), gold)
@@ -1559,11 +1577,11 @@ export class TempleWorld {
     caisson.add(caissonOuter, caissonRing1, caissonRing2, caissonBoss, caissonLight)
     rear.add(caisson)
 
-    // 10. Double-Eave Sweeping Imperial Roof (後殿重簷廡殿九脊頂: 下簷 26.8m x 18.5m, 上簷 20.8m x 13.5m, 高達 11.5m)
-    const lowerRoof = this.createRoof(26.8, 18.5, 6.6, 8.8)
-    lowerRoof.position.set(0, 0, -25.0)
-    const upperRoof = this.createRoof(20.8, 13.5, 8.6, 11.5)
-    upperRoof.position.set(0, 0, -25.0)
+    // 10. Double-Eave Sweeping Imperial Roof (後殿重簷廡殿九脊頂: 下簷 26.8m x 16.4m, 上簷 20.8m x 12.8m, 精準居中於殿體 z = -0.65)
+    const lowerRoof = this.createRoof(26.8, 16.4, 6.6, 8.8)
+    lowerRoof.position.set(0, 0, -25.65)
+    const upperRoof = this.createRoof(20.8, 12.8, 8.6, 11.5)
+    upperRoof.position.set(0, 0, -25.65)
     this.rearRoof.add(lowerRoof, upperRoof)
     this.scene.add(this.rearRoof)
   }
@@ -1694,8 +1712,8 @@ export class TempleWorld {
     this.scene.add(this.leftSideGroup, this.rightSideGroup)
     for (let x = -6; x <= 6; x += 3) {
       const paving = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.04, 1.15), makeMat('#a59479', 0.93))
-      paving.position.set(x, 0.035, -15.8)
-      this.scene.add(paving)
+      paving.position.set(x, 0.035, 9.2)
+      this.rearHallGroup.add(paving)
     }
   }
 
@@ -5163,6 +5181,26 @@ export class TempleWorld {
       const marker = this.markers.get('offerings')
       if (marker) marker.position.set(-2.25 * s, 0.09, this.mainHallZ - 3.05 * s)
     }
+
+    // 7. Dynamically shift Rear Hall (後殿凌霄寶殿) backwards when Main Hall scale expands (> 1.35x)
+    // so the Rear Hall facade, columns, roof, and plaque never penetrate or overlap the Main Hall sanctuary!
+    const rearShiftZ = Math.min(0, (this.mainHallZ - 8.4 * s) - (-18.62))
+    if (this.rearHallGroup) {
+      this.rearHallGroup.position.set(0, 0, -25.0 + rearShiftZ)
+    }
+    if (this.rearRoof) {
+      this.rearRoof.position.set(0, 0, rearShiftZ)
+    }
+    for (const rc of this.rearHallColliders) {
+      rc.collider.setTranslation({ x: rc.x, y: rc.y, z: rc.origZ + rearShiftZ })
+    }
+    const yuhuangPoint = this.points.find(p => p.id === 'yuhuang')
+    if (yuhuangPoint) {
+      yuhuangPoint.position.set(0, 0, -23.5 + rearShiftZ)
+      const marker = this.markers.get('yuhuang')
+      if (marker) marker.position.set(0, 0.09, -23.5 + rearShiftZ)
+    }
+    POINT_TARGETS[12] = [0, -30.2 + rearShiftZ]
   }
 
   private rebuildMainHallColliders(scale: number, hallZ: number): void {

@@ -11,7 +11,13 @@ execSync('node ./node_modules/vite/bin/vite.js build', { stdio: 'inherit' })
 
 console.log('[deploy] Syncing compiled assets to root assets/ for GitHub Pages main branch support...')
 mkdirSync(rootAssetsDir, { recursive: true })
-const distFiles = new Set(readdirSync(join(distDir, 'assets')))
+const distAssetsPath = join(distDir, 'assets')
+const distFilesList = readdirSync(distAssetsPath)
+const hashedEntry = distFilesList.find(f => /^index-[A-Za-z0-9_-]+\.js$/.test(f))
+if (hashedEntry) {
+  copyFileSync(join(distAssetsPath, hashedEntry), join(distAssetsPath, 'index.js'))
+}
+const distFiles = new Set(readdirSync(distAssetsPath))
 for (const existing of readdirSync(rootAssetsDir)) {
   if (existing === 'models' || existing === 'share') continue
   if (!distFiles.has(existing)) {
