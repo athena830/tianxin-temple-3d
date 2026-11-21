@@ -13,8 +13,9 @@ const RADIUS = 0.36
 const FOOT_OFFSET = HALF_HEIGHT + RADIUS
 const DEFAULT_AZIMUTH = 0.24 // 正交 2.5D 俯視角，完整呈現雨夜霓虹街道與四間獨立攤位
 const DEFAULT_ELEVATION = 0.68
-const MIN_ELEVATION = 0.32
-const MAX_ELEVATION = 1.12
+const EYE_LEVEL_ELEVATION = 0.06 // 正面平視攤位角度（水平直視攤位門面與招牌）
+const MIN_ELEVATION = 0.02 // 允許平視至近乎水平
+const MAX_ELEVATION = 1.20 // 允許高空俯視
 const CAMERA_DISTANCE = 28
 const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 
@@ -88,15 +89,37 @@ export class MarketGame {
     this.audio.play('chime')
   }
 
+  /** 切換為正面平視攤位角度（水平直視門面、招牌與道具） */
+  setEyeLevelView(): void {
+    this.targetAzimuth = 0.0
+    this.targetElevation = EYE_LEVEL_ELEVATION
+    this.zoom = 8.2
+  }
+
+  /** 切換為 2.5D 俯視全景角度 */
+  setOverview(): void {
+    this.targetAzimuth = DEFAULT_AZIMUTH
+    this.targetElevation = DEFAULT_ELEVATION
+    this.zoom = 10.6
+  }
+
+  /** 向上或向下微調俯仰角（radians，負值更平視，正值更俯視） */
+  tiltCamera(deltaRadians: number): void {
+    this.targetElevation = THREE.MathUtils.clamp(
+      this.targetElevation + deltaRadians,
+      MIN_ELEVATION,
+      MAX_ELEVATION,
+    )
+  }
+
   /** 360° 平滑旋轉市集視角（正值逆時針、負值順時針） */
   rotateCamera(deltaRadians: number): void {
     this.targetAzimuth += deltaRadians
   }
 
-  /** 重設市集視角至預設正交 2.5D 角度 */
+  /** 重設市集視角至預設俯視角度 */
   resetCamera(): void {
-    this.targetAzimuth = DEFAULT_AZIMUTH
-    this.targetElevation = DEFAULT_ELEVATION
+    this.setOverview()
   }
 
   startExplore(): void { this.mode = 'explore' }
@@ -306,7 +329,8 @@ export class MarketGame {
     this.azimuth += (this.targetAzimuth - this.azimuth) * smooth
     this.elevation += (this.targetElevation - this.elevation) * smooth
 
-    const target = new THREE.Vector3(feet.x, feet.y + 1.1, feet.z)
+    const targetY = THREE.MathUtils.lerp(feet.y + 1.45, feet.y + 1.05, Math.min(1, this.elevation / DEFAULT_ELEVATION))
+    const target = new THREE.Vector3(feet.x, targetY, feet.z)
     if (!this.cameraReady) {
       this.cameraTarget.copy(target)
       this.cameraReady = true

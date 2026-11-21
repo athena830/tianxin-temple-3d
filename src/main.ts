@@ -455,10 +455,11 @@ async function boot(): Promise<void> {
   window.addEventListener('market:camera', e => {
     if (sceneManager?.world !== 'market') return
     const market = sceneManager.current as MarketGame
-    const dir = (e as CustomEvent<string>).detail
-    if (dir === 'left') market.rotateCamera(-Math.PI / 4)
-    else if (dir === 'right') market.rotateCamera(Math.PI / 4)
-    else if (dir === 'reset') market.resetCamera()
+    const act = (e as CustomEvent<string>).detail
+    if (act === 'left') market.rotateCamera(-Math.PI / 4)
+    else if (act === 'right') market.rotateCamera(Math.PI / 4)
+    else if (act === 'reset' || act === 'overview') market.setOverview()
+    else if (act === 'eye-level') market.setEyeLevelView()
     audio.play('ui')
   })
   window.addEventListener('market:open-ziwei', () => {

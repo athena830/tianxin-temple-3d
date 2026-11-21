@@ -194,6 +194,10 @@ export class TempleUi {
             <button type="button" data-act="market-walk" data-market-target="service-desk">市集服務台</button>
             <button type="button" class="ro-return" data-act="market-walk" data-market-target="return-temple">返回天心宮</button>
           </div>
+          <div class="ro-nav-grid" style="padding-top:0;grid-template-columns:1fr 1fr;">
+            <button type="button" data-act="market-cam" data-market-cam="eye-level" style="border-color:#b84fba;background:linear-gradient(180deg,#fff2fd,#f6d4f3);color:#5d1c5b;font-weight:700;" title="切換為正面平視攤位視角">👁️ 平視攤位</button>
+            <button type="button" data-act="market-cam" data-market-cam="overview" style="border-color:#597ea6;background:linear-gradient(180deg,#ffffff,#e3eef9);color:#203b58;font-weight:700;" title="切換為 2.5D 俯視全景">🦅 俯視全景</button>
+          </div>
           <div class="ro-nav-grid" style="padding-top:0;grid-template-columns:1fr 1fr 1fr;">
             <button type="button" data-act="market-cam" data-market-cam="left" title="向左旋轉視角">↺ 左轉</button>
             <button type="button" data-act="market-cam" data-market-cam="reset" title="重設視角">◎ 重設</button>
@@ -268,7 +272,7 @@ export class TempleUi {
     const roHud = this.root.querySelector<HTMLElement>('.market-ro-hud')
     if (roHud) roHud.hidden = world !== 'market'
     const helpText = world === 'market'
-      ? '左鍵點擊地面走動／WASD 移動・右鍵拖曳 360° 旋轉視角・滾輪縮放・點擊攤位或按 E 互動'
+      ? '左鍵點擊地面走動／WASD 移動・右鍵拖曳 360° 旋轉（上下微調平視/俯視）・滾輪縮放・點擊右上角「平視攤位」一鍵切換'
       : '滑鼠點擊／WASD 移動・右鍵拖曳 旋轉視角・滾輪 縮放・點擊／E 互動'
     for (const el of this.root.querySelectorAll<HTMLElement>('.help')) el.textContent = helpText
     if (world === 'market') {

@@ -628,21 +628,16 @@ export class MarketWorld {
     this.scene.add(outerBase)
   }
 
-  /** 後方深色低面數台灣公寓剪影與暖黃窗格（南北兩側皆具完整 360° 街景天際線） */
+  /** 後方深色低面數台灣公寓剪影與暖黃窗格（置於北側背景，確保平視與 360° 旋轉視角無任何前景遮擋） */
   private buildApartmentSkyline(): void {
     const buildings = [
-      // 北側主背景公寓剪影（離街道略遠，確保 360° 旋轉視角清晰不遮擋）
+      // 北側背景公寓剪影（坐落於攤位後方 z = -15.5，襯托市集夜色天際線）
       { x: -16.5, z: -15.2, w: 6.4, h: 12.5, d: 5.0, color: '#181524', faceSouth: true },
       { x: -10.2, z: -15.8, w: 6.0, h: 15.2, d: 5.2, color: '#1d1a2c', faceSouth: true },
       { x: -3.6, z: -15.0, w: 6.6, h: 11.4, d: 4.8, color: '#161422', faceSouth: true },
       { x: 3.2, z: -16.0, w: 6.4, h: 16.0, d: 5.4, color: '#1f1c30', faceSouth: true },
       { x: 9.8, z: -15.2, w: 6.0, h: 13.0, d: 4.8, color: '#181626', faceSouth: true },
       { x: 16.2, z: -15.6, w: 6.2, h: 14.2, d: 5.0, color: '#1b182a', faceSouth: true },
-      // 南側遠景低層老屋剪影（轉 180° 向南望時同樣呈現台灣雨夜街景）
-      { x: -13.0, z: 18.8, w: 6.2, h: 8.6, d: 4.6, color: '#171524', faceSouth: false },
-      { x: -4.2, z: 19.4, w: 6.8, h: 9.4, d: 4.8, color: '#1b182b', faceSouth: false },
-      { x: 4.8, z: 19.0, w: 6.4, h: 8.2, d: 4.6, color: '#161422', faceSouth: false },
-      { x: 13.4, z: 18.8, w: 6.0, h: 9.0, d: 4.8, color: '#1a1729', faceSouth: false },
     ]
 
     const windowLitMat = new THREE.MeshStandardMaterial({
@@ -1166,11 +1161,10 @@ export class MarketWorld {
       emissiveIntensity: 2.1,
     })
     const polePositions: [number, number][] = [
-      [-13.8, -1.6],
-      [0.0, -1.6],
-      [13.8, -1.6],
-      [-6.5, 8.1],
-      [6.5, 8.1],
+      [-14.5, -1.6],
+      [14.5, -1.6],
+      [-14.5, 9.6],
+      [14.5, 9.6],
     ]
 
     const poleTops: THREE.Vector3[] = []
@@ -1206,16 +1200,13 @@ export class MarketWorld {
       this.physics.addStaticCylinder(new THREE.Vector3(px, 1.4, pz), 0.28, 2.8)
     }
 
-    // 垂弧黑色電線連接電線桿
+    // 垂弧黑色電線連接四角電線桿（中央視角完全無阻擋）
     const wireMat = new THREE.LineBasicMaterial({ color: '#110f1a' })
     const wirePairs: [number, number][] = [
       [0, 1],
-      [1, 2],
-      [0, 3],
+      [0, 2],
       [1, 3],
-      [1, 4],
-      [2, 4],
-      [3, 4],
+      [2, 3],
     ]
     for (const [a, b] of wirePairs) {
       const start = poleTops[a]
@@ -1227,11 +1218,11 @@ export class MarketWorld {
       this.scene.add(new THREE.Line(geo, wireMat))
     }
 
-    // 跨街復古紅燈籠串
+    // 跨街復古紅燈籠串（懸掛於上方高處 y = 4.2m，美觀且不遮擋攤位招牌與平視視角）
     const lanternSpan = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(-13.8, 5.0, -1.6),
-      new THREE.Vector3(0, 4.15, -1.6),
-      new THREE.Vector3(13.8, 5.0, -1.6),
+      new THREE.Vector3(-14.5, 5.2, -1.6),
+      new THREE.Vector3(0, 4.35, -1.6),
+      new THREE.Vector3(14.5, 5.2, -1.6),
     )
     this.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lanternSpan.getPoints(20)), wireMat))
     for (let i = 1; i <= 9; i += 1) {
