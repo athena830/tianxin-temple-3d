@@ -1,5 +1,4 @@
 import './styles/main.css'
-import GUI from 'lil-gui'
 import { Audio, getUserMuted } from './engine/audio'
 import { Assets } from './engine/assets'
 import { Input } from './engine/input'
@@ -364,30 +363,9 @@ async function boot(): Promise<void> {
     ui.toast((e as CustomEvent<string>).detail, 3200)
   })
 
-  const savedScaleStr = safeGet('temple_main_hall_scale')
-  const initialScale = savedScaleStr ? Math.min(2.0, Math.max(1.0, parseFloat(savedScaleStr) || 1.35)) : 1.35
+  try { localStorage.removeItem('temple_main_hall_scale') } catch {}
+  const initialScale = 1.35
   g.setMainHallScale(initialScale)
-
-  // 右上角 lil-gui 控制面板：保留大殿 scale 微調空間 (1.0 ~ 2.0，基準 1.35x)
-  const gui = new GUI({ title: '大殿微調 (Main Hall)' })
-  const guiParams = {
-    mainHallScale: initialScale,
-    reset: () => {
-      guiParams.mainHallScale = 1.35
-      scaleController.setValue(1.35)
-    },
-  }
-  const scaleController = gui.add(guiParams, 'mainHallScale', 1.0, 2.0, 0.01)
-    .name('大殿比例 (Scale)')
-    .onChange((val: number) => {
-      g.setMainHallScale(val)
-      try { localStorage.setItem('temple_main_hall_scale', String(val)) } catch {}
-    })
-  gui.add(guiParams, 'reset').name('重設預設 (1.35x)')
-
-  if (window.innerWidth < 768 || document.body.classList.contains('has-touch')) {
-    gui.close()
-  }
 
   if (import.meta.env.DEV) {
     const [{ registerGameTuning }, { tuning }] = await Promise.all([import('../scripts/manus-tuning/adapter.js'), import('./game/tuning')])
@@ -413,11 +391,6 @@ async function boot(): Promise<void> {
     onTransition: (state, message) => ui.setWorldTransition(state !== 'idle', message),
     onWorldChanged: (world: WorldId, active) => {
       ui.setWorld(world)
-      // The hall-scale tuning panel is irrelevant while the independent market
-      // world is active, and otherwise makes the arrival screen look unfinished.
-      if (gui?.domElement?.style) {
-        gui.domElement.style.display = world === 'market' ? 'none' : ''
-      }
       if (world === 'temple') game = active as TempleGame
       else game = undefined
       ui.setMode(active.mode)
