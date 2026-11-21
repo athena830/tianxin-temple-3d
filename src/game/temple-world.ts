@@ -656,9 +656,9 @@ export class TempleWorld {
     }
 
     // 2. Solid Back Wall with Wide Grand Passageway Doors to Rear Hall (神龕背牆與通往後殿之開闊穿堂大門)
-    // Central Shrine Back Wall (中央主殿神龕實體背牆)
-    const backCenter = new THREE.Mesh(new THREE.BoxGeometry(8.2, 5.1, 0.6), makeMat('#543b2f'))
-    backCenter.position.set(0, 2.55, -6.4)
+    // Central Shrine Back Wall (中央主殿神龕實體背牆，通高 8.0m 直達大殿重檐屋架，徹底隔絕後方殿宇背景，確保神聖莊嚴)
+    const backCenter = new THREE.Mesh(new THREE.BoxGeometry(8.2, 8.0, 0.6), makeMat('#543b2f'))
+    backCenter.position.set(0, 4.0, -6.4)
     backCenter.castShadow = true
     backCenter.receiveShadow = true
     hall.add(backCenter)
@@ -1333,18 +1333,21 @@ export class TempleWorld {
     portalLintel.position.set(0, 5.5, frontZ)
     rear.add(portalLintel)
 
-    // 4. Grand Palace Plaque: 「凌 霄 寶 殿」 (殿前六尺金字主匾)
+    // 4. Grand Palace Plaque: 「凌 霄 寶 殿」 (二層重簷金字主匾，高懸於重簷歇山頂正中央明樓額枋，氣勢恢宏且絕不遮蔽神佛視線)
+    const plaqueBacking = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.9, 0.3), darkWood)
+    plaqueBacking.position.set(0, 7.6, frontZ + 0.28)
+    rear.add(plaqueBacking)
     const plaqueFrame = new THREE.Mesh(new THREE.BoxGeometry(6.6, 1.6, 0.22), darkWood)
-    plaqueFrame.position.set(0, 5.8, frontZ + 0.38)
+    plaqueFrame.position.set(0, 7.6, frontZ + 0.44)
     rear.add(plaqueFrame)
     const plaqueGoldBorder = new THREE.Mesh(new THREE.BoxGeometry(6.3, 1.35, 0.24), gold)
-    plaqueGoldBorder.position.set(0, 5.8, frontZ + 0.38)
+    plaqueGoldBorder.position.set(0, 7.6, frontZ + 0.46)
     rear.add(plaqueGoldBorder)
     const plaqueText = new THREE.Mesh(
       new THREE.PlaneGeometry(6.0, 1.15),
       this.textMaterial('凌  霄  寶  殿', '#fced9c', '#200f08')
     )
-    plaqueText.position.set(0, 5.8, frontZ + 0.52)
+    plaqueText.position.set(0, 7.6, frontZ + 0.58)
     rear.add(plaqueText)
 
     // Front Dou-Gong Bracket Clusters (前簷斗栱組)
@@ -3518,8 +3521,8 @@ export class TempleWorld {
     // =========================================================================
     // 2. 三聖神龕奶油白與暖金雕花背屏、內殿額匾與對聯掛軸
     // =========================================================================
-    const screenBacking = new THREE.Mesh(new THREE.BoxGeometry(7.9, 4.7, 0.12), clayCream)
-    screenBacking.position.set(0, 2.65, -6.04)
+    const screenBacking = new THREE.Mesh(new THREE.BoxGeometry(7.9, 5.6, 0.12), clayCream)
+    screenBacking.position.set(0, 3.1, -6.04)
     hall.add(screenBacking)
 
     // 四根暖金雕花神龕界柱（將背屏劃分為：左月老龕、中觀音龕、右財神龕）
