@@ -531,6 +531,7 @@ export class MarketWorld {
     this.buildRainSystem()
     this.buildGroundCursor()
     this.buildChibiAvatar()
+    this.applyWeather(this.currentWeather)
   }
 
   /** 設定滑鼠懸停高亮回饋（由 MarketGame Raycaster 呼叫） */
@@ -1413,6 +1414,7 @@ export class MarketWorld {
       depthWrite: false,
     })
     this.rainLines = new THREE.LineSegments(geo, mat)
+    this.rainLines.visible = false
     this.scene.add(this.rainLines)
 
     // 柏油路微弱雨滴擴散漣漪
@@ -1426,6 +1428,7 @@ export class MarketWorld {
         depthWrite: false,
       })
       const rMesh = new THREE.Mesh(rippleGeo, rMat)
+      rMesh.visible = false
       rMesh.rotation.x = -Math.PI / 2
       rMesh.position.set((Math.random() - 0.5) * 28, 0.018, (Math.random() - 0.1) * 7.5)
       this.scene.add(rMesh)
