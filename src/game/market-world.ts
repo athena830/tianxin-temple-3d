@@ -468,6 +468,17 @@ export class MarketWorld {
   private readonly visualRefs = new Map<MarketPointId, StallVisualRef>()
   private readonly swayingLanterns: SwayingLantern[] = []
   private readonly rainRipples: RainRipple[] = []
+  private readonly floatingIslets: { group: THREE.Group; baseY: number; amp: number; speed: number; phase: number }[] = []
+  private readonly driftingClouds: { group: THREE.Group; speed: number; minX: number; maxX: number }[] = []
+  private readonly skyCloudMats: THREE.MeshLambertMaterial[] = []
+  private readonly waterfallMats: THREE.MeshBasicMaterial[] = []
+  private readonly windmillBlades: THREE.Group[] = []
+  private skyCrystalCore?: THREE.Mesh
+  private skyRuneRing?: THREE.Mesh
+  private skyUnderLight?: THREE.PointLight
+  private skyStars?: THREE.Points
+  private skyMotes?: THREE.Points
+  private skyMotesPositions?: Float32Array
   private crystalBall?: THREE.Mesh
   private crystalHalo?: THREE.Sprite
   private rainLines!: THREE.LineSegments
@@ -522,7 +533,8 @@ export class MarketWorld {
 
     this.setupAtmosphere()
     this.buildStreetGround()
-    // 前後二側大樓完全刪除，僅保留純粹靈光市集與自然天空
+    // 周圍打造天空之城（浮空島岩盤、雲海、遠景天空城遺跡與飄浮白雲），主市集完全不更動
+    this.buildSkyCitySurroundings()
     for (const spec of this.stallSpecs) {
       this.buildStall(spec)
     }
@@ -677,15 +689,6 @@ export class MarketWorld {
     southCurb.position.set(0, 0.05, 7.7)
     southCurb.receiveShadow = true
     this.scene.add(southCurb)
-
-    // 5. 遠景暗色地基（無任何前後大樓，純粹開闊市集街道與自然天幕）
-    const outerBase = new THREE.Mesh(
-      new THREE.PlaneGeometry(90, 70),
-      new THREE.MeshLambertMaterial({ color: '#171522' }),
-    )
-    outerBase.rotation.x = -Math.PI / 2
-    outerBase.position.y = -0.02
-    this.scene.add(outerBase)
   }
 
   /**
@@ -725,20 +728,20 @@ export class MarketWorld {
         this.mainLight.color.set('#fdf0db')
         this.mainLight.intensity = 1.15
       } else {
-        // 台中白日晴天：清爽蔚藍天幕與溫暖日光
-        this.scene.background = new THREE.Color('#72b0de')
-        this.scene.fog = new THREE.FogExp2('#72b0de', 0.005)
-        this.hemiLight.color.set('#e2f4ff')
-        this.hemiLight.groundColor.set('#7a6e5b')
-        this.hemiLight.intensity = 1.45
+        // 台中白日晴天：清爽蔚藍天幕與溫暖日光（適度淡霧讓遠景天空之城清晰可辨）
+        this.scene.background = new THREE.Color('#78b7e6')
+        this.scene.fog = new THREE.FogExp2('#8cc4ec', 0.0036)
+        this.hemiLight.color.set('#e8f6ff')
+        this.hemiLight.groundColor.set('#7a7060')
+        this.hemiLight.intensity = 1.5
         this.mainLight.color.set('#fff6df')
-        this.mainLight.intensity = 1.45
+        this.mainLight.intensity = 1.48
       }
     } else {
       // 台中夜間天氣
       if (isRain) {
         this.scene.background = new THREE.Color('#1f1c2c')
-        this.scene.fog = new THREE.FogExp2('#1f1c2c', 0.012)
+        this.scene.fog = new THREE.FogExp2('#1f1c2c', 0.011)
         this.hemiLight.color.set('#8e84b8')
         this.hemiLight.groundColor.set('#242033')
         this.hemiLight.intensity = 1.2
@@ -746,7 +749,7 @@ export class MarketWorld {
         this.mainLight.intensity = 0.85
       } else if (info.condition === 'cloudy') {
         this.scene.background = new THREE.Color('#1d1a29')
-        this.scene.fog = new THREE.FogExp2('#1d1a29', 0.008)
+        this.scene.fog = new THREE.FogExp2('#1d1a29', 0.007)
         this.hemiLight.color.set('#968bb8')
         this.hemiLight.groundColor.set('#282238')
         this.hemiLight.intensity = 1.25
@@ -755,7 +758,7 @@ export class MarketWorld {
       } else {
         // 台中晴夜：清澈深紫夜色，微風無雨，攤位霓虹長明
         this.scene.background = new THREE.Color('#151222')
-        this.scene.fog = new THREE.FogExp2('#151222', 0.005)
+        this.scene.fog = new THREE.FogExp2('#151222', 0.004)
         this.hemiLight.color.set('#9e91cc')
         this.hemiLight.groundColor.set('#2b243d')
         this.hemiLight.intensity = 1.35
@@ -763,6 +766,500 @@ export class MarketWorld {
         this.mainLight.intensity = 1.05
       }
     }
+
+    // 同步雲海與飄浮白雲色調以符合當下日夜與天氣
+    const cloudColor = info.isDay
+      ? isRain
+        ? '#8a95a6'
+        : info.condition === 'cloudy'
+          ? '#d6e0ec'
+          : '#ffffff'
+      : isRain
+        ? '#3f3c5c'
+        : '#6c6a96'
+    const cloudEmissive = info.isDay
+      ? isRain
+        ? '#313945'
+        : '#5a738c'
+      : '#343259'
+    for (const mat of this.skyCloudMats) {
+      mat.color.set(cloudColor)
+      mat.emissive.set(cloudEmissive)
+      mat.emissiveIntensity = info.isDay ? (isRain ? 0.16 : 0.28) : 0.42
+    }
+    if (this.skyStars) {
+      this.skyStars.visible = !info.isDay && !isRain
+    }
+    if (this.skyUnderLight) {
+      this.skyUnderLight.intensity = info.isDay ? 5.5 : 10.5
+    }
+  }
+
+  /**
+   * 打造「天空之城（Laputa）」周圍浮空環境（主市集街道、攤位與互動完全維持不變）：
+   * 1. 主市集下方：古石城垣拱門底座、苔蘚草沿、倒錐浮空岩盤、懸浮飛行石結晶與垂掛雲瀑
+   * 2. 周圍遠景：浮空小島群（風車塔島、古石拱水道島、遠方天空城聖殿圓頂與大樹）
+   * 3. 雲海與飄雲：島嶼下方蓬鬆雲海與天際緩緩飄動的低面數白雲，加上微光天空塵埃
+   */
+  private buildSkyCitySurroundings(): void {
+    const stoneLightMat = new THREE.MeshLambertMaterial({ color: '#d8d2c3', flatShading: true })
+    const stoneMidMat = new THREE.MeshLambertMaterial({ color: '#b5ae9e', flatShading: true })
+    const stoneDarkMat = new THREE.MeshLambertMaterial({ color: '#7d7870', flatShading: true })
+    const rockUpperMat = new THREE.MeshLambertMaterial({ color: '#6b635a', flatShading: true })
+    const rockDeepMat = new THREE.MeshLambertMaterial({ color: '#4d4744', flatShading: true })
+    const grassMat = new THREE.MeshLambertMaterial({ color: '#67a85c', flatShading: true })
+    const mossMat = new THREE.MeshLambertMaterial({ color: '#4f8a4b', flatShading: true })
+    const foliageMat = new THREE.MeshLambertMaterial({ color: '#478246', flatShading: true })
+    const foliageLightMat = new THREE.MeshLambertMaterial({ color: '#6fb35b', flatShading: true })
+    const woodMat = new THREE.MeshLambertMaterial({ color: '#8a5d3b', flatShading: true })
+    const sailMat = new THREE.MeshLambertMaterial({ color: '#f3ecd9', side: THREE.DoubleSide })
+
+    // ─── 1. 主市集下方：天空之城浮空島石砌底座與倒錐岩盤（中心 x=0, z=2.2，嚴格位於 y <= -0.02） ───
+    const mainIsland = new THREE.Group()
+    mainIsland.position.set(0, 0, 2.2)
+
+    // 外圈苔蘚石垣框（微微包覆主市集四周邊緣，高於 -0.05 不會蓋過柏油路與人行道）
+    const rimPlate = new THREE.Mesh(new THREE.BoxGeometry(37.4, 0.55, 21.0), stoneMidMat)
+    rimPlate.position.set(0, -0.32, 0)
+    rimPlate.receiveShadow = true
+    mainIsland.add(rimPlate)
+
+    // 苔蘚草地沿邊（在主市集外框周圍點綴生機綠意，位於市集範圍外緣）
+    const rimTrimN = new THREE.Mesh(new THREE.BoxGeometry(37.6, 0.14, 0.72), grassMat)
+    rimTrimN.position.set(0, -0.05, -10.3)
+    mainIsland.add(rimTrimN)
+    const rimTrimS = new THREE.Mesh(new THREE.BoxGeometry(37.6, 0.14, 0.72), grassMat)
+    rimTrimS.position.set(0, -0.05, 10.3)
+    mainIsland.add(rimTrimS)
+    const rimTrimW = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.14, 21.2), grassMat)
+    rimTrimW.position.set(-18.4, -0.05, 0)
+    mainIsland.add(rimTrimW)
+    const rimTrimE = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.14, 21.2), grassMat)
+    rimTrimE.position.set(18.4, -0.05, 0)
+    mainIsland.add(rimTrimE)
+
+    // 古石城垣牆體與拉普達風格拱門扶壁（正面與背面皆有立體石砌細節，平視視角清晰可見）
+    const terraceWall = new THREE.Mesh(new THREE.BoxGeometry(36.2, 1.35, 19.8), stoneLightMat)
+    terraceWall.position.set(0, -1.25, 0)
+    mainIsland.add(terraceWall)
+
+    const archSpan = 3.2
+    const archGemMat = new THREE.MeshBasicMaterial({ color: '#7ff3ff' })
+    for (let x = -16; x <= 16; x += archSpan) {
+      // 南面（平視正前方底部）石柱與拱門凹槽
+      const pillarS = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.45, 0.65), stoneMidMat)
+      pillarS.position.set(x, -1.25, 10.05)
+      mainIsland.add(pillarS)
+      if (x < 16) {
+        const archRecessS = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.92, 0.25), stoneDarkMat)
+        archRecessS.position.set(x + archSpan / 2, -1.36, 9.95)
+        mainIsland.add(archRecessS)
+        // 拉普達風格微光飛行石鑲嵌晶點
+        const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), archGemMat)
+        gem.position.set(x + archSpan / 2, -1.12, 10.12)
+        mainIsland.add(gem)
+      }
+      // 北面石柱
+      const pillarN = new THREE.Mesh(new THREE.BoxGeometry(0.75, 1.45, 0.65), stoneMidMat)
+      pillarN.position.set(x, -1.25, -10.05)
+      mainIsland.add(pillarN)
+    }
+
+    // 底部倒錐浮空岩盤（多層 Low-Poly 切削岩塊向下收束）
+    const rockTier1 = new THREE.Mesh(new THREE.CylinderGeometry(18.5, 13.8, 2.3, 10), rockUpperMat)
+    rockTier1.scale.set(1.1, 1, 0.62)
+    rockTier1.position.set(0, -3.0, 0)
+    mainIsland.add(rockTier1)
+
+    const rockTier2 = new THREE.Mesh(new THREE.CylinderGeometry(13.2, 6.2, 2.8, 9), rockDeepMat)
+    rockTier2.scale.set(1.12, 1, 0.62)
+    rockTier2.position.set(0, -5.3, 0)
+    mainIsland.add(rockTier2)
+
+    const rockSpire = new THREE.Mesh(new THREE.ConeGeometry(5.8, 3.6, 7), rockDeepMat)
+    rockSpire.rotation.x = Math.PI
+    rockSpire.position.set(0, -8.2, 0)
+    mainIsland.add(rockSpire)
+
+    // 岩盤周邊不規則附屬浮岩簇與垂掛苔蘚藤蔓
+    const subRocks: [number, number, number, number, number][] = [
+      [-14.5, -2.9, 5.2, 3.4, 3.8],
+      [-11.2, -4.1, -4.8, 3.0, 4.2],
+      [14.2, -3.0, 4.6, 3.6, 4.0],
+      [11.8, -4.2, -4.5, 2.8, 3.6],
+      [-5.8, -4.4, 6.6, 2.9, 3.5],
+      [6.4, -4.3, 6.4, 3.1, 3.8],
+      [0.2, -4.5, 6.8, 2.5, 3.0],
+    ]
+    for (const [rx, ry, rz, rad, h] of subRocks) {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(rad, h, 6), rx % 2 === 0 ? rockUpperMat : rockDeepMat)
+      cone.rotation.x = Math.PI
+      cone.rotation.y = rx * 0.5
+      cone.position.set(rx, ry, rz)
+      mainIsland.add(cone)
+    }
+
+    // 垂掛綠色藤蔓（有機多段低面數葉簇，點綴於城垣邊緣）
+    const vineXs = [-16.2, -12.4, -7.8, -3.1, 2.6, 8.2, 13.0, 16.4]
+    for (let i = 0; i < vineXs.length; i += 1) {
+      const vx = vineXs[i]
+      const segs = 3 + (i % 3)
+      for (let s = 0; s < segs; s += 1) {
+        const leaf = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.24 - s * 0.03, 0),
+          (i + s) % 2 === 0 ? mossMat : grassMat,
+        )
+        leaf.position.set(vx + Math.sin(s * 1.3 + i) * 0.14, -0.35 - s * 0.42, 10.38)
+        mainIsland.add(leaf)
+      }
+    }
+
+    // 懸浮於主島前下方的「飛行石結晶核心」、發光古代符文環與底部補光（照亮岩盤與雲海）
+    const crystalMat = new THREE.MeshStandardMaterial({
+      color: '#8cf6ff',
+      emissive: '#38d9ff',
+      emissiveIntensity: 1.85,
+      roughness: 0.12,
+      metalness: 0.2,
+      flatShading: true,
+    })
+    this.skyCrystalCore = new THREE.Mesh(new THREE.OctahedronGeometry(1.15, 0), crystalMat)
+    this.skyCrystalCore.scale.set(0.9, 1.55, 0.9)
+    this.skyCrystalCore.position.set(0, -4.55, 8.4)
+    mainIsland.add(this.skyCrystalCore)
+
+    const runeRingMat = new THREE.MeshBasicMaterial({
+      color: '#9ef7ff',
+      transparent: true,
+      opacity: 0.78,
+      side: THREE.DoubleSide,
+    })
+    this.skyRuneRing = new THREE.Mesh(new THREE.RingGeometry(1.7, 2.05, 24), runeRingMat)
+    this.skyRuneRing.rotation.x = Math.PI / 2
+    this.skyRuneRing.position.set(0, -4.55, 8.4)
+    mainIsland.add(this.skyRuneRing)
+
+    this.skyUnderLight = new THREE.PointLight('#6ceeff', 9.0, 26, 1.4)
+    this.skyUnderLight.position.set(0, -4.6, 10.6)
+    mainIsland.add(this.skyUnderLight)
+
+    // 兩道從浮空島側緣傾瀉入雲海的天空瀑布
+    const addWaterfall = (wx: number, wz: number, width: number, height: number) => {
+      const wfMat = new THREE.MeshBasicMaterial({
+        color: '#b8eeff',
+        transparent: true,
+        opacity: 0.62,
+        side: THREE.DoubleSide,
+      })
+      this.waterfallMats.push(wfMat)
+      const stream = new THREE.Mesh(new THREE.PlaneGeometry(width, height), wfMat)
+      stream.position.set(wx, -0.35 - height / 2, wz)
+      mainIsland.add(stream)
+
+      const foam = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(width * 0.85, 0),
+        new THREE.MeshLambertMaterial({ color: '#eefaff', transparent: true, opacity: 0.78 }),
+      )
+      foam.scale.set(1.4, 0.55, 1.2)
+      foam.position.set(wx, -0.35 - height, wz)
+      mainIsland.add(foam)
+    }
+    addWaterfall(-17.8, 9.6, 1.35, 6.2)
+    addWaterfall(17.8, 9.4, 1.15, 5.8)
+
+    this.scene.add(mainIsland)
+
+    // ─── 2. 周圍天空之城浮空小島群（嚴格置於主市集外圍與遠景天際，絕不遮擋主市集） ───
+    const makeTree = (scale = 1): THREE.Group => {
+      const t = new THREE.Group()
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * scale, 0.2 * scale, 1.0 * scale, 6), woodMat)
+      trunk.position.y = 0.5 * scale
+      t.add(trunk)
+      const crown1 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75 * scale, 0), foliageMat)
+      crown1.position.y = 1.35 * scale
+      t.add(crown1)
+      const crown2 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.55 * scale, 0), foliageLightMat)
+      crown2.position.set(0.32 * scale, 1.72 * scale, 0.12 * scale)
+      t.add(crown2)
+      return t
+    }
+
+    const createFloatingIslet = (
+      x: number,
+      y: number,
+      z: number,
+      radius: number,
+      depth: number,
+      bobAmp: number,
+      bobSpeed: number,
+      phase: number,
+    ): THREE.Group => {
+      const g = new THREE.Group()
+      g.position.set(x, y, z)
+      const rock = new THREE.Mesh(new THREE.ConeGeometry(radius, depth, 7), rockUpperMat)
+      rock.rotation.x = Math.PI
+      rock.position.y = -depth / 2
+      g.add(rock)
+
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.04, radius * 0.96, 0.55, 8), grassMat)
+      cap.position.y = 0.25
+      g.add(cap)
+
+      // 小島底部的微型飛行石光點
+      const miniCore = new THREE.Mesh(
+        new THREE.OctahedronGeometry(radius * 0.16, 0),
+        new THREE.MeshBasicMaterial({ color: '#8ef5ff' }),
+      )
+      miniCore.position.y = -depth - 0.35
+      g.add(miniCore)
+
+      this.scene.add(g)
+      this.floatingIslets.push({ group: g, baseY: y, amp: bobAmp, speed: bobSpeed, phase })
+      return g
+    }
+
+    // (A) 左後方：風車白石塔浮空島（平視與俯視皆可望見）
+    const windmillIslet = createFloatingIslet(-11.2, 5.2, -28, 3.2, 4.6, 0.34, 0.75, 0.3)
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.1, 3.1, 8), stoneLightMat)
+    tower.position.set(-0.2, 1.95, 0)
+    windmillIslet.add(tower)
+    const towerRoof = new THREE.Mesh(new THREE.ConeGeometry(1.15, 1.3, 8), new THREE.MeshLambertMaterial({ color: '#5c7c99', flatShading: true }))
+    towerRoof.position.set(-0.2, 4.1, 0)
+    windmillIslet.add(towerRoof)
+    const towerWin = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.58, 0.18),
+      new THREE.MeshBasicMaterial({ color: '#ffe59c' }),
+    )
+    towerWin.position.set(-0.2, 2.05, 1.0)
+    windmillIslet.add(towerWin)
+    // 風車轉動葉片組
+    const blades = new THREE.Group()
+    blades.position.set(-0.2, 3.0, 1.08)
+    for (let i = 0; i < 4; i += 1) {
+      const arm = new THREE.Group()
+      arm.rotation.z = (i * Math.PI) / 2
+      const spar = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.75, 0.08), woodMat)
+      spar.position.y = 0.85
+      arm.add(spar)
+      const sail = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 1.25), sailMat)
+      sail.position.set(0.26, 1.0, 0.02)
+      arm.add(sail)
+      blades.add(arm)
+    }
+    windmillIslet.add(blades)
+    this.windmillBlades.push(blades)
+    const wt1 = makeTree(0.85)
+    wt1.position.set(1.6, 0.45, 0.6)
+    windmillIslet.add(wt1)
+    const wt2 = makeTree(0.68)
+    wt2.position.set(-1.8, 0.45, -0.7)
+    windmillIslet.add(wt2)
+
+    // (B) 右後方：古代白石拱門水道遺跡島
+    const archIslet = createFloatingIslet(11.6, 5.4, -30, 3.4, 4.8, 0.32, 0.68, 1.8)
+    for (let i = -1; i <= 1; i += 1) {
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.55, 2.25, 0.55), stoneLightMat)
+      col.position.set(i * 1.55, 1.55, 0)
+      archIslet.add(col)
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.48, 0.72), stoneMidMat)
+    lintel.position.set(0, 2.85, 0)
+    archIslet.add(lintel)
+    const ruinTop = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.75, 0.62), stoneLightMat)
+    ruinTop.position.set(-0.9, 3.35, 0)
+    archIslet.add(ruinTop)
+    const archBeacon = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.32, 0),
+      new THREE.MeshBasicMaterial({ color: '#9cf7ff' }),
+    )
+    archBeacon.position.set(0, 1.65, 0.1)
+    archIslet.add(archBeacon)
+    const at1 = makeTree(0.9)
+    at1.position.set(1.9, 0.45, 0.8)
+    archIslet.add(at1)
+    const at2 = makeTree(0.72)
+    at2.position.set(-2.0, 0.45, 0.7)
+    archIslet.add(at2)
+
+    // (C) 正後方遠天際：天空之城主聖殿浮空大島（層疊白石城牆、暖光窗格、中央巨樹與半球遺跡）
+    const citadel = createFloatingIslet(0.2, 6.2, -46, 5.4, 6.2, 0.24, 0.55, 3.1)
+    citadel.scale.setScalar(0.38)
+    const cWall1 = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 5.0, 1.55, 12), stoneLightMat)
+    cWall1.position.y = 1.15
+    citadel.add(cWall1)
+    const cWall2 = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.5, 1.6, 12), stoneMidMat)
+    cWall2.position.y = 2.6
+    citadel.add(cWall2)
+    // 聖殿暖黃微光窗格環（夜間遠望清晰如夢幻天空城）
+    const castleWinMat = new THREE.MeshBasicMaterial({ color: '#ffe59c' })
+    for (let i = 0; i < 6; i += 1) {
+      const ang = (i / 6) * Math.PI - Math.PI * 0.08
+      const wMesh = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.52, 0.18), castleWinMat)
+      wMesh.position.set(Math.cos(ang) * 4.75, 1.2, Math.sin(ang) * 4.75)
+      citadel.add(wMesh)
+    }
+    const cDome = new THREE.Mesh(new THREE.SphereGeometry(2.1, 10, 7, 0, Math.PI * 2, 0, Math.PI / 2), stoneLightMat)
+    cDome.position.y = 3.35
+    citadel.add(cDome)
+    // 天空之城標誌性巨樹樹冠
+    const greatTreeCrown = new THREE.Mesh(new THREE.DodecahedronGeometry(2.55, 1), foliageLightMat)
+    greatTreeCrown.scale.set(1.25, 0.82, 1.1)
+    greatTreeCrown.position.set(0, 5.7, 0)
+    citadel.add(greatTreeCrown)
+    const greatTreeSub = new THREE.Mesh(new THREE.DodecahedronGeometry(1.75, 0), foliageMat)
+    greatTreeSub.position.set(-1.5, 4.95, 0.9)
+    citadel.add(greatTreeSub)
+    // 環繞主城的小尖塔
+    for (let i = 0; i < 4; i += 1) {
+      const ang = (i * Math.PI) / 2 + 0.45
+      const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.5, 1.9, 6), stoneLightMat)
+      spire.position.set(Math.cos(ang) * 3.85, 2.35, Math.sin(ang) * 3.85)
+      citadel.add(spire)
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.92, 6), new THREE.MeshLambertMaterial({ color: '#6b8ba8', flatShading: true }))
+      cap.position.set(Math.cos(ang) * 3.85, 3.7, Math.sin(ang) * 3.85)
+      citadel.add(cap)
+    }
+
+    // (D) 左右兩側陪襯浮空小島（360° 轉動視角時完整呈現浮空群島感）
+    const leftSideIslet = createFloatingIslet(-26.5, -0.6, 3.8, 3.4, 4.8, 0.35, 0.82, 0.9)
+    const lTree = makeTree(1.0)
+    lTree.position.set(0.2, 0.45, -0.2)
+    leftSideIslet.add(lTree)
+    const lStone = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.8, 0.6), stoneLightMat)
+    lStone.position.set(-1.3, 1.3, 0.6)
+    leftSideIslet.add(lStone)
+
+    const rightSideIslet = createFloatingIslet(26.8, 0.1, 1.8, 3.6, 5.2, 0.36, 0.78, 2.5)
+    const rTree = makeTree(1.1)
+    rTree.position.set(-0.4, 0.45, 0.4)
+    rightSideIslet.add(rTree)
+    const rPillar1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.9, 0.5), stoneLightMat)
+    rPillar1.position.set(1.1, 1.35, -0.5)
+    rightSideIslet.add(rPillar1)
+
+    // (E) 漂浮在主島周圍底部的零星小浮石（增加懸浮空間層次）
+    const pebbleSpecs: [number, number, number, number][] = [
+      [-15.5, -4.6, 12.2, 0.95],
+      [-7.2, -5.8, 13.0, 0.75],
+      [9.4, -5.2, 12.6, 0.85],
+      [16.2, -4.2, 11.8, 1.0],
+      [-21.2, 1.6, -12.0, 1.15],
+      [21.6, 2.2, -13.5, 1.1],
+    ]
+    pebbleSpecs.forEach(([px, py, pz, r], idx) => {
+      const g = new THREE.Group()
+      g.position.set(px, py, pz)
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), idx % 2 === 0 ? rockUpperMat : stoneMidMat)
+      rock.scale.set(1.1, 0.85, 1.0)
+      g.add(rock)
+      this.scene.add(g)
+      this.floatingIslets.push({ group: g, baseY: py, amp: 0.32, speed: 0.95 + idx * 0.08, phase: idx * 1.1 })
+    })
+
+    // ─── 3. 蓬鬆立體雲海與高空飄雲（主島下方雲海 + 背景高空飄雲） ───
+    const createCloudCluster = (
+      x: number,
+      y: number,
+      z: number,
+      scale: number,
+      speed: number,
+      opacity = 0.92,
+    ): void => {
+      const g = new THREE.Group()
+      g.position.set(x, y, z)
+      const mat = new THREE.MeshLambertMaterial({
+        color: '#ffffff',
+        emissive: '#4e6378',
+        emissiveIntensity: 0.24,
+        transparent: true,
+        opacity,
+        flatShading: true,
+      })
+      this.skyCloudMats.push(mat)
+
+      const puffs: [number, number, number, number][] = [
+        [0, 0.25, 0, 1.65],
+        [-1.45, -0.08, 0.2, 1.25],
+        [1.55, -0.1, -0.15, 1.3],
+        [-0.65, 0.55, -0.35, 1.15],
+        [0.75, 0.45, 0.35, 1.1],
+      ]
+      for (const [cx, cy, cz, cr] of puffs) {
+        const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(cr * scale, 1), mat)
+        puff.scale.set(1.25, 0.72, 0.95)
+        puff.position.set(cx * scale, cy * scale, cz * scale)
+        g.add(puff)
+      }
+      this.scene.add(g)
+      this.driftingClouds.push({ group: g, speed, minX: -52, maxX: 52 })
+    }
+
+    // 主島下方雲海（位於 y = -6.8 至 -10.5，讓主市集彷彿高懸雲端之上）
+    const seaClouds: [number, number, number, number, number][] = [
+      [-26, -7.8, 12, 2.5, 0.42],
+      [-10, -8.6, 15, 2.9, 0.36],
+      [8, -8.2, 14, 2.7, 0.40],
+      [25, -7.6, 11, 2.4, 0.45],
+      [-20, -9.2, -8, 3.1, 0.32],
+      [0, -9.8, -14, 3.4, 0.28],
+      [21, -8.8, -10, 3.0, 0.35],
+    ]
+    for (const [cx, cy, cz, sc, sp] of seaClouds) {
+      createCloudCluster(cx, cy, cz, sc, sp, 0.9)
+    }
+
+    // 背景高空飄雲（位於 z = -22 至 -52，襯托左右天際線，不遮擋正後方天空聖殿）
+    const skyClouds: [number, number, number, number, number][] = [
+      [-26, 7.2, -26, 1.55, 0.55],
+      [-16, 8.6, -38, 1.75, 0.46],
+      [16, 8.8, -38, 1.7, 0.50],
+      [27, 7.4, -26, 1.6, 0.58],
+      [-32, 3.2, -18, 1.5, 0.62],
+      [32, 3.6, -18, 1.55, 0.60],
+      [-6, 4.2, -48, 1.8, 0.36],
+    ]
+    for (const [cx, cy, cz, sc, sp] of skyClouds) {
+      createCloudCluster(cx, cy, cz, sc, sp, 0.82)
+    }
+
+    // ─── 4. 晴夜繁星點點（夜間無雨時自動顯示於高空天幕） ───
+    const starCount = 140
+    const starPos = new Float32Array(starCount * 3)
+    for (let i = 0; i < starCount; i += 1) {
+      starPos[i * 3] = (Math.random() - 0.5) * 90
+      starPos[i * 3 + 1] = 2.8 + Math.random() * 14
+      starPos[i * 3 + 2] = -36 - Math.random() * 24
+    }
+    const starGeo = new THREE.BufferGeometry()
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
+    this.skyStars = new THREE.Points(
+      starGeo,
+      new THREE.PointsMaterial({ color: '#eef4ff', size: 0.22, transparent: true, opacity: 0.85, depthWrite: false }),
+    )
+    this.skyStars.visible = !this.currentWeather.isDay && this.currentWeather.condition !== 'rainy'
+    this.scene.add(this.skyStars)
+
+    // ─── 4. 環繞天空島的漂浮光塵粒子（微弱柔和，營造奇幻空島光澤） ───
+    const moteCount = 64
+    this.skyMotesPositions = new Float32Array(moteCount * 3)
+    for (let i = 0; i < moteCount; i += 1) {
+      const ang = (i / moteCount) * Math.PI * 2 + Math.random() * 0.4
+      const rad = 16 + Math.random() * 14
+      this.skyMotesPositions[i * 3] = Math.cos(ang) * rad
+      this.skyMotesPositions[i * 3 + 1] = -4.5 + Math.random() * 12.5
+      this.skyMotesPositions[i * 3 + 2] = Math.sin(ang) * rad * 0.65 - 2
+    }
+    const moteGeo = new THREE.BufferGeometry()
+    moteGeo.setAttribute('position', new THREE.BufferAttribute(this.skyMotesPositions, 3))
+    const moteMat = new THREE.PointsMaterial({
+      color: '#d8f8ff',
+      size: 0.24,
+      transparent: true,
+      opacity: 0.68,
+      depthWrite: false,
+    })
+    this.skyMotes = new THREE.Points(moteGeo, moteMat)
+    this.scene.add(this.skyMotes)
   }
 
   /** 建立單一獨立台式雨夜市集攤位 */
@@ -1612,6 +2109,43 @@ export class MarketWorld {
     // 5. 復古紅燈籠微風搖曳
     for (const item of this.swayingLanterns) {
       item.group.rotation.z = Math.sin(this.time * 1.9 + item.phase) * item.amp
+    }
+
+    // 5b. 天空之城動態（浮空小島緩慢上下漂浮、雲海飄移、風車轉動、飛行石核心旋轉與光塵緩升）
+    for (const islet of this.floatingIslets) {
+      islet.group.position.y = islet.baseY + Math.sin(this.time * islet.speed + islet.phase) * islet.amp
+    }
+    for (const cloud of this.driftingClouds) {
+      cloud.group.position.x += cloud.speed * dt
+      if (cloud.group.position.x > cloud.maxX) {
+        cloud.group.position.x = cloud.minX
+      }
+    }
+    for (const blades of this.windmillBlades) {
+      blades.rotation.z -= dt * 0.65
+    }
+    if (this.skyCrystalCore) {
+      this.skyCrystalCore.rotation.y += dt * 0.85
+      const s = 1 + Math.sin(this.time * 2.4) * 0.06
+      this.skyCrystalCore.scale.set(0.9 * s, 1.55 * s, 0.9 * s)
+    }
+    if (this.skyRuneRing) {
+      this.skyRuneRing.rotation.z -= dt * 0.45
+    }
+    for (let i = 0; i < this.waterfallMats.length; i += 1) {
+      this.waterfallMats[i].opacity = 0.56 + Math.sin(this.time * 4.2 + i * 1.4) * 0.1
+    }
+    if (this.skyMotes && this.skyMotesPositions) {
+      const count = this.skyMotesPositions.length / 3
+      for (let i = 0; i < count; i += 1) {
+        const yIdx = i * 3 + 1
+        this.skyMotesPositions[yIdx] += dt * 0.35
+        if (this.skyMotesPositions[yIdx] > 8.5) {
+          this.skyMotesPositions[yIdx] = -4.5
+        }
+      }
+      const attr = this.skyMotes.geometry.getAttribute('position') as THREE.BufferAttribute
+      attr.needsUpdate = true
     }
 
     // 6. 細雨粒子與水窪漣漪（僅在台中為雨天時運算與渲染）
