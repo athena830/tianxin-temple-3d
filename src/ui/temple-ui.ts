@@ -177,9 +177,9 @@ export class TempleUi {
       <div class="toast" hidden></div>
       <div class="market-ro-hud" hidden>
         <section class="ro-window ro-basic-info" aria-label="旅人狀態">
-          <header class="ro-win-bar"><span>✦ 天心靈光市集</span><small>雨夜霓虹街</small></header>
+          <header class="ro-win-bar"><span>✦ 天心靈光市集</span><small data-market-weather>📍 台中即時連線中</small></header>
           <div class="ro-win-body">
-            <div class="ro-char-row"><b>靈光旅人</b><span>雨夜漫步模式</span></div>
+            <div class="ro-char-row"><b>靈光旅人</b><span>漫步模式</span></div>
             <div class="ro-stat-bar"><label>靜心</label><i><em style="width:100%"></em></i><span>100%</span></div>
             <div class="ro-stat-bar sp"><label>靈光</label><i><em style="width:100%"></em></i><span>100%</span></div>
           </div>
@@ -249,6 +249,19 @@ export class TempleUi {
         return
       }
       if (!this.panelHidden) { e.stopPropagation(); this.actions.closePanel() }
+    })
+    window.addEventListener('market:weather', e => {
+      const info = (e as CustomEvent<any>).detail
+      if (!info) return
+      const badge = this.root.querySelector<HTMLElement>('[data-market-weather]')
+      if (badge) {
+        const icon = info.condition === 'rainy' ? '🌧️' : info.condition === 'cloudy' ? '☁️' : info.isDay ? '☀️' : '🌙'
+        badge.textContent = `${icon} 台中：${info.description} ${info.temperature}°C`
+      }
+      const charMode = this.root.querySelector<HTMLElement>('.ro-char-row span')
+      if (charMode) {
+        charMode.textContent = `${info.isDay ? '日間' : '夜間'}漫步・${info.description}`
+      }
     })
     this.refreshCharacter()
   }

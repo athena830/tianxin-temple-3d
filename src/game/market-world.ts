@@ -32,6 +32,53 @@ export type MarketVenueId = 'birth-chart-hall' | 'card-house' | 'moon-meditation
 export type MarketPointId = 'return-temple' | MarketVenueId
 export type MarketPoint = { id: MarketPointId; title: string; subtitle: string; position: THREE.Vector3; radius: number }
 
+export type WeatherCondition = 'clear' | 'cloudy' | 'rainy'
+export interface TaichungWeatherInfo {
+  condition: WeatherCondition
+  description: string
+  isDay: boolean
+  temperature: number
+  rainMm: number
+}
+
+/** 查詢台中即時現實氣象（Open-Meteo 台中測站，無須金鑰、免費即時） */
+export async function fetchTaichungWeather(): Promise<TaichungWeatherInfo> {
+  try {
+    const res = await fetch(
+      'https://api.open-meteo.com/v1/forecast?latitude=24.1477&longitude=120.6736&current=is_day,precipitation,rain,weather_code,cloud_cover,temperature_2m',
+      { signal: AbortSignal.timeout(4500) },
+    )
+    if (!res.ok) throw new Error('status ' + res.status)
+    const json = await res.json()
+    const cur = json.current
+    const rain = cur.rain ?? cur.precipitation ?? 0
+    const code = cur.weather_code ?? 0
+    // WMO 天氣代碼：51~67, 80~82 為降雨；95~99 為雷陣雨
+    const isRainy = rain > 0.05 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95
+    const isCloudy = !isRainy && ((cur.cloud_cover ?? 0) > 40 || code === 2 || code === 3)
+    const isDay = cur.is_day === 1
+    const cond: WeatherCondition = isRainy ? 'rainy' : isCloudy ? 'cloudy' : 'clear'
+    const desc = isRainy ? '雨天' : isCloudy ? '多雲' : isDay ? '晴天' : '晴夜'
+    return {
+      condition: cond,
+      description: desc,
+      isDay,
+      temperature: Math.round(cur.temperature_2m ?? 20),
+      rainMm: +rain.toFixed(1),
+    }
+  } catch {
+    const h = new Date().getHours()
+    const isDay = h >= 6 && h < 18
+    return {
+      condition: 'clear',
+      description: isDay ? '晴天' : '晴夜',
+      isDay,
+      temperature: 20,
+      rainMm: 0,
+    }
+  }
+}
+
 type StallStyle = 'ziwei' | 'reiki' | 'tarot' | 'consultation' | 'info'
 
 type StallSpec = {
@@ -427,6 +474,18 @@ export class MarketWorld {
   private rainPositions!: Float32Array
   private readonly rainCount = 340
 
+  currentWeather: TaichungWeatherInfo = {
+    condition: 'clear',
+    description: '晴天',
+    isDay: true,
+    temperature: 20,
+    rainMm: 0,
+  }
+  private hemiLight!: THREE.HemisphereLight
+  private mainLight!: THREE.DirectionalLight
+  private fillLight!: THREE.DirectionalLight
+  private asphaltMat!: THREE.MeshStandardMaterial
+
   private groundCursor!: THREE.Group
   private groundCursorRing!: THREE.Mesh
   private groundCursorActive = false
@@ -463,7 +522,7 @@ export class MarketWorld {
 
     this.setupAtmosphere()
     this.buildStreetGround()
-    this.buildApartmentSkyline()
+    // 前後二側大樓完全刪除，僅保留純粹靈光市集與自然天空
     for (const spec of this.stallSpecs) {
       this.buildStall(spec)
     }
@@ -543,30 +602,30 @@ export class MarketWorld {
 
   private setupAtmosphere(): void {
     this.scene.background = new THREE.Color(PALETTE.nightSky)
-    this.scene.fog = new THREE.FogExp2(PALETTE.nightSky, 0.0115)
+    this.scene.fog = new THREE.FogExp2(PALETTE.nightSky, 0.007)
 
-    // 柔和深紫灰夜色環境光，讓 Low-Poly 啞光材質與街景層次清晰溫潤
-    const hemi = new THREE.HemisphereLight('#9489c4', '#332d47', 1.38)
-    this.scene.add(hemi)
+    // 柔和環境光（隨台中即時天氣切換日光/夜色）
+    this.hemiLight = new THREE.HemisphereLight('#9489c4', '#332d47', 1.38)
+    this.scene.add(this.hemiLight)
 
-    // 月色斜向主光（營造低面數建築立體層次）
-    const moon = new THREE.DirectionalLight('#d2d6ff', 1.05)
-    moon.position.set(12, 24, 15)
-    moon.castShadow = true
-    moon.shadow.mapSize.set(1024, 1024)
-    moon.shadow.camera.left = -22
-    moon.shadow.camera.right = 22
-    moon.shadow.camera.top = 18
-    moon.shadow.camera.bottom = -18
-    moon.shadow.camera.near = 2
-    moon.shadow.camera.far = 55
-    moon.shadow.bias = -0.0005
-    this.scene.add(moon)
+    // 斜向主光源（白晝太陽光／夜間月光）
+    this.mainLight = new THREE.DirectionalLight('#d2d6ff', 1.05)
+    this.mainLight.position.set(12, 24, 15)
+    this.mainLight.castShadow = true
+    this.mainLight.shadow.mapSize.set(1024, 1024)
+    this.mainLight.shadow.camera.left = -22
+    this.mainLight.shadow.camera.right = 22
+    this.mainLight.shadow.camera.top = 18
+    this.mainLight.shadow.camera.bottom = -18
+    this.mainLight.shadow.camera.near = 2
+    this.mainLight.shadow.camera.far = 55
+    this.mainLight.shadow.bias = -0.0005
+    this.scene.add(this.mainLight)
 
-    // 街口暖紫補光
-    const fill = new THREE.DirectionalLight('#ffcaa0', 0.45)
-    fill.position.set(-14, 12, 14)
-    this.scene.add(fill)
+    // 街口暖色補光
+    this.fillLight = new THREE.DirectionalLight('#ffcaa0', 0.45)
+    this.fillLight.position.set(-14, 12, 14)
+    this.scene.add(this.fillLight)
   }
 
   private buildStreetGround(): void {
@@ -578,15 +637,15 @@ export class MarketWorld {
     this.physics.addStaticBox(new THREE.Vector3(0, 1.5, -7.2), new THREE.Vector3(34, 3, 0.8))
     this.physics.addStaticBox(new THREE.Vector3(0, 1.5, 10.2), new THREE.Vector3(34, 3, 0.8))
 
-    // 2. 深色微反光雨夜柏油路（低粗糙度模擬雨後濕潤倒影）
+    // 2. 柏油路（晴天為乾淨啞光柏油，雨天則呈現微反光濕潤質感）
     const asphaltTex = makeWetAsphaltTexture()
-    const asphaltMat = new THREE.MeshStandardMaterial({
+    this.asphaltMat = new THREE.MeshStandardMaterial({
       map: asphaltTex,
       color: '#ffffff',
-      roughness: 0.2,
-      metalness: 0.3,
+      roughness: 0.65,
+      metalness: 0.06,
     })
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(36, 9.2), asphaltMat)
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(36, 9.2), this.asphaltMat)
     road.rotation.x = -Math.PI / 2
     road.position.set(0, 0.005, 3.2)
     road.receiveShadow = true
@@ -618,7 +677,7 @@ export class MarketWorld {
     southCurb.receiveShadow = true
     this.scene.add(southCurb)
 
-    // 5. 遠景暗色地基（避免邊緣露空）
+    // 5. 遠景暗色地基（無任何前後大樓，純粹開闊市集街道與自然天幕）
     const outerBase = new THREE.Mesh(
       new THREE.PlaneGeometry(90, 70),
       new THREE.MeshLambertMaterial({ color: '#171522' }),
@@ -628,72 +687,81 @@ export class MarketWorld {
     this.scene.add(outerBase)
   }
 
-  /** 後方深色低面數台灣公寓剪影與暖黃窗格（置於北側背景，確保平視與 360° 旋轉視角無任何前景遮擋） */
-  private buildApartmentSkyline(): void {
-    const buildings = [
-      // 北側背景公寓剪影（坐落於攤位後方 z = -15.5，襯托市集夜色天際線）
-      { x: -16.5, z: -15.2, w: 6.4, h: 12.5, d: 5.0, color: '#181524', faceSouth: true },
-      { x: -10.2, z: -15.8, w: 6.0, h: 15.2, d: 5.2, color: '#1d1a2c', faceSouth: true },
-      { x: -3.6, z: -15.0, w: 6.6, h: 11.4, d: 4.8, color: '#161422', faceSouth: true },
-      { x: 3.2, z: -16.0, w: 6.4, h: 16.0, d: 5.4, color: '#1f1c30', faceSouth: true },
-      { x: 9.8, z: -15.2, w: 6.0, h: 13.0, d: 4.8, color: '#181626', faceSouth: true },
-      { x: 16.2, z: -15.6, w: 6.2, h: 14.2, d: 5.0, color: '#1b182a', faceSouth: true },
-    ]
+  /**
+   * 同步台中現實即時天氣（晴天、多雲、雨天、白晝與黑夜）：
+   * - 晴天：關閉雨水粒子與水窪漣漪，呈現乾淨開闊天幕與溫暖光照
+   * - 雨天：開啟細雨粒子與地面漣漪，啟用濕潤柏油反光倒影
+   * - 依據台中現實時間自動切換白晝與黑夜天色
+   */
+  applyWeather(info: TaichungWeatherInfo): void {
+    this.currentWeather = info
+    const isRain = info.condition === 'rainy'
+    if (this.rainLines) this.rainLines.visible = isRain
+    for (const r of this.rainRipples) {
+      r.mesh.visible = isRain
+    }
+    if (this.asphaltMat) {
+      this.asphaltMat.roughness = isRain ? 0.20 : 0.65
+      this.asphaltMat.metalness = isRain ? 0.30 : 0.06
+    }
 
-    const windowLitMat = new THREE.MeshStandardMaterial({
-      color: PALETTE.windowWarm,
-      emissive: PALETTE.windowWarm,
-      emissiveIntensity: 1.45,
-      roughness: 0.4,
-    })
-    const windowDimMat = new THREE.MeshLambertMaterial({ color: '#272338' })
-    const tankMat = new THREE.MeshLambertMaterial({ color: '#39374c' })
-
-    buildings.forEach((b, bIdx) => {
-      const group = new THREE.Group()
-      group.position.set(b.x, 0, b.z)
-
-      const body = new THREE.Mesh(
-        new THREE.BoxGeometry(b.w, b.h, b.d),
-        new THREE.MeshLambertMaterial({ color: b.color }),
-      )
-      body.position.y = b.h / 2
-      group.add(body)
-
-      // 頂樓女兒牆與台式水塔剪影
-      const roofRim = new THREE.Mesh(
-        new THREE.BoxGeometry(b.w + 0.2, 0.35, b.d + 0.2),
-        new THREE.MeshLambertMaterial({ color: '#252136' }),
-      )
-      roofRim.position.y = b.h + 0.15
-      group.add(roofRim)
-
-      const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 8), tankMat)
-      tank.position.set(-b.w * 0.25, b.h + 0.85, 0.4)
-      group.add(tank)
-
-      // 公寓暖黃窗格（交錯點亮，營造台灣夜色生活感）
-      const cols = 3
-      const rows = Math.floor((b.h - 3.2) / 2.1)
-      for (let r = 0; r < rows; r += 1) {
-        for (let c = 0; c < cols; c += 1) {
-          const lit = ((bIdx * 7 + r * 5 + c * 3) % 5) < 2
-          const win = new THREE.Mesh(
-            new THREE.PlaneGeometry(0.95, 1.15),
-            lit ? windowLitMat : windowDimMat,
-          )
-          win.position.set(
-            (c - 1) * (b.w * 0.28),
-            3.4 + r * 2.05,
-            b.faceSouth ? b.d / 2 + 0.04 : -b.d / 2 - 0.04,
-          )
-          if (!b.faceSouth) win.rotation.y = Math.PI
-          group.add(win)
-        }
+    if (info.isDay) {
+      // 台中日間天氣
+      if (isRain) {
+        this.scene.background = new THREE.Color('#4c5563')
+        this.scene.fog = new THREE.FogExp2('#4c5563', 0.012)
+        this.hemiLight.color.set('#9eb0c2')
+        this.hemiLight.groundColor.set('#434852')
+        this.hemiLight.intensity = 1.15
+        this.mainLight.color.set('#c8d5e0')
+        this.mainLight.intensity = 0.85
+      } else if (info.condition === 'cloudy') {
+        this.scene.background = new THREE.Color('#8ea7bd')
+        this.scene.fog = new THREE.FogExp2('#8ea7bd', 0.007)
+        this.hemiLight.color.set('#cde2f2')
+        this.hemiLight.groundColor.set('#6b747d')
+        this.hemiLight.intensity = 1.25
+        this.mainLight.color.set('#fdf0db')
+        this.mainLight.intensity = 1.15
+      } else {
+        // 台中白日晴天：清爽蔚藍天幕與溫暖日光
+        this.scene.background = new THREE.Color('#72b0de')
+        this.scene.fog = new THREE.FogExp2('#72b0de', 0.005)
+        this.hemiLight.color.set('#e2f4ff')
+        this.hemiLight.groundColor.set('#7a6e5b')
+        this.hemiLight.intensity = 1.45
+        this.mainLight.color.set('#fff6df')
+        this.mainLight.intensity = 1.45
       }
-
-      this.scene.add(group)
-    })
+    } else {
+      // 台中夜間天氣
+      if (isRain) {
+        this.scene.background = new THREE.Color('#1f1c2c')
+        this.scene.fog = new THREE.FogExp2('#1f1c2c', 0.012)
+        this.hemiLight.color.set('#8e84b8')
+        this.hemiLight.groundColor.set('#242033')
+        this.hemiLight.intensity = 1.2
+        this.mainLight.color.set('#c2c6ff')
+        this.mainLight.intensity = 0.85
+      } else if (info.condition === 'cloudy') {
+        this.scene.background = new THREE.Color('#1d1a29')
+        this.scene.fog = new THREE.FogExp2('#1d1a29', 0.008)
+        this.hemiLight.color.set('#968bb8')
+        this.hemiLight.groundColor.set('#282238')
+        this.hemiLight.intensity = 1.25
+        this.mainLight.color.set('#d0d4ff')
+        this.mainLight.intensity = 0.95
+      } else {
+        // 台中晴夜：清澈深紫夜色，微風無雨，攤位霓虹長明
+        this.scene.background = new THREE.Color('#151222')
+        this.scene.fog = new THREE.FogExp2('#151222', 0.005)
+        this.hemiLight.color.set('#9e91cc')
+        this.hemiLight.groundColor.set('#2b243d')
+        this.hemiLight.intensity = 1.35
+        this.mainLight.color.set('#dbe0ff')
+        this.mainLight.intensity = 1.05
+      }
+    }
   }
 
   /** 建立單一獨立台式雨夜市集攤位 */
@@ -1543,31 +1611,33 @@ export class MarketWorld {
       item.group.rotation.z = Math.sin(this.time * 1.9 + item.phase) * item.amp
     }
 
-    // 6. 微弱細雨粒子下落
-    const fallSpeed = 12.5 * dt
-    const windDrift = -1.4 * dt
-    for (let i = 0; i < this.rainCount; i += 1) {
-      const idx = i * 6
-      let y = this.rainPositions[idx + 1] - fallSpeed
-      let x = this.rainPositions[idx] + windDrift
-      if (y < 0.1) {
-        y = 13.5 + Math.random() * 2.5
-        x = (Math.random() - 0.5) * 38
+    // 6. 細雨粒子與水窪漣漪（僅在台中為雨天時運算與渲染）
+    if (this.currentWeather.condition === 'rainy' && this.rainLines) {
+      const fallSpeed = 12.5 * dt
+      const windDrift = -1.4 * dt
+      for (let i = 0; i < this.rainCount; i += 1) {
+        const idx = i * 6
+        let y = this.rainPositions[idx + 1] - fallSpeed
+        let x = this.rainPositions[idx] + windDrift
+        if (y < 0.1) {
+          y = 13.5 + Math.random() * 2.5
+          x = (Math.random() - 0.5) * 38
+        }
+        this.rainPositions[idx] = x
+        this.rainPositions[idx + 1] = y
+        this.rainPositions[idx + 3] = x - 0.06
+        this.rainPositions[idx + 4] = y - 0.52
       }
-      this.rainPositions[idx] = x
-      this.rainPositions[idx + 1] = y
-      this.rainPositions[idx + 3] = x - 0.06
-      this.rainPositions[idx + 4] = y - 0.52
-    }
-    const posAttr = this.rainLines.geometry.getAttribute('position') as THREE.BufferAttribute
-    posAttr.needsUpdate = true
+      const posAttr = this.rainLines.geometry.getAttribute('position') as THREE.BufferAttribute
+      posAttr.needsUpdate = true
 
-    // 7. 濕潤柏油路細雨漣漪
-    for (const r of this.rainRipples) {
-      r.phase = (r.phase + dt * r.speed) % 1
-      const s = 0.6 + r.phase * 2.4
-      r.mesh.scale.set(s, s, 1)
-      r.mat.opacity = (1 - r.phase) * 0.24
+      // 7. 濕潤柏油路細雨漣漪
+      for (const r of this.rainRipples) {
+        r.phase = (r.phase + dt * r.speed) % 1
+        const s = 0.6 + r.phase * 2.4
+        r.mesh.scale.set(s, s, 1)
+        r.mat.opacity = (1 - r.phase) * 0.24
+      }
     }
   }
 }

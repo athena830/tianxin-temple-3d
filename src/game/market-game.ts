@@ -4,7 +4,13 @@ import type { Input } from '../engine/input'
 import { Physics, RAPIER } from '../engine/physics'
 import type { Renderer } from '../engine/renderer'
 import { CONFIG } from './config'
-import { MarketWorld, type MarketPoint, type MarketPointId } from './market-world'
+import {
+  MarketWorld,
+  fetchTaichungWeather,
+  type MarketPoint,
+  type MarketPointId,
+  type TaichungWeatherInfo,
+} from './market-world'
 import { disposeWorldScene } from './world-dispose'
 
 export type MarketMode = 'browse' | 'explore' | 'panel'
@@ -47,6 +53,7 @@ export class MarketGame {
   private pendingInteractId: MarketPointId | null = null
   private lastMoveSpeed = 0
   private lastFacingYaw = 0
+  private weatherSyncTimer = 0
   active: MarketPoint | null = null
   onNear: (point: MarketPoint | null) => void = () => undefined
 
@@ -66,11 +73,20 @@ export class MarketGame {
 
     this.onPointerMoveBound = (e: PointerEvent) => this.handlePointerMove(e)
     this.renderer.gl.domElement.addEventListener('pointermove', this.onPointerMoveBound)
+    void this.syncLiveWeather()
   }
 
   /** 預留介面：透過 GLTFLoader 替換真實 3D 角色模型 */
   loadCharacterModel(url: string, targetHeight = 1.65): Promise<THREE.Object3D> {
     return this.world.loadCharacterModel(url, targetHeight)
+  }
+
+  /** 同步台中即時氣象至市集場景（晴天／雨天／多雲／日夜） */
+  async syncLiveWeather(): Promise<TaichungWeatherInfo> {
+    const info = await fetchTaichungWeather()
+    this.world.applyWeather(info)
+    window.dispatchEvent(new CustomEvent('market:weather', { detail: info }))
+    return info
   }
 
   enter(): void {
@@ -87,6 +103,7 @@ export class MarketGame {
     this.clearMoveTarget()
     this.world.setHoveredPoint(null)
     this.audio.play('chime')
+    void this.syncLiveWeather()
   }
 
   /** 切換為正面平視攤位角度（水平直視門面、招牌與道具） */
@@ -236,6 +253,12 @@ export class MarketGame {
   }
 
   step(dt: number): void {
+    this.weatherSyncTimer += dt
+    if (this.weatherSyncTimer >= 180) {
+      this.weatherSyncTimer = 0
+      void this.syncLiveWeather()
+    }
+
     const look = this.input.takeLook()
     const zoom = this.input.takeZoom()
     const clicks = this.input.takeClicks()
