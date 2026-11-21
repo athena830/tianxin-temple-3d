@@ -1,2 +1,2 @@
-/** VER 3.70.8 — 移除右上角大殿微調（Main Hall Scale）控制面板，固定大殿最佳黃金比例 1.35x。 */
-export const APP_VERSION = 'VER 3.70.8'
+/** VER 3.70.9 — 全面打通正殿通往後殿玉皇上帝（凌霄寶殿）之左右穿堂通道，移除通道阻礙立柱與牆體，實現全平面無障礙直通後殿。 */
+export const APP_VERSION = 'VER 3.70.9'

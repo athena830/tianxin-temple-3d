@@ -658,29 +658,29 @@ export class TempleWorld {
     }
 
     // 2. Solid Back Wall with Wide Grand Passageway Doors to Rear Hall (神龕背牆與通往後殿之開闊穿堂大門)
-    // Central Shrine Back Wall (中央主殿神龕實體背牆，通高 8.0m 直達大殿重檐屋架，徹底隔絕後方殿宇背景，確保神聖莊嚴)
-    const backCenter = new THREE.Mesh(new THREE.BoxGeometry(8.2, 8.0, 0.6), makeMat('#543b2f'))
+    // Central Shrine Back Wall (中央主殿神龕實體背牆，寬 7.6m、通高 8.0m 直達大殿重檐屋架，兩側留出超過 5.1m 寬之超大穿堂通道)
+    const backCenter = new THREE.Mesh(new THREE.BoxGeometry(7.6, 8.0, 0.6), makeMat('#543b2f'))
     backCenter.position.set(0, 4.0, -6.4)
     backCenter.castShadow = true
     backCenter.receiveShadow = true
     hall.add(backCenter)
 
-    // Left & Right Outer Back Walls (左右外側背牆與寬闊連通御門，通道寬達 3.3 公尺、通高 4.25 公尺，上方背牆同樣通高 8.0m 封頂)
+    // Left & Right Outer Back Walls (左右外側背牆與超寬闊連通御門，世界座標通道淨寬達 5.13 公尺、完全無柱阻擋)
     for (const side of [-1, 1]) {
-      const outerWall = new THREE.Mesh(new THREE.BoxGeometry(2.2, 8.0, 0.6), makeMat('#543b2f'))
-      outerWall.position.set(side * 8.5, 4.0, -6.4)
+      const outerWall = new THREE.Mesh(new THREE.BoxGeometry(2.0, 8.0, 0.6), makeMat('#543b2f'))
+      outerWall.position.set(side * 8.6, 4.0, -6.4)
       outerWall.castShadow = true
       outerWall.receiveShadow = true
       hall.add(outerWall)
 
-      // Grand arch door lintel spanning 3.3m wide open passageway
-      const doorLintel = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.85, 0.6), redDark)
-      doorLintel.position.set(side * 5.75, 4.68, -6.4)
+      // Grand arch door lintel spanning 3.8m (world 5.13m) wide open passageway
+      const doorLintel = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.85, 0.6), redDark)
+      doorLintel.position.set(side * 5.7, 4.68, -6.4)
       hall.add(doorLintel)
 
       // Upper wall above door lintel up to y = 8.0m ceiling
-      const doorUpperWall = new THREE.Mesh(new THREE.BoxGeometry(3.3, 2.9, 0.6), makeMat('#543b2f'))
-      doorUpperWall.position.set(side * 5.75, 6.55, -6.4)
+      const doorUpperWall = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.9, 0.6), makeMat('#543b2f'))
+      doorUpperWall.position.set(side * 5.7, 6.55, -6.4)
       doorUpperWall.castShadow = true
       doorUpperWall.receiveShadow = true
       hall.add(doorUpperWall)
@@ -835,9 +835,11 @@ export class TempleWorld {
     }
 
     // 5. Main Columns, Carved Dragon Pillars & Crossbeams (大木作柱梁系統：金環立柱、前門雙龍柱與鰲魚雀替)
+    // 殿內 (z = -0.2, -5.8) 僅於兩側靠牆處 (x = ±8.6) 設柱，確保通往後殿凌霄寶殿之左右穿堂走道 (x = ±3.8 ~ ±7.6) 完全無柱暢通！
     const cyanStone = makeMat('#41554c', 0.85, 0.25)
     for (const z of [-5.8, -0.2, 5.2]) {
-      for (const x of [-8.1, -5.4, 5.4, 8.1]) {
+      const colXs = z === 5.2 ? [-8.1, -5.4, 5.4, 8.1] : [-8.6, 8.6]
+      for (const x of colXs) {
         const isDragonCol = z === 5.2 && (x === -5.4 || x === 5.4)
         if (isDragonCol) {
           // 青石雙龍盤柱（雕塑青石龍柱柱身、八角蓮花柱礎與盤旋金龍金環）
@@ -1182,38 +1184,20 @@ export class TempleWorld {
     const darkWood = makeMat(C.darkWood, 0.88)
     const gold = makeMat(C.gold, 0.48, 0.28)
     const stonePlinth = makeMat('#9e9382', 0.94)
-    const balustradeMat = makeMat('#d6cfc2', 0.88)
     const jade = makeMat(C.jade, 0.4, 0.25)
 
-    // 1. Grand Elevated Podium (凌霄寶殿宏偉巨型石台基: 寬 24.0m x 深 16.5m x 高 0.28m，與主殿走廊完全等高平整)
-    const podium = new THREE.Mesh(new THREE.BoxGeometry(24.0, 0.28, 16.5), stonePlinth)
-    podium.position.set(0, 0.14, 0)
+    // 1. Grand Elevated Podium (凌霄寶殿宏偉巨型石台基: 寬 24.0m x 深 17.5m，與主殿台基完全無縫齊平銜接，中間無任何阻礙柱或階差)
+    const podium = new THREE.Mesh(new THREE.BoxGeometry(24.0, 0.38, 17.5), stonePlinth)
+    podium.position.set(0, 0.19, 0.5)
     podium.receiveShadow = true
     rear.add(podium)
-    addRearBox(new THREE.Vector3(0, 0.14, -25.0), new THREE.Vector3(24.0, 0.28, 16.5))
+    addRearBox(new THREE.Vector3(0, 0.19, -24.5), new THREE.Vector3(24.0, 0.38, 17.5))
 
-    // Courtyard Atrium Stone Paving & Seamless Connecting Covered Walkways (天井與左右連通穿堂迴廊，無障礙平整銜接)
+    // Courtyard Atrium Stone Paving & Seamless Connecting Covered Walkways (天井與左右連通穿堂迴廊，全平面無柱無障礙銜接)
     for (const side of [-1, 1]) {
-      // Covered walkway floor connecting Main Hall seamlessly to Rear Hall at y = 0.28m (positioned strictly between halls, no indoor penetration)
-      const corridorFloor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.28, 1.2), stonePlinth)
-      corridorFloor.position.set(side * 5.85, 0.14, 8.5)
-      corridorFloor.receiveShadow = true
-      rear.add(corridorFloor)
-      addRearBox(new THREE.Vector3(side * 5.85, 0.14, -16.5), new THREE.Vector3(3.6, 0.28, 1.2))
-
-      // Walkway Pillars placed on outer edges in the courtyard (立柱位於天井通道外側，通道中央寬敞通暢，不侵入大殿)
-      const cPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 4.4, 10), red)
-      cPillar.position.set(side * 7.6, 2.2, 8.8)
-      rear.add(cPillar)
-      addRearCylinder(new THREE.Vector3(side * 7.6, 2.2, 8.8 - 25.0), 0.22, 4.4)
-
-      // Notice: Main Hall roof (depth 21.87m, extending back past z = -18.2m) and Rear Hall roof (reaching z = -15.75m)
-      // already span and overlap seamlessly by over 2.4m above the walkway, so no intermediate miniature roof is needed
-      // (preventing any indoor roof eaves from obstructing deity sightlines).
-
-      // Walkway warm ceiling lantern (穿堂連通迴廊原神璃月六角挑簷長明宮燈)
+      // Walkway warm ceiling lantern (穿堂連通迴廊原神璃月六角挑簷長明宮燈，高懸於 y = 4.2m 不影響通行)
       const corrLantern = new THREE.Group()
-      corrLantern.position.set(side * 5.85, 3.6, 8.5)
+      corrLantern.position.set(side * 6.8, 4.2, 8.5)
       const corrCord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.45, 4), gold)
       corrCord.position.y = 0.32
       const corrCap = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.32, 0.14, 6), gold)
@@ -1232,57 +1216,23 @@ export class TempleWorld {
       rear.add(corrLantern)
 
       const corrLight = new THREE.PointLight('#ffbf66', 1.8, 12, 1.5)
-      corrLight.position.set(side * 5.85, 3.4, 8.5)
+      corrLight.position.set(side * 6.8, 3.8, 8.5)
       rear.add(corrLight)
     }
 
-    // 2. Approach Steps & Imperial Dragon Ramp (登殿大階梯、中央雲龍陛與兩側望柱欄杆)
-    // Central Imperial Dragon Ramp (中央丹墀雲龍陛)
-    const dragonRamp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 1.6), makeMat('#5f7169', 0.88, 0.15))
-    dragonRamp.position.set(0, 0.18, 8.8)
-    dragonRamp.rotation.x = -0.18
-    dragonRamp.receiveShadow = true
-    rear.add(dragonRamp)
+    // 2. Central Imperial Dragon Relief Embedded Flush in Courtyard Terrace (中央御路雲龍陛嵌花石雕，與台基完全齊平不阻擋行走)
     const dragonRelief = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.2, 1.3),
+      new THREE.PlaneGeometry(2.6, 1.6),
       this.textMaterial('丹 墀 雲 龍 陛', '#dfc47b', '#35433d')
     )
-    dragonRelief.position.set(0, 0.24, 8.8)
-    dragonRelief.rotation.x = -Math.PI / 2 + 0.18
+    dragonRelief.position.set(0, 0.385, 7.8)
+    dragonRelief.rotation.x = -Math.PI / 2
     rear.add(dragonRelief)
 
-    // Front 2-Tier Grand Stone Steps (前庭登殿雙級石階，步高僅 0.14m，行者輕鬆邁步登殿)
-    const step1 = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.14, 0.8), stonePlinth)
-    step1.position.set(0, 0.07, 8.65)
-    step1.receiveShadow = true
-    rear.add(step1)
-    addRearBox(new THREE.Vector3(0, 0.07, -16.35), new THREE.Vector3(9.2, 0.14, 0.8))
-
-    const step2 = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.14, 0.6), stonePlinth)
-    step2.position.set(0, 0.21, 8.1)
-    step2.receiveShadow = true
-    rear.add(step2)
-    addRearBox(new THREE.Vector3(0, 0.21, -16.9), new THREE.Vector3(8.6, 0.14, 0.6))
-
-    // White Stone Balustrade (僅配置於外側端緣，通道完全暢通無阻)
-    for (const side of [-1, 1]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.56, 0.16), balustradeMat)
-      rail.position.set(side * 10.0, 0.55, 8.1)
-      rear.add(rail)
-      for (let x = 8.5; x <= 11.5; x += 1.5) {
-        const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.82, 0.22), balustradeMat)
-        post.position.set(side * x, 0.62, 8.1)
-        const lotusBud = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), balustradeMat)
-        lotusBud.position.set(side * x, 1.08, 8.1)
-        lotusBud.scale.set(0.9, 1.3, 0.9)
-        rear.add(post, lotusBud)
-      }
-    }
-
-    // 3. Grand Front Facade & Majestic Imperial Triple Doors (宏偉三川殿廓、6.4m 極度寬敞大御門暢行無阻)
+    // 3. Grand Front Facade & Majestic Imperial Triple Open Portals (三川三門全敞通透格局：左虎門、中御門、右龍門全面暢通無柱阻擋)
     const frontZ = 6.2
-    // Front eave six grand pillars (前簷六大金柱，中門淨寬達 6.4 公尺)
-    for (const x of [-10.5, -6.8, -3.2, 3.2, 6.8, 10.5]) {
+    // Front eave four grand pillars placed outside the walkways (僅於兩側端角 ±11.2m 與中門兩側 ±3.6m 設柱，左右穿堂通道 ±4.2m~±10.6m 完全無柱無牆！)
+    for (const x of [-11.2, -3.6, 3.6, 11.2]) {
       const col = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 6.4, 14), red)
       col.position.set(x, 3.2, frontZ)
       col.castShadow = true
@@ -1298,25 +1248,24 @@ export class TempleWorld {
     frontBeam.position.set(0, 6.45, frontZ)
     rear.add(frontBeam)
 
-    // Central Grand Open Palace Portal (中央大敞御門，中央 6.4m 通透門洞，人物可自由暢行進出)
+    // Open Side Archway Lintels & Interior Decorative Screens (左右龍虎門上方高聳額枋，下方 6.4m 寬通道完全敞開直通玉皇上帝殿堂)
     for (const side of [-1, 1]) {
-      const wallPanel = new THREE.Mesh(new THREE.BoxGeometry(6.8, 5.2, 0.4), darkWood)
-      wallPanel.position.set(side * 7.8, 2.86, frontZ)
-      wallPanel.castShadow = true
-      rear.add(wallPanel)
-      addRearBox(new THREE.Vector3(side * 7.8, 2.86, frontZ - 25.0), new THREE.Vector3(6.8, 5.2, 0.4))
+      const sidePortalLintel = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.85, 0.45), redDark)
+      sidePortalLintel.position.set(side * 7.4, 5.55, frontZ)
+      rear.add(sidePortalLintel)
 
-      // Carved Gilded Window Screen (金雕花鳥連雲格扇窗)
+      // Carved Gilded Window Screen mounted on interior side wall (金雕花鳥連雲格扇屏風移至殿內兩側山牆，完全不阻擋入口通道)
       const windowScreen = new THREE.Mesh(
         new THREE.PlaneGeometry(3.6, 2.4),
         this.textMaterial('五 福 臨 門', '#dfc17c', '#3e2417')
       )
-      windowScreen.position.set(side * 7.4, 3.1, frontZ + 0.22)
+      windowScreen.position.set(side * 11.2, 3.1, 1.5)
+      windowScreen.rotation.y = -side * (Math.PI / 2)
       rear.add(windowScreen)
 
-      // Grand Double Palace Doors (九龍殿大御門與天宮護法門神：王靈官、馬天君)
+      // Grand Double Palace Doors (九龍殿大御門與天宮護法門神：王靈官、馬天君，向殿內90度敞開貼合柱側，不佔走道)
       const doorLeaf = new THREE.Group()
-      doorLeaf.position.set(side * 3.2, 2.66, frontZ)
+      doorLeaf.position.set(side * 3.6, 2.66, frontZ)
       const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(2.3, 4.8, 0.12), makeMat('#8c261b', 0.72))
       doorMesh.position.set(side * -1.15, 0, 0)
       doorMesh.castShadow = true
@@ -1341,8 +1290,8 @@ export class TempleWorld {
       knocker.position.set(side * -0.42, 0, 0.09)
       doorLeaf.add(knocker)
 
-      // 朝向殿內靠兩側敞開約 43 度（保留中央 3.06m 宏偉走道，信眾暢行瞻仰玉皇上帝）
-      doorLeaf.rotation.y = -side * 0.76
+      // 朝向殿內 90 度敞開（中央與兩側走道完全寬敞通透）
+      doorLeaf.rotation.y = -side * (Math.PI / 2)
       rear.add(doorLeaf)
     }
 
@@ -1395,8 +1344,8 @@ export class TempleWorld {
       addRearBox(new THREE.Vector3(sx, 3.4, -25.65), new THREE.Vector3(0.65, 6.8, 14.5))
     }
 
-    // 6. Inner Imperial Pillars (殿內四大通天金柱與金龍盤繞)
-    for (const x of [-6.2, 6.2]) {
+    // 6. Inner Imperial Pillars (殿內四大通天金柱與金龍盤繞，移至外側 x = ±10.2m 確保左右連通走道完全寬敞無阻)
+    for (const x of [-10.2, 10.2]) {
       for (const z of [2.2, -3.2]) {
         const inCol = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.52, 6.4, 14), red)
         inCol.position.set(x, 3.2, z)
@@ -5252,8 +5201,8 @@ export class TempleWorld {
     // 2. Central shrine back wall
     this.mainHallColliders.push(
       this.physics.addStaticBox(
-        new THREE.Vector3(0, 2.55 * scale, hallZ - 6.4 * scale),
-        new THREE.Vector3(8.2 * scale, 5.1 * scale, 0.6 * scale)
+        new THREE.Vector3(0, 4.0 * scale, hallZ - 6.4 * scale),
+        new THREE.Vector3(7.6 * scale, 8.0 * scale, 0.6 * scale)
       )
     )
 
@@ -5261,8 +5210,8 @@ export class TempleWorld {
     for (const side of [-1, 1]) {
       this.mainHallColliders.push(
         this.physics.addStaticBox(
-          new THREE.Vector3(side * 8.5 * scale, 2.55 * scale, hallZ - 6.4 * scale),
-          new THREE.Vector3(2.2 * scale, 5.1 * scale, 0.6 * scale)
+          new THREE.Vector3(side * 8.6 * scale, 4.0 * scale, hallZ - 6.4 * scale),
+          new THREE.Vector3(2.0 * scale, 8.0 * scale, 0.6 * scale)
         )
       )
     }
@@ -5298,9 +5247,10 @@ export class TempleWorld {
       )
     }
 
-    // 7. Columns (vermilion & dragon pillars)
+    // 7. Columns (vermilion & dragon pillars: interior columns only near outer walls ±8.6 to keep side walkways 100% clear)
     for (const z of [-5.8, -0.2, 5.2]) {
-      for (const x of [-8.1, -5.4, 5.4, 8.1]) {
+      const colXs = z === 5.2 ? [-8.1, -5.4, 5.4, 8.1] : [-8.6, 8.6]
+      for (const x of colXs) {
         const isDragonCol = z === 5.2 && (x === -5.4 || x === 5.4)
         const rad = (isDragonCol ? 0.42 : 0.36) * scale
         const h = 5.0 * scale
