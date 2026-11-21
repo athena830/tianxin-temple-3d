@@ -374,15 +374,68 @@ body[data-world="market"] .hud-top button[data-act="music"] {
 .market-panel .btn {
   pointer-events: auto !important;
 }
-.ro-dialog-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: linear-gradient(180deg, #9cc4eb 0%, #6899ce 52%, #5081b7 100%); border-bottom: 2px solid #2b435c; color: #ffffff; font-weight: 700; font-size: 13px; text-shadow: 0 1px 1px rgba(20, 38, 60, 0.65); }
-.ro-dialog-body { padding: 22px 24px 26px; }
-.market-panel h2 { margin: 5px 0 12px; font: 700 24px var(--serif); color: #24577a; }
-.market-panel p { line-height: 1.7; color: #2b435a; }
-.market-panel .eyebrow { color: #3f7a6d; }
-.market-panel .info { color: #3e5b74; }
-.market-panel .venue-intro { margin: 0 0 14px; font-size: 13px; line-height: 1.6; color: #3b5c7c; }
-.market-panel .panel-x { position: static; width: 26px; height: 26px; border: 1.5px solid #243b54; border-radius: 4px; background: linear-gradient(180deg, #fff6f6, #e8c4c4); color: #541d1d; font-size: 18px; line-height: 1; display: grid; place-items: center; cursor: pointer; }
-.market-panel .panel-x:hover { background: #ffdede; }
+
+.ro-dialog-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: linear-gradient(180deg, #9cc4eb 0%, #6899ce 52%, #5081b7 100%);
+  border-bottom: 2px solid #2b435c;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  text-shadow: 0 1px 1px rgba(20, 38, 60, 0.65);
+}
+
+.ro-dialog-body {
+  padding: 22px 24px 26px;
+}
+
+.market-panel h2 {
+  margin: 5px 0 12px;
+  font: 700 24px var(--serif);
+  color: #24577a;
+}
+
+.market-panel p {
+  line-height: 1.7;
+  color: #2b435a;
+}
+
+.market-panel .eyebrow {
+  color: #3f7a6d;
+}
+
+.market-panel .info {
+  color: #3e5b74;
+}
+
+.market-panel .venue-intro {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #3b5c7c;
+}
+
+.market-panel .panel-x {
+  position: static;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid #243b54;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #fff6f6, #e8c4c4);
+  color: #541d1d;
+  font-size: 18px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.market-panel .panel-x:hover {
+  background: #ffdede;
+}
 
 .market-ro-hud[hidden] {
   display: none;

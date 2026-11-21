@@ -260,7 +260,7 @@ const C = {
 export const COURTYARD_PRAYER_WALL_POS = new THREE.Vector3(8.8, 0, 8.2)
 
 const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
-  { id: 'incense', title: '上香祈福', subtitle: '於香爐前敬香祈願', radius: 3.2 },
+  { id: 'incense', title: '上香祈福', subtitle: '於香爐前敬香祈願', radius: 1.8 },
   { id: 'prayer', title: '大殿外廣場・祈願牆', subtitle: '書寫心願，祈求平安吉祥', radius: 3.4 },
   { id: 'offerings', title: '虛擬供奉', subtitle: '供花、供果、供茶', radius: 3.0 },
   { id: 'daily-lot', title: '每日抽籤', subtitle: '靜心抽取今日籤詩', radius: 3.0 },
@@ -279,7 +279,7 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'market-portal', title: '踏入靈光時空門', subtitle: '前往天心靈光市集', radius: 2.8 },
 ]
 const pointPositions: [number, number][] = [
-  [0, 0.4], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z + 1.4], [-2.25, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
+  [0, 6.39], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z + 1.4], [-2.25, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],
   [12.5, 2.2], [8.5, -6.2], [12.4, -5.6], [LOTUS_POND.x - 5.8, LOTUS_POND.z], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z + 1.4], [15, 0.2],
   [-12.4, -5.6], [0, -23.5], [GOLD_FURNACE.x + 3.2, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x + 4.8, DRAGON_GUANYIN_POS.z],
@@ -289,7 +289,7 @@ const pointPositions: [number, number][] = [
 
 /** Object each station faces, used to orient visitors who use the quick guide. */
 export const POINT_TARGETS: [number, number][] = [
-  [0, -2.55], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z], [-2.25, -4.55], [-12, 1.2], [PAVILION.x, PAVILION.z],
+  [0, 6.39], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z], [-2.25, -4.55], [-12, 1.2], [PAVILION.x, PAVILION.z],
   [12.5, -1.6], [8.5, -8.5], [15.2, -8], [LOTUS_POND.x, LOTUS_POND.z], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z], [17.2, 0.2],
   [-15.2, -8.0], [0, -30.2], [GOLD_FURNACE.x, GOLD_FURNACE.z],
   [DRAGON_GUANYIN_POS.x, DRAGON_GUANYIN_POS.z],
@@ -1719,7 +1719,7 @@ export class TempleWorld {
       urn.add(ember)
     }
     this.scene.add(urn)
-    this.outdoorUrnCollider = this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, urnZ), 0.86, 1.1)
+    this.outdoorUrnCollider = this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, urnZ), 0.52, 1.1)
 
     // 原神璃月風格七星蓮華祈願長明神燈（平安燈、財神燈、文昌燈）
     this.lamps.forEach((lamp, i) => {
@@ -5073,7 +5073,7 @@ export class TempleWorld {
       if (this.outdoorUrnCollider) {
         this.physics.removeCollider(this.outdoorUrnCollider)
       }
-      this.outdoorUrnCollider = this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, urnZ), 0.86, 1.1)
+      this.outdoorUrnCollider = this.physics.addStaticCylinder(new THREE.Vector3(0, 0.55, urnZ), 0.52, 1.1)
       if (this.incenseGlow) {
         this.incenseGlow.position.set(0, 1.8, urnZ - 0.05)
       }
@@ -5135,37 +5135,34 @@ export class TempleWorld {
       )
     )
 
-    // 1b. Grand front steps & anti-stuck incline ramp across all three temple gates
-    // Upper step tier (0.14m to 0.28m, z: 6.65 to 7.15)
-    for (const [x, w] of [[0, 4.6], [6.75, 2.8], [-6.75, 2.8]] as const) {
-      this.mainHallColliders.push(
-        this.physics.addStaticBox(
-          new THREE.Vector3(x * scale, 0.14 * scale, hallZ + 6.9 * scale),
-          new THREE.Vector3(w * scale, 0.28 * scale, 0.5 * scale)
-        )
-      )
-    }
+    // 1b. Seamless approach ramps & stairs across all three temple portals
+    // Continuous incline ramp (8.6° slope: ground level to 0.28m podium top over 1.85m run)
+    // Starting in front of the steps at z = hallZ + 8.45 * scale (submerged at y = -0.04m to eliminate vertical lip)
+    // and rising seamlessly to meet podium at z = hallZ + 6.60 * scale (y = 0.28 * scale)
+    const run = 1.85 * scale
+    const rise = 0.28 * scale
+    const rampTheta = Math.atan2(rise, run)
+    const rampLen = Math.hypot(rise, run)
+    const rampCenterZ = hallZ + ((8.45 + 6.60) / 2) * scale
+    const rampCenterY = (rise / 2) - 0.015
+    const rampRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), rampTheta)
 
-    // Lower step tier (0.0m to 0.14m, z: 7.15 to 7.9)
-    for (const [x, w] of [[0, 4.6], [6.75, 2.8], [-6.75, 2.8]] as const) {
+    for (const [x, w] of [[0, 5.4], [6.75, 3.2], [-6.75, 3.2]] as const) {
       this.mainHallColliders.push(
         this.physics.addStaticBox(
-          new THREE.Vector3(x * scale, 0.07 * scale, hallZ + 7.525 * scale),
-          new THREE.Vector3(w * scale, 0.14 * scale, 0.75 * scale)
-        )
-      )
-    }
-
-    // Smooth invisible transition ramp colliders (12.6° incline: 0 to 0.28m over 1.25m run)
-    const rampTheta = Math.atan2(0.28, 1.25)
-    const rampLen = Math.hypot(0.28, 1.25) * scale
-    const rampRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -rampTheta)
-    for (const [x, w] of [[0, 4.6], [6.75, 2.8], [-6.75, 2.8]] as const) {
-      this.mainHallColliders.push(
-        this.physics.addStaticBox(
-          new THREE.Vector3(x * scale, 0.14 * scale, hallZ + 7.275 * scale),
-          new THREE.Vector3(w * scale, 0.06 * scale, rampLen),
+          new THREE.Vector3(x * scale, rampCenterY, rampCenterZ),
+          new THREE.Vector3(w * scale, 0.08 * scale, rampLen),
           rampRot
+        )
+      )
+    }
+
+    // Supportive step foundations under the ramp (recessed behind ramp surface to prevent snagging)
+    for (const [x, w] of [[0, 5.0], [6.75, 2.8], [-6.75, 2.8]] as const) {
+      this.mainHallColliders.push(
+        this.physics.addStaticBox(
+          new THREE.Vector3(x * scale, 0.10 * scale, hallZ + 7.0 * scale),
+          new THREE.Vector3(w * scale, 0.20 * scale, 0.8 * scale)
         )
       )
     }

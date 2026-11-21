@@ -527,6 +527,16 @@ export class TempleGame {
       this.pendingStationId = null
       this.clickMarker.position.set(hit.point.x, hit.point.y + 0.04, hit.point.z)
       this.clickMarker.visible = true
+    } else if (hit.point.z < 6.0 && hit.point.y < 4.8 && Math.abs(hit.point.x) < 5.0) {
+      // Clicked on Main Hall door / door gods / threshold / entrance facade / steps:
+      // Walk directly towards the entrance doorway floor!
+      const floorY = 0.38
+      const targetZ = Math.max(hit.point.z, -3.5)
+      this.navQueue = []
+      this.targetDestination = new THREE.Vector3(hit.point.x, floorY, targetZ)
+      this.pendingStationId = null
+      this.clickMarker.position.set(hit.point.x, floorY + 0.04, targetZ)
+      this.clickMarker.visible = true
     }
     return null
   }
