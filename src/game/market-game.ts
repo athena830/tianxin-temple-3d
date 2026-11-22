@@ -126,7 +126,7 @@ export class MarketGame {
 
   /** 切換為正面平視攤位角度（水平直視門面、招牌與道具） */
   setEyeLevelView(): void {
-    this.targetAzimuth = 0.0
+    this.targetAzimuth = this.active?.id === 'service-desk' ? Math.PI : 0.0
     this.targetElevation = EYE_LEVEL_ELEVATION
     this.cameraZoom = SHARED_ORTHO_CAMERA_CONFIG.zoom
   }
