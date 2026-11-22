@@ -1,5 +1,4 @@
 import './styles/main.css'
-import GUI from 'lil-gui'
 import { Audio, getUserMuted } from './engine/audio'
 import { Assets } from './engine/assets'
 import { Input } from './engine/input'
@@ -374,24 +373,7 @@ async function boot(): Promise<void> {
   const initialScale = 1.35
   g.setMainHallScale(initialScale)
 
-  // 暫時性除錯輔助：僅於「靈光市集」顯示整體建築比例微調拉桿（0.7 ~ 1.5，預設 1.0），玉皇宮主場景完全隱藏
   let activeMarketGame: MarketGame | undefined
-  const marketGui = new GUI({ title: '市集比例微調 (Debug)' })
-  const marketGuiParams = {
-    marketBuildingScale: 1.0,
-    reset: () => {
-      marketGuiParams.marketBuildingScale = 1.0
-      marketScaleController.setValue(1.0)
-    },
-  }
-  const marketScaleController = marketGui
-    .add(marketGuiParams, 'marketBuildingScale', 0.7, 1.5, 0.01)
-    .name('建築整體比例')
-    .onChange((val: number) => {
-      activeMarketGame?.setMarketBuildingScale(val)
-    })
-  marketGui.add(marketGuiParams, 'reset').name('重設預設 (1.00x)')
-  marketGui.domElement.style.display = 'none'
 
   if (import.meta.env.DEV) {
     const [{ registerGameTuning }, { tuning }] = await Promise.all([import('../scripts/manus-tuning/adapter.js'), import('./game/tuning')])
@@ -413,13 +395,11 @@ async function boot(): Promise<void> {
       const next = new MarketGame(renderer, input, audio)
       next.onNear = point => ui.near(point)
       next.setCharacter(store.data.character)
-      next.setMarketBuildingScale(marketGuiParams.marketBuildingScale)
       return next
     },
     onTransition: (state, message) => ui.setWorldTransition(state !== 'idle', message),
     onWorldChanged: (world: WorldId, active) => {
       ui.setWorld(world)
-      marketGui.domElement.style.display = world === 'market' ? '' : 'none'
       if (world === 'temple') {
         game = active as TempleGame
         activeMarketGame = undefined
@@ -427,7 +407,6 @@ async function boot(): Promise<void> {
         game = undefined
         activeMarketGame = active as MarketGame
         activeMarketGame.setCharacter(store.data.character)
-        activeMarketGame.setMarketBuildingScale(marketGuiParams.marketBuildingScale)
       }
       ui.setMode(active.mode)
 
