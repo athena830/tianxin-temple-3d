@@ -193,14 +193,14 @@ function makeNeonSignTexture(
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.shadowColor = '#f26ee8'
-      ctx.shadowBlur = 18
-      ctx.fillStyle = '#fff0c8'
+      ctx.shadowBlur = 8
+      ctx.fillStyle = '#fff4fa'
       ctx.font = '700 58px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
       ctx.fillText(zh, 256, 68)
 
       ctx.shadowColor = '#ffd36e'
-      ctx.shadowBlur = 12
-      ctx.fillStyle = '#ff9ef6'
+      ctx.shadowBlur = 6
+      ctx.fillStyle = '#ffbaf9'
       ctx.font = '700 28px "Segoe UI", sans-serif'
       ctx.fillText(en, 256, 120)
     } else if (style === 'reiki') {
@@ -217,14 +217,14 @@ function makeNeonSignTexture(
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.shadowColor = '#72f2c8'
-      ctx.shadowBlur = 18
-      ctx.fillStyle = '#dcfff4'
+      ctx.shadowBlur = 8
+      ctx.fillStyle = '#d8fff3'
       ctx.font = '700 56px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
       ctx.fillText(zh, 256, 68)
 
       ctx.shadowColor = '#b488ff'
-      ctx.shadowBlur = 12
-      ctx.fillStyle = '#d3b8ff'
+      ctx.shadowBlur = 6
+      ctx.fillStyle = '#dbc4ff'
       ctx.font = '700 28px "Segoe UI", sans-serif'
       ctx.fillText(en, 256, 120)
     } else if (style === 'tarot') {
@@ -241,14 +241,14 @@ function makeNeonSignTexture(
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.shadowColor = '#ffd36e'
-      ctx.shadowBlur = 18
-      ctx.fillStyle = '#ffeab0'
+      ctx.shadowBlur = 8
+      ctx.fillStyle = '#ffefbe'
       ctx.font = '700 56px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
       ctx.fillText(zh, 256, 68)
 
       ctx.shadowColor = '#b694ff'
-      ctx.shadowBlur = 12
-      ctx.fillStyle = '#ffd36e'
+      ctx.shadowBlur = 6
+      ctx.fillStyle = '#ffd87a'
       ctx.font = '700 28px "Segoe UI", sans-serif'
       ctx.fillText(en, 256, 120)
     } else if (style === 'consultation') {
@@ -285,13 +285,13 @@ function makeNeonSignTexture(
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.shadowColor = '#00e5ff'
-      ctx.shadowBlur = 18
+      ctx.shadowBlur = 8
       ctx.fillStyle = '#00e5ff'
       ctx.font = '700 56px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
       ctx.fillText(zh, 256, 68)
 
       ctx.shadowColor = '#ffd54f'
-      ctx.shadowBlur = 12
+      ctx.shadowBlur = 6
       ctx.fillStyle = '#ffd54f'
       ctx.font = '700 28px "Segoe UI", sans-serif'
       ctx.fillText(en, 256, 120)
@@ -306,7 +306,7 @@ function makeNeonSignTexture(
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.shadowColor = '#79c6ff'
-      ctx.shadowBlur = 14
+      ctx.shadowBlur = 7
       ctx.fillStyle = '#e8f6ff'
       ctx.font = '700 52px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
       ctx.fillText(zh, 256, 68)
@@ -325,7 +325,7 @@ function makeNeonSignTexture(
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.shadowColor = '#ff8c52'
-      ctx.shadowBlur = 16
+      ctx.shadowBlur = 7
       ctx.fillStyle = '#ffe9a8'
       ctx.font = '700 54px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
       ctx.fillText(zh, 256, 68)
@@ -573,13 +573,13 @@ export class MarketWorld {
     for (const [key, ref] of this.visualRefs.entries()) {
       const active = key === id
       if (ref.signMaterial) {
-        ref.signMaterial.emissiveIntensity = active ? ref.baseEmissiveIntensity * 1.48 : ref.baseEmissiveIntensity
+        ref.signMaterial.emissiveIntensity = active ? ref.baseEmissiveIntensity * 1.35 : ref.baseEmissiveIntensity
       }
       if (ref.glowHalo) {
-        ref.glowHalo.material.opacity = active ? Math.min(0.95, ref.baseHaloOpacity * 1.65) : ref.baseHaloOpacity
+        ref.glowHalo.material.opacity = active ? Math.min(0.24, ref.baseHaloOpacity * 1.6) : ref.baseHaloOpacity
       }
       if (ref.pointLight) {
-        ref.pointLight.intensity = active ? ref.baseLightIntensity * 1.45 : ref.baseLightIntensity
+        ref.pointLight.intensity = active ? ref.baseLightIntensity * 1.3 : ref.baseLightIntensity
       }
       ref.ringMaterial.opacity = active ? 0.92 : 0.34
       ref.ring.scale.setScalar(active ? 1.12 : 1.0)
@@ -974,14 +974,14 @@ export class MarketWorld {
     backWall.receiveShadow = true
     group.add(backWall)
 
-    // 攤位內部暖黃木格窗與微光室內裝潢（呈現真實室內深度與鎢絲燈暖光）
+    // 攤位內部暖黃木格窗與微光室內裝潢（呈現真實室內深度與鎢絲燈暖光，柔和微光）
     const winW = width * 0.44
     const winH = 0.85
     const innerWindowMat = new THREE.MeshStandardMaterial({
       color: '#ffebb8',
       emissive: '#ffb84d',
-      emissiveIntensity: 1.45,
-      roughness: 0.25,
+      emissiveIntensity: 0.55,
+      roughness: 0.35,
     })
     const innerWindow = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), innerWindowMat)
     innerWindow.position.set(0, height * 0.62, -depth / 2 + 0.2)
@@ -999,8 +999,8 @@ export class MarketWorld {
       group.add(transom)
     }
 
-    // 室內暖黃鎢絲燈點光源
-    const interiorWarmLight = new THREE.PointLight('#ffca7a', 2.4, 5.2, 1.8)
+    // 室內暖黃鎢絲燈點光源（自然柔和微光）
+    const interiorWarmLight = new THREE.PointLight('#ffca7a', 0.85, 4.2, 2.0)
     interiorWarmLight.position.set(0, height * 0.72, -0.2)
     group.add(interiorWarmLight)
 
@@ -1036,7 +1036,7 @@ export class MarketWorld {
 
     // 4. 屋頂上方立體 3D 金屬燈箱與實體凸起霓虹燈管招牌（Physical 3D Neon Sign）
     const signTex = makeNeonSignTexture(spec.signZh, spec.signEn, spec.style)
-    const baseEmissive = spec.style === 'consultation' ? 1.05 : 1.32
+    const baseEmissive = spec.style === 'consultation' ? 0.36 : 0.44
     const neonSign = create3DNeonSign(
       spec.signZh,
       spec.signEn,
@@ -1045,31 +1045,32 @@ export class MarketWorld {
       spec.accentHex,
       spec.secondaryHex,
       signTex,
+      baseEmissive,
     )
     neonSign.group.position.set(0, height + 0.94, depth / 2 - 0.02)
     group.add(neonSign.group)
     const signMat = neonSign.faceMaterial
 
-    // 招牌霓虹柔光光暈（置於招牌後方，強化 Bloom 氛圍）
+    // 招牌霓虹柔光光暈（精緻微弱光暈，避免夜空中過大刺眼光暈）
     const haloTex = makeGlowHaloTexture(spec.accentHex)
     const haloMat = new THREE.SpriteMaterial({
       map: haloTex,
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.09,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
     const halo = new THREE.Sprite(haloMat)
     halo.position.set(0, height + 0.94, depth / 2 - 0.24)
-    halo.scale.set(width + 1.8, 2.7, 1)
+    halo.scale.set(width + 0.6, 1.8, 1)
     group.add(halo)
 
     // 5. 各攤位專屬台式特色裝潢與道具
     this.decorateStallByStyle(group, spec, width, depth, height, woodMat, woodDarkMat)
 
-    // 6. 攤位專屬暖色／霓虹點光源（照亮雨夜濕潤街道）
-    const lightIntensity = spec.style === 'reiki' ? 4.4 : 4.0
-    const stallLight = new THREE.PointLight(spec.accentHex, lightIntensity, 9.5, 1.7)
+    // 6. 攤位專屬暖色／霓虹點光源（照亮雨夜濕潤街道，柔和均勻不刺眼）
+    const lightIntensity = spec.style === 'reiki' ? 1.45 : 1.35
+    const stallLight = new THREE.PointLight(spec.accentHex, lightIntensity, 7.2, 1.9)
     stallLight.position.set(0, height - 0.2, depth / 2 + 0.85)
     group.add(stallLight)
 
@@ -1077,7 +1078,7 @@ export class MarketWorld {
     const puddleRefMat = new THREE.MeshBasicMaterial({
       map: haloTex,
       transparent: true,
-      opacity: 0.24,
+      opacity: 0.16,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
@@ -1145,7 +1146,7 @@ export class MarketWorld {
       ring,
       ringMaterial: ringMat,
       glowHalo: halo,
-      baseHaloOpacity: 0.42,
+      baseHaloOpacity: 0.09,
       pointLight: stallLight,
       baseLightIntensity: lightIntensity,
     })
@@ -1190,7 +1191,7 @@ export class MarketWorld {
         new THREE.MeshStandardMaterial({
           color: '#ffe39c',
           emissive: '#ffbe55',
-          emissiveIntensity: 1.8,
+          emissiveIntensity: 0.65,
         }),
       )
       lampShade.position.set(0.85, 1.24, depth / 2 - 0.55)
@@ -1204,7 +1205,7 @@ export class MarketWorld {
       const glassMat = new THREE.MeshStandardMaterial({
         color: '#8cf7dc',
         emissive: '#47b89c',
-        emissiveIntensity: 0.45,
+        emissiveIntensity: 0.14,
         transparent: true,
         opacity: 0.36,
         roughness: 0.12,
@@ -1224,9 +1225,9 @@ export class MarketWorld {
         new THREE.MeshStandardMaterial({
           color: '#8e74e8',
           emissive: '#6ef2c4',
-          emissiveIntensity: 1.15,
+          emissiveIntensity: 0.32,
           transparent: true,
-          opacity: 0.68,
+          opacity: 0.35,
         }),
       )
       innerGlow.position.set(0, height / 2, -depth / 2 + 0.22)
@@ -1277,7 +1278,7 @@ export class MarketWorld {
         new THREE.MeshStandardMaterial({
           color: '#e5dcff',
           emissive: '#9f82ff',
-          emissiveIntensity: 2.2,
+          emissiveIntensity: 0.85,
           roughness: 0.15,
         }),
       )
@@ -1289,7 +1290,7 @@ export class MarketWorld {
         new THREE.SpriteMaterial({
           map: makeGlowHaloTexture('#b89aff'),
           transparent: true,
-          opacity: 0.72,
+          opacity: 0.22,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
         }),
@@ -1309,7 +1310,7 @@ export class MarketWorld {
         new THREE.MeshStandardMaterial({
           color: '#fff3c4',
           emissive: '#ffc94d',
-          emissiveIntensity: 2.0,
+          emissiveIntensity: 0.75,
         }),
       )
       bulb.position.set(0, height - 0.48, depth / 2 - 0.3)
@@ -1321,7 +1322,7 @@ export class MarketWorld {
         new THREE.MeshStandardMaterial({
           color: '#ffe082',
           emissive: '#ffbf3f',
-          emissiveIntensity: 1.5,
+          emissiveIntensity: 0.65,
         }),
       )
       sideBox.position.set(width / 2 + 0.18, height - 0.4, depth / 2 - 0.2)
@@ -1349,7 +1350,7 @@ export class MarketWorld {
         new THREE.MeshStandardMaterial({
           color: '#0d2230',
           emissive: '#00e5ff',
-          emissiveIntensity: 0.85,
+          emissiveIntensity: 0.48,
           roughness: 0.28,
         }),
       )
@@ -1368,14 +1369,14 @@ export class MarketWorld {
         new THREE.MeshStandardMaterial({
           color: '#ffd54f',
           emissive: '#00e5ff',
-          emissiveIntensity: 1.8,
+          emissiveIntensity: 0.65,
         }),
       )
       lamp.position.set(0, 1.05, depth / 2 - 0.52)
       group.add(lamp)
 
       // 攤位內微弱的藍金色點光源（呼應心靈探討主題）
-      const innerBlueGoldLight = new THREE.PointLight('#00e5ff', 2.2, 5.5, 1.8)
+      const innerBlueGoldLight = new THREE.PointLight('#00e5ff', 0.75, 4.2, 2.0)
       innerBlueGoldLight.position.set(0, height * 0.65, depth / 2 - 0.5)
       group.add(innerBlueGoldLight)
 
@@ -1389,7 +1390,7 @@ export class MarketWorld {
         new THREE.MeshStandardMaterial({
           color: '#d6f0ff',
           emissive: '#6ec4ff',
-          emissiveIntensity: 1.6,
+          emissiveIntensity: 0.62,
         }),
       )
       deskLamp.position.set(0, 1.04, depth / 2 - 0.5)
@@ -1426,14 +1427,14 @@ export class MarketWorld {
       map: signTex,
       emissiveMap: signTex,
       emissive: new THREE.Color('#ffffff'),
-      emissiveIntensity: 1.65,
+      emissiveIntensity: 0.42,
       roughness: 0.3,
     })
     const sign = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.85, 0.18), signMat)
     sign.position.set(0, 3.85, 0)
     group.add(sign)
 
-    const archLight = new THREE.PointLight('#ff9a52', 3.4, 8.5, 1.8)
+    const archLight = new THREE.PointLight('#ff9a52', 1.25, 6.2, 2.0)
     archLight.position.set(0, 2.8, 0.5)
     group.add(archLight)
 

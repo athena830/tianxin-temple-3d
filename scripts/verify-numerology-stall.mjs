@@ -46,10 +46,26 @@ async function run() {
     await page.evaluate(() => window.__game?.sceneManager?.enterMarket())
     await page.waitForTimeout(2500)
 
-    // Capture market overview screenshot showing stalls
-    const marketPath = join(artifactDir, 'verify_numerology_market_view.png')
-    await page.screenshot({ path: marketPath })
-    console.log('Saved market overview screenshot:', marketPath)
+    // Click "平視攤位" button
+    const eyeBtn = await page.$('button[data-market-cam="eye-level"]')
+    if (eyeBtn) {
+      await eyeBtn.click()
+      await page.waitForTimeout(1500)
+    }
+
+    // Tilt camera slightly up to frame the upper neon signs directly
+    await page.evaluate(() => {
+      const sm = window.__game?.sceneManager
+      if (sm?.current && 'tiltCamera' in sm.current) {
+        sm.current.tiltCamera(-0.18)
+      }
+    })
+    await page.waitForTimeout(1500)
+
+    // Capture eye-level screenshot showing stalls and signs face-on
+    const eyeLevelPath = join(artifactDir, 'verify_eye_level_signs.png')
+    await page.screenshot({ path: eyeLevelPath })
+    console.log('Saved eye-level screenshot:', eyeLevelPath)
 
     // Check life-numerology button
     const numBtn = await page.$('button[data-market-target="life-numerology"]')

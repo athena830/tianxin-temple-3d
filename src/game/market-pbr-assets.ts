@@ -387,6 +387,7 @@ export function create3DNeonSign(
   accentColor: string,
   secondaryColor: string,
   faceTexture: THREE.Texture,
+  faceEmissiveIntensity = 0.44,
 ): NeonSignResult {
   const group = new THREE.Group()
   const depth = 0.28
@@ -401,13 +402,13 @@ export function create3DNeonSign(
   frameBox.castShadow = true
   group.add(frameBox)
 
-  // 2. 壓克力漫射發光面板（正面微凹鑲嵌）
+  // 2. 壓克力漫射發光面板（正面微凹鑲嵌，適度自發光確保文字清晰不曝色）
   const faceMat = new THREE.MeshStandardMaterial({
     map: faceTexture,
     emissiveMap: faceTexture,
     emissive: new THREE.Color('#ffffff'),
-    emissiveIntensity: 1.45,
-    roughness: 0.18,
+    emissiveIntensity: faceEmissiveIntensity,
+    roughness: 0.25,
     metalness: 0.05,
   })
   const faceMesh = new THREE.Mesh(
@@ -417,19 +418,19 @@ export function create3DNeonSign(
   faceMesh.position.set(0, 0, depth / 2 + 0.005)
   group.add(faceMesh)
 
-  // 3. 實體 3D 凸出立體霓虹燈管 (Physical 3D Neon Glass Tubing)
+  // 3. 實體 3D 凸出立體霓虹燈管 (Physical 3D Neon Glass Tubing) - 降低至自然發光強度避免泛白過曝
   const tubeMatAccent = new THREE.MeshStandardMaterial({
     color: accentColor,
     emissive: new THREE.Color(accentColor),
-    emissiveIntensity: 3.4,
-    roughness: 0.12,
+    emissiveIntensity: 1.15,
+    roughness: 0.18,
     metalness: 0.1,
   })
   const tubeMatSecondary = new THREE.MeshStandardMaterial({
     color: secondaryColor,
     emissive: new THREE.Color(secondaryColor),
-    emissiveIntensity: 2.8,
-    roughness: 0.12,
+    emissiveIntensity: 0.95,
+    roughness: 0.18,
     metalness: 0.1,
   })
 
@@ -475,9 +476,10 @@ export function create3DNeonSign(
     }
   }
 
-  // 專屬局部點光源（在雨夜中投射高飽和霓虹氛圍）
-  const signLight = new THREE.PointLight(accentColor, 3.2, 7.5, 1.8)
-  signLight.position.set(0, 0, depth / 2 + 0.6)
+  // 專屬局部微光點光源（提供招牌邊框自然微弱霓虹漫射，避免正面強光沖刷發光面板）
+  const signLight = new THREE.PointLight(accentColor, 0.45, 3.8, 2.0)
+  signLight.position.set(0, 0, depth / 2 + 0.5)
+  group.add(signLight)
   group.add(signLight)
 
   return {
