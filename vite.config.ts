@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       rollupOptions: {
         output: {
-          entryFileNames: 'assets/index-[hash].js',
+          entryFileNames: 'assets/index.js',
           assetFileNames: assetInfo => {
             if (assetInfo.name && assetInfo.name.endsWith('.css')) return 'assets/index.css'
             return 'assets/[name]-[hash][extname]'
