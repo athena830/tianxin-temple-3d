@@ -22,6 +22,12 @@ for (const file of distFiles) {
   cpSync(join(distDir, 'assets', file), join(rootAssetsDir, file), { recursive: true })
 }
 
+// Also provide an assets/index.js compatibility alias for any legacy links
+const entryHashed = [...distFiles].find(f => f.startsWith('index-') && f.endsWith('.js'))
+if (entryHashed) {
+  cpSync(join(distDir, 'assets', entryHashed), join(rootAssetsDir, 'index.js'), { force: true })
+}
+
 // Add cache-busting timestamp/version ONLY to index.css in dist/index.html.
 // CRITICAL: NEVER add query parameters (?v=...) to index.js because ES modules
 // require exact specifier matching. Dynamic chunks import from './index.js' (without query params);

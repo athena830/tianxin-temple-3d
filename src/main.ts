@@ -4,6 +4,7 @@ import { Audio, getUserMuted } from './engine/audio'
 import { Assets } from './engine/assets'
 import { Input } from './engine/input'
 import { GameLoop } from './engine/loop'
+import { initPhysics } from './engine/physics'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
 import type { TempleGame } from './game/temple-game'
@@ -26,6 +27,8 @@ async function boot(): Promise<void> {
   }
   hasBooted = true
   ;(window as any).__TEMPLE_BOOTING__ = true
+  // 最優先確保 Rapier WASM 物理引擎就緒，徹底杜絕非同步載入競態或 raw 未初始化
+  await initPhysics()
   const canvas = document.querySelector<HTMLCanvasElement>('#game')!
   const firstRun = safeGet(SAVE_KEY) === null
   const save = new SaveStore()
@@ -195,15 +198,13 @@ async function boot(): Promise<void> {
   ;(window as any).__templeAudio__ = audio
 
   let loaded = 0
-  const track = <T>(p: Promise<T>): Promise<T> => p.then(v => (ui.setBootProgress(0.1 + (++loaded / 4) * 0.6), v))
+  const track = <T>(p: Promise<T>): Promise<T> => p.then(v => (ui.setBootProgress(0.1 + (++loaded / 3) * 0.6), v))
   ui.setBootProgress(0.1)
-  const [{ TempleGame }, { Renderer, suggestQuality }, physics] = await Promise.all([
+  const [{ TempleGame }, { Renderer, suggestQuality }] = await Promise.all([
     track(import('./game/temple-game')),
     track(import('./engine/renderer')),
-    track(import('./engine/physics')),
     track(Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 400))])),
   ])
-  await physics.initPhysics()
   if (firstRun) save.update({ quality: suggestQuality() })
   const renderer = new Renderer(canvas, save.data.quality)
   const g = new TempleGame(renderer, input, audio)

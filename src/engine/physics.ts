@@ -10,6 +10,9 @@ export function initPhysics(): Promise<void> {
   return ready
 }
 
+// Eagerly initiate Rapier WASM loading in background upon module import
+void initPhysics()
+
 type Binding = { body: RAPIER.RigidBody; object: THREE.Object3D; prev: THREE.Vector3; prevRot: THREE.Quaternion }
 
 /**
@@ -24,6 +27,9 @@ export class Physics {
   private bindings: Binding[] = []
 
   constructor(gravity = -24) {
+    if (!RAPIER || typeof (RAPIER as any).World !== 'function') {
+      throw new Error('Rapier WASM module not initialized. Await initPhysics() first.')
+    }
     this.world = new RAPIER.World({ x: 0, y: gravity, z: 0 })
   }
 
