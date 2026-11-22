@@ -19,6 +19,12 @@ if (typeof (globalThis as any).document === 'undefined') {
 import * as THREE from 'three'
 import { initPhysics, Physics } from '../src/engine/physics'
 import { MarketWorld } from '../src/game/market-world'
+import {
+  MARKET_STALL_TARGET_HEIGHT,
+  PLAYER_TARGET_HEIGHT,
+  SHARED_ORTHO_CAMERA_CONFIG,
+  normalizeScaleToHeight,
+} from '../src/game/sceneConfig'
 
 describe('RO-style Aura Market world', () => {
   beforeAll(async () => {
@@ -45,12 +51,42 @@ describe('RO-style Aura Market world', () => {
     world.setHoveredPoint('card-house')
     world.setHoveredPoint(null)
 
+    // Verify Market avatar matches PLAYER_TARGET_HEIGHT at rest pose before walking animation
+    const avatarBody = (world as any).avatarBodyGroup as THREE.Group
+    expect(avatarBody).toBeDefined()
+    avatarBody.updateMatrixWorld(true)
+    const avatarBox = new THREE.Box3().setFromObject(avatarBody)
+    expect(avatarBox.max.y - avatarBox.min.y).toBeCloseTo(PLAYER_TARGET_HEIGHT, 2)
+    expect(avatarBox.min.y).toBeCloseTo(0, 2)
+
     // Verify ground cursor, rain particles & Q-chibi walk animation update loop run cleanly
     world.setGroundCursor(2.5, 1.5, true)
     world.update(0.16, 4.2, 0.8)
     world.update(0.16, 0, -0.5)
     world.setGroundCursor(0, 0, false)
     expect(typeof world.loadCharacterModel).toBe('function')
+
+    // Verify shared sceneConfig camera & height normalization parity
+    expect(SHARED_ORTHO_CAMERA_CONFIG.frustumSize).toBeGreaterThan(5.0)
+    expect(SHARED_ORTHO_CAMERA_CONFIG.frustumSize).toBeLessThan(6.0)
+
+    const testBox = new THREE.Mesh(new THREE.BoxGeometry(1, 4, 1), new THREE.MeshBasicMaterial())
+    testBox.position.set(0, 2.5, 0)
+    const norm = normalizeScaleToHeight(testBox, PLAYER_TARGET_HEIGHT, 0)
+    expect(norm.finalHeight).toBeCloseTo(PLAYER_TARGET_HEIGHT, 3)
+    const afterBox = new THREE.Box3().setFromObject(testBox)
+    expect(afterBox.min.y).toBeCloseTo(0, 3)
+    expect(afterBox.max.y - afterBox.min.y).toBeCloseTo(PLAYER_TARGET_HEIGHT, 3)
+
+    // Verify marketBuildingScale debug slider clamps cleanly [0.7, 1.5] without altering avatar height
+    world.setMarketBuildingScale(1.25)
+    expect(world.getMarketBuildingScale()).toBeCloseTo(1.25, 3)
+    world.setMarketBuildingScale(2.5)
+    expect(world.getMarketBuildingScale()).toBeCloseTo(1.5, 3)
+    world.setMarketBuildingScale(0.2)
+    expect(world.getMarketBuildingScale()).toBeCloseTo(0.7, 3)
+    world.setMarketBuildingScale(1.0)
+    expect(MARKET_STALL_TARGET_HEIGHT).toBeCloseTo(PLAYER_TARGET_HEIGHT * 2.3, 3)
 
     physics.dispose()
   })

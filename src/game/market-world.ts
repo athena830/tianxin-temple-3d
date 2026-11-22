@@ -1,6 +1,14 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import type { Physics } from '../engine/physics'
+import type { Physics, RAPIER } from '../engine/physics'
+import {
+  MARKET_BUILDING_SCALE_DEFAULT,
+  MARKET_BUILDING_SCALE_MAX,
+  MARKET_BUILDING_SCALE_MIN,
+  MARKET_STALL_TARGET_HEIGHT,
+  PLAYER_TARGET_HEIGHT,
+  normalizeScaleToHeight,
+} from './sceneConfig'
 
 /** 台灣雨夜霓虹 × Low-Poly 市集配色（純市集版本） */
 const PALETTE = {
@@ -394,10 +402,10 @@ export class MarketWorld {
       subtitle: '紫微排盤與命理探索',
       signZh: '紫微斗數',
       signEn: 'Ziwei',
-      x: -9.6,
-      z: -4.1,
-      interactX: -9.6,
-      interactZ: -0.9,
+      x: -7.8,
+      z: -3.4,
+      interactX: -7.8,
+      interactZ: -1.1,
       rotY: 0,
       accentHex: PALETTE.neonPink,
       secondaryHex: PALETTE.neonGold,
@@ -409,10 +417,10 @@ export class MarketWorld {
       subtitle: '能量調頻與靜心療癒',
       signZh: '靈氣療癒',
       signEn: 'Reiki',
-      x: -3.2,
-      z: -4.1,
-      interactX: -3.2,
-      interactZ: -0.9,
+      x: -2.6,
+      z: -3.4,
+      interactX: -2.6,
+      interactZ: -1.1,
       rotY: 0,
       accentHex: PALETTE.neonReiki,
       secondaryHex: PALETTE.neonViolet,
@@ -424,10 +432,10 @@ export class MarketWorld {
       subtitle: '水晶球指引與牌卡占卜',
       signZh: '塔羅占卜',
       signEn: 'Tarot',
-      x: 3.2,
-      z: -4.1,
-      interactX: 3.2,
-      interactZ: -0.9,
+      x: 2.6,
+      z: -3.4,
+      interactX: 2.6,
+      interactZ: -1.1,
       rotY: 0,
       accentHex: PALETTE.neonGold,
       secondaryHex: PALETTE.neonViolet,
@@ -439,10 +447,10 @@ export class MarketWorld {
       subtitle: '傳統問事與心靈對話',
       signZh: '問事／心靈諮詢',
       signEn: 'Consultation',
-      x: 9.6,
-      z: -4.1,
-      interactX: 9.6,
-      interactZ: -0.9,
+      x: 7.8,
+      z: -3.4,
+      interactX: 7.8,
+      interactZ: -1.1,
       rotY: 0,
       accentHex: PALETTE.neonAmber,
       secondaryHex: PALETTE.lanternRed,
@@ -454,10 +462,10 @@ export class MarketWorld {
       subtitle: '導覽資訊與預約備忘',
       signZh: '市集服務台',
       signEn: 'Info Desk',
-      x: 12.6,
-      z: 6.4,
-      interactX: 11.4,
-      interactZ: 4.4,
+      x: 10.6,
+      z: 5.6,
+      interactX: 9.6,
+      interactZ: 4.0,
       rotY: Math.PI,
       accentHex: '#79c6ff',
       secondaryHex: '#d8f0ff',
@@ -502,9 +510,23 @@ export class MarketWorld {
   private groundCursorActive = false
   private hoveredId: MarketPointId | null = null
 
+  /** 可受 `marketBuildingScale` 除錯拉桿即時等比例調整之市集建築與物件清單 */
+  private marketBuildingScale = MARKET_BUILDING_SCALE_DEFAULT
+  private readonly scalableBuildings: {
+    group: THREE.Object3D
+    baseTargetHeight: number
+    groundY: number
+    hotspot?: THREE.Mesh
+    hotspotBaseSize?: THREE.Vector3
+    collider?: RAPIER.Collider
+    colliderPos?: { x: number; z: number }
+    colliderBaseSize?: THREE.Vector3
+  }[] = []
+
   // Q 版低面數角色與 GLTFLoader 佔位節點
   private avatarVisualRoot = new THREE.Group()
   private avatarBodyGroup?: THREE.Group
+  private avatarBaseY = 0
   private avatarLeftLeg?: THREE.Mesh
   private avatarRightLeg?: THREE.Mesh
   private avatarLeftArm?: THREE.Mesh
@@ -526,7 +548,7 @@ export class MarketWorld {
       id: 'return-temple',
       title: '返回天心宮',
       subtitle: '沿街口牌樓回到天心玉皇宮',
-      position: new THREE.Vector3(-12.2, 0, 5.2),
+      position: new THREE.Vector3(-10.4, 0, 4.6),
       radius: 2.4,
     }
     this.points = [...this.venuePoints, this.returnPoint]
@@ -576,10 +598,43 @@ export class MarketWorld {
   }
 
   /**
+   * 除錯輔助：動態調整市集整體建築與街景物件比例（0.7 ~ 1.5，預設 1.0）。
+   * 僅改變各建築群組的 scale 與貼地位置，不更動人物身高（維持 PLAYER_TARGET_HEIGHT）與任何美術材質。
+   */
+  setMarketBuildingScale(scale: number): void {
+    const s = THREE.MathUtils.clamp(scale, MARKET_BUILDING_SCALE_MIN, MARKET_BUILDING_SCALE_MAX)
+    this.marketBuildingScale = s
+
+    for (const entry of this.scalableBuildings) {
+      normalizeScaleToHeight(entry.group, entry.baseTargetHeight * s, entry.groundY)
+
+      if (entry.hotspot && entry.hotspotBaseSize) {
+        entry.hotspot.scale.setScalar(s)
+        entry.hotspot.position.y = entry.groundY + (entry.hotspotBaseSize.y * s) / 2
+      }
+
+      if (entry.collider && entry.colliderPos && entry.colliderBaseSize) {
+        this.physics.removeCollider(entry.collider)
+        const sx = entry.colliderBaseSize.x * s
+        const sy = entry.colliderBaseSize.y * s
+        const sz = entry.colliderBaseSize.z * s
+        entry.collider = this.physics.addStaticBox(
+          new THREE.Vector3(entry.colliderPos.x, entry.groundY + sy / 2, entry.colliderPos.z),
+          new THREE.Vector3(sx, sy, sz),
+        )
+      }
+    }
+  }
+
+  getMarketBuildingScale(): number {
+    return this.marketBuildingScale
+  }
+
+  /**
    * 預留 GLTFLoader 替換真實 3D 角色模型的介面。
    * 載入完成後會自動替換低面數 Q 版佔位幾何體，並維持既有移動與陰影設定。
    */
-  async loadCharacterModel(url: string, targetHeight = 1.65): Promise<THREE.Object3D> {
+  async loadCharacterModel(url: string, targetHeight = PLAYER_TARGET_HEIGHT): Promise<THREE.Object3D> {
     const loader = new GLTFLoader()
     const gltf = await loader.loadAsync(url)
     const model = gltf.scene
@@ -591,16 +646,8 @@ export class MarketWorld {
       }
     })
 
-    // 自動校正模型高度與腳底貼地
-    const box = new THREE.Box3().setFromObject(model)
-    const size = new THREE.Vector3()
-    box.getSize(size)
-    if (size.y > 0.001) {
-      const scale = targetHeight / size.y
-      model.scale.setScalar(scale)
-      const scaledBox = new THREE.Box3().setFromObject(model)
-      model.position.y -= scaledBox.min.y
-    }
+    // 使用共用 normalizeScaleToHeight 自動校正模型高度與腳底貼地
+    normalizeScaleToHeight(model, targetHeight, 0)
 
     this.avatarVisualRoot.clear()
     this.avatarVisualRoot.add(model)
@@ -1394,21 +1441,43 @@ export class MarketWorld {
 
     this.scene.add(group)
 
-    // 8. 物理碰撞體（防止角色穿過攤位）
-    this.physics.addStaticBox(
-      new THREE.Vector3(spec.x, height / 2, spec.z),
-      new THREE.Vector3(width + 0.2, height, depth + 0.2),
+    // 7b. 以人物身高（PLAYER_TARGET_HEIGHT）之 2.3 倍為基準等比例縮放攤位並精準貼地，完全不改動內部材質與結構
+    const groundY = 0.09
+    const targetStallHeight = isInfo ? MARKET_STALL_TARGET_HEIGHT * 0.88 : MARKET_STALL_TARGET_HEIGHT
+    const { scaleFactor } = normalizeScaleToHeight(group, targetStallHeight, groundY)
+
+    // 8. 物理碰撞體（依實際等比例縮放後尺寸建立，防止角色穿過攤位）
+    const colW = (width + 0.16) * scaleFactor
+    const colH = targetStallHeight
+    const colD = (depth + 0.16) * scaleFactor
+    const collider = this.physics.addStaticBox(
+      new THREE.Vector3(spec.x, groundY + colH / 2, spec.z),
+      new THREE.Vector3(colW, colH, colD),
     )
 
     // 9. 點擊熱區（Hotspot）與地面互動高亮環
+    const hotW = (width + 0.4) * scaleFactor
+    const hotH = targetStallHeight + 0.35
+    const hotD = (depth + 0.8) * scaleFactor
     const hotspot = new THREE.Mesh(
-      new THREE.BoxGeometry(width + 0.4, height + 1.6, depth + 0.8),
+      new THREE.BoxGeometry(hotW, hotH, hotD),
       new THREE.MeshBasicMaterial({ visible: false }),
     )
-    hotspot.position.set(spec.x, (height + 1.6) / 2, spec.z)
+    hotspot.position.set(spec.x, groundY + hotH / 2, spec.z)
     hotspot.userData.marketPointId = spec.id
     this.scene.add(hotspot)
     this.hotspotMeshes.push(hotspot)
+
+    this.scalableBuildings.push({
+      group,
+      baseTargetHeight: targetStallHeight,
+      groundY,
+      hotspot,
+      hotspotBaseSize: new THREE.Vector3(hotW, hotH, hotD),
+      collider,
+      colliderPos: { x: spec.x, z: spec.z },
+      colliderBaseSize: new THREE.Vector3(colW, colH, colD),
+    })
 
     const ringMat = new THREE.MeshBasicMaterial({
       color: spec.accentHex,
@@ -1683,16 +1752,32 @@ export class MarketWorld {
 
     this.scene.add(group)
 
+    // 等比例縮放返回天心宮牌樓並精準貼齊地面
+    const archGroundY = 0.02
+    const archTargetHeight = MARKET_STALL_TARGET_HEIGHT * 1.04
+    const { scaleFactor: archScale } = normalizeScaleToHeight(group, archTargetHeight, archGroundY)
+
     // 點擊熱區與地面互動環
+    const hotW = 3.4 * archScale
+    const hotH = archTargetHeight + 0.2
+    const hotD = 1.6 * archScale
     const hotspot = new THREE.Mesh(
-      new THREE.BoxGeometry(3.4, 4.4, 1.6),
+      new THREE.BoxGeometry(hotW, hotH, hotD),
       new THREE.MeshBasicMaterial({ visible: false }),
     )
-    hotspot.position.set(pos.x, 2.2, pos.z)
+    hotspot.position.set(pos.x, archGroundY + hotH / 2, pos.z)
     hotspot.rotation.y = Math.PI / 5
     hotspot.userData.marketPointId = 'return-temple'
     this.scene.add(hotspot)
     this.hotspotMeshes.push(hotspot)
+
+    this.scalableBuildings.push({
+      group,
+      baseTargetHeight: archTargetHeight,
+      groundY: archGroundY,
+      hotspot,
+      hotspotBaseSize: new THREE.Vector3(hotW, hotH, hotD),
+    })
 
     const ringMat = new THREE.MeshBasicMaterial({
       color: '#ffcf66',
@@ -1762,8 +1847,15 @@ export class MarketWorld {
       poleGroup.add(streetLight)
 
       this.scene.add(poleGroup)
-      poleTops.push(new THREE.Vector3(px, 6.2, pz))
-      this.physics.addStaticCylinder(new THREE.Vector3(px, 1.4, pz), 0.28, 2.8)
+      const poleTargetHeight = PLAYER_TARGET_HEIGHT * 3.6
+      normalizeScaleToHeight(poleGroup, poleTargetHeight, 0)
+      this.scalableBuildings.push({
+        group: poleGroup,
+        baseTargetHeight: poleTargetHeight,
+        groundY: 0,
+      })
+      poleTops.push(new THREE.Vector3(px, poleTargetHeight * 0.91, pz))
+      this.physics.addStaticCylinder(new THREE.Vector3(px, 1.4, pz), 0.24, 2.8)
     }
 
     // 垂弧黑色電線連接四角電線桿（中央視角完全無阻擋）
@@ -1799,23 +1891,43 @@ export class MarketWorld {
       this.swayingLanterns.push({ group: lantern, phase: i * 0.75, amp: 0.065 })
     }
 
-    // 路邊橘白反光三角錐（Traffic Cones）
+    // 路邊橘白反光三角錐（Traffic Cones，依人物比例等比縮放並貼齊地面）
     const conePositions: [number, number][] = [
-      [-13.0, -0.75],
-      [-6.4, -0.85],
-      [6.4, -0.85],
-      [13.4, -0.75],
+      [-11.8, -0.75],
+      [-5.2, -0.85],
+      [5.2, -0.85],
+      [11.8, -0.75],
       [-4.2, 7.25],
       [8.2, 7.25],
     ]
+    const coneTargetHeight = PLAYER_TARGET_HEIGHT * 0.32
     for (const [cx, cz] of conePositions) {
-      this.scene.add(this.createTrafficCone(cx, cz))
+      const cone = this.createTrafficCone(cx, cz)
+      this.scene.add(cone)
+      normalizeScaleToHeight(cone, coneTargetHeight, 0.01)
+      this.scalableBuildings.push({
+        group: cone,
+        baseTargetHeight: coneTargetHeight,
+        groundY: 0.01,
+      })
     }
 
-    // 街角散落的台式塑膠小板凳
-    this.scene.add(this.createStool(-5.8, 0.24, 8.6, PALETTE.stoolRed))
-    this.scene.add(this.createStool(-5.1, 0.24, 8.9, PALETTE.stoolBlue))
-    this.scene.add(this.createStool(5.4, 0.24, 8.7, PALETTE.stoolRed))
+    // 街角散落的台式塑膠小板凳（依人物比例等比縮放並貼齊人行道地面）
+    const stoolTargetHeight = PLAYER_TARGET_HEIGHT * 0.22
+    for (const [sx, sz, col] of [
+      [-5.8, 8.6, PALETTE.stoolRed],
+      [-5.1, 8.9, PALETTE.stoolBlue],
+      [5.4, 8.7, PALETTE.stoolRed],
+    ] as const) {
+      const stool = this.createStool(sx, 0, sz, col)
+      this.scene.add(stool)
+      normalizeScaleToHeight(stool, stoolTargetHeight, 0.09)
+      this.scalableBuildings.push({
+        group: stool,
+        baseTargetHeight: stoolTargetHeight,
+        groundY: 0.09,
+      })
+    }
   }
 
   private createLantern(colorHex: string, radius: number, height: number): THREE.Group {
@@ -2036,6 +2148,10 @@ export class MarketWorld {
     this.avatarLeftArm = leftArm
     this.avatarRightArm = rightArm
 
+    // 套用共用 PLAYER_TARGET_HEIGHT，確保市集人物與玉皇宮角色身高 100% 一致並腳底精準貼地 y = 0
+    normalizeScaleToHeight(bodyGroup, PLAYER_TARGET_HEIGHT, 0)
+    this.avatarBaseY = bodyGroup.position.y
+
     this.avatarVisualRoot.add(bodyGroup)
     this.avatar.add(this.avatarVisualRoot)
     this.scene.add(this.avatar)
@@ -2074,13 +2190,13 @@ export class MarketWorld {
         if (this.avatarRightLeg) this.avatarRightLeg.rotation.x = -swing
         if (this.avatarLeftArm) this.avatarLeftArm.rotation.x = -swing * 0.8
         if (this.avatarRightArm) this.avatarRightArm.rotation.x = swing * 0.8
-        this.avatarBodyGroup.position.y = Math.abs(Math.sin(this.walkCycle)) * 0.06
+        this.avatarBodyGroup.position.y = this.avatarBaseY + Math.abs(Math.sin(this.walkCycle)) * 0.06
       } else {
         if (this.avatarLeftLeg) this.avatarLeftLeg.rotation.x *= 0.82
         if (this.avatarRightLeg) this.avatarRightLeg.rotation.x *= 0.82
         if (this.avatarLeftArm) this.avatarLeftArm.rotation.x *= 0.82
         if (this.avatarRightArm) this.avatarRightArm.rotation.x *= 0.82
-        this.avatarBodyGroup.position.y = Math.sin(this.time * 2.5) * 0.02
+        this.avatarBodyGroup.position.y = this.avatarBaseY + Math.sin(this.time * 2.5) * 0.02
       }
     }
 

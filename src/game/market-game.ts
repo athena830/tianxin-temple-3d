@@ -11,41 +11,50 @@ import {
   type MarketPointId,
   type TaichungWeatherInfo,
 } from './market-world'
+import { PLAYER_TARGET_HEIGHT, SHARED_ORTHO_CAMERA_CONFIG } from './sceneConfig'
 import { disposeWorldScene } from './world-dispose'
 
 export type MarketMode = 'browse' | 'explore' | 'panel'
 const HALF_HEIGHT = 0.55
 const RADIUS = 0.36
 const FOOT_OFFSET = HALF_HEIGHT + RADIUS
-const DEFAULT_AZIMUTH = 0.24 // 正交 2.5D 俯視角，完整呈現雨夜霓虹街道與四間獨立攤位
-const DEFAULT_ELEVATION = 0.68
-const EYE_LEVEL_ELEVATION = 0.06 // 正面平視攤位角度（水平直視攤位門面與招牌）
-const MIN_ELEVATION = 0.02 // 允許平視至近乎水平
-const MAX_ELEVATION = 1.20 // 允許高空俯視
-const CAMERA_DISTANCE = 28
+const DEFAULT_AZIMUTH = SHARED_ORTHO_CAMERA_CONFIG.defaultAzimuth
+const DEFAULT_ELEVATION = SHARED_ORTHO_CAMERA_CONFIG.defaultElevation
+const EYE_LEVEL_ELEVATION = SHARED_ORTHO_CAMERA_CONFIG.eyeLevelElevation
+const MIN_ELEVATION = SHARED_ORTHO_CAMERA_CONFIG.minElevation
+const MAX_ELEVATION = SHARED_ORTHO_CAMERA_CONFIG.maxElevation
+const CAMERA_DISTANCE = SHARED_ORTHO_CAMERA_CONFIG.distance
 const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 
 /**
  * 台灣雨夜霓虹 × Low-Poly 2.5D「靈光市集」互動遊戲控制層。
- * 具備 OrthographicCamera 360° 全方位旋轉正交視角、Raycaster + Lerp 點擊地面移動、
+ * 強制共用 `sceneConfig.ts` 中與玉皇宮一致的 OrthographicCamera 視覺比例，
+ * 具備 360° 全方位旋轉正交視角、Raycaster + Lerp 點擊地面移動、
  * 攤位點擊熱區（Hotspots）與滑鼠移入高亮回饋，以及 GLTFLoader 角色模型替換介面。
  */
 export class MarketGame {
   mode: MarketMode = 'explore'
   readonly physics = new Physics(-24)
   readonly world = new MarketWorld(this.physics)
-  /** 正交 2.5D 俯視角鏡頭，支援 360° 自由旋轉、仰角微調與滾輪縮放 */
-  readonly camera = new THREE.OrthographicCamera(-8, 8, 8, -8, -40, 140)
+  /** 正交 2.5D 俯視角鏡頭，強制共用玉皇宮視覺比例參數，支援 360° 自由旋轉、仰角微調與滾輪縮放 */
+  readonly camera = new THREE.OrthographicCamera(
+    -SHARED_ORTHO_CAMERA_CONFIG.frustumSize / 2,
+    SHARED_ORTHO_CAMERA_CONFIG.frustumSize / 2,
+    SHARED_ORTHO_CAMERA_CONFIG.frustumSize / 2,
+    -SHARED_ORTHO_CAMERA_CONFIG.frustumSize / 2,
+    SHARED_ORTHO_CAMERA_CONFIG.near,
+    SHARED_ORTHO_CAMERA_CONFIG.far,
+  )
   readonly body: RAPIER.RigidBody
   private readonly collider: RAPIER.Collider
   private readonly controller: RAPIER.KinematicCharacterController
   private readonly raycaster = new THREE.Raycaster()
   private readonly onPointerMoveBound: (e: PointerEvent) => void
-  private zoom = 10.6
-  private azimuth = DEFAULT_AZIMUTH
-  private targetAzimuth = DEFAULT_AZIMUTH
-  private elevation = DEFAULT_ELEVATION
-  private targetElevation = DEFAULT_ELEVATION
+  private cameraZoom: number = SHARED_ORTHO_CAMERA_CONFIG.zoom
+  private azimuth: number = DEFAULT_AZIMUTH
+  private targetAzimuth: number = DEFAULT_AZIMUTH
+  private elevation: number = DEFAULT_ELEVATION
+  private targetElevation: number = DEFAULT_ELEVATION
   private cameraTarget = new THREE.Vector3()
   private cameraReady = false
   private verticalVelocity = 0
@@ -77,8 +86,17 @@ export class MarketGame {
   }
 
   /** 預留介面：透過 GLTFLoader 替換真實 3D 角色模型 */
-  loadCharacterModel(url: string, targetHeight = 1.65): Promise<THREE.Object3D> {
+  loadCharacterModel(url: string, targetHeight = PLAYER_TARGET_HEIGHT): Promise<THREE.Object3D> {
     return this.world.loadCharacterModel(url, targetHeight)
+  }
+
+  /** 除錯輔助：即時微調市集整體建築比例（0.7 ~ 1.5，預設 1.0） */
+  setMarketBuildingScale(scale: number): void {
+    this.world.setMarketBuildingScale(scale)
+  }
+
+  getMarketBuildingScale(): number {
+    return this.world.getMarketBuildingScale()
   }
 
   /** 同步台中即時氣象至市集場景（晴天／雨天／多雲／日夜） */
@@ -98,7 +116,7 @@ export class MarketGame {
     this.targetAzimuth = DEFAULT_AZIMUTH
     this.elevation = DEFAULT_ELEVATION
     this.targetElevation = DEFAULT_ELEVATION
-    this.zoom = window.innerHeight > window.innerWidth ? 13.8 : 10.6
+    this.cameraZoom = window.innerHeight > window.innerWidth ? SHARED_ORTHO_CAMERA_CONFIG.zoom * 0.78 : SHARED_ORTHO_CAMERA_CONFIG.zoom
     this.cameraReady = false
     this.clearMoveTarget()
     this.world.setHoveredPoint(null)
@@ -110,14 +128,14 @@ export class MarketGame {
   setEyeLevelView(): void {
     this.targetAzimuth = 0.0
     this.targetElevation = EYE_LEVEL_ELEVATION
-    this.zoom = 8.2
+    this.cameraZoom = SHARED_ORTHO_CAMERA_CONFIG.zoom
   }
 
   /** 切換為 2.5D 俯視全景角度 */
   setOverview(): void {
     this.targetAzimuth = DEFAULT_AZIMUTH
-    this.targetElevation = DEFAULT_ELEVATION
-    this.zoom = 10.6
+    this.targetElevation = SHARED_ORTHO_CAMERA_CONFIG.overviewElevation
+    this.cameraZoom = SHARED_ORTHO_CAMERA_CONFIG.overviewZoom
   }
 
   /** 向上或向下微調俯仰角（radians，負值更平視，正值更俯視） */
@@ -134,9 +152,11 @@ export class MarketGame {
     this.targetAzimuth += deltaRadians
   }
 
-  /** 重設市集視角至預設俯視角度 */
+  /** 重設市集視角至與玉皇宮一致的預設視覺比例角度 */
   resetCamera(): void {
-    this.setOverview()
+    this.targetAzimuth = DEFAULT_AZIMUTH
+    this.targetElevation = DEFAULT_ELEVATION
+    this.cameraZoom = SHARED_ORTHO_CAMERA_CONFIG.zoom
   }
 
   startExplore(): void { this.mode = 'explore' }
@@ -275,7 +295,11 @@ export class MarketGame {
           MAX_ELEVATION,
         )
       }
-      this.zoom = THREE.MathUtils.clamp(this.zoom * Math.exp(zoom * 0.0012), 7.2, 16.0)
+      this.cameraZoom = THREE.MathUtils.clamp(
+        this.cameraZoom * Math.exp(-zoom * 0.0012),
+        SHARED_ORTHO_CAMERA_CONFIG.minZoom,
+        SHARED_ORTHO_CAMERA_CONFIG.maxZoom,
+      )
     }
     if (this.mode === 'explore' && clicks.length > 0) {
       const lastClick = clicks[clicks.length - 1]
@@ -352,7 +376,11 @@ export class MarketGame {
     this.azimuth += (this.targetAzimuth - this.azimuth) * smooth
     this.elevation += (this.targetElevation - this.elevation) * smooth
 
-    const targetY = THREE.MathUtils.lerp(feet.y + 1.45, feet.y + 1.05, Math.min(1, this.elevation / DEFAULT_ELEVATION))
+    const targetY = THREE.MathUtils.lerp(
+      feet.y + SHARED_ORTHO_CAMERA_CONFIG.lookHeight,
+      feet.y + 0.95,
+      Math.min(1, this.elevation / SHARED_ORTHO_CAMERA_CONFIG.overviewElevation),
+    )
     const target = new THREE.Vector3(feet.x, targetY, feet.z)
     if (!this.cameraReady) {
       this.cameraTarget.copy(target)
@@ -361,10 +389,12 @@ export class MarketGame {
       this.cameraTarget.lerp(target, 1 - Math.exp(-10 * dtClamp))
     }
     const aspect = Math.max(0.5, window.innerWidth / Math.max(1, window.innerHeight))
-    this.camera.top = this.zoom
-    this.camera.bottom = -this.zoom
-    this.camera.right = this.zoom * aspect
-    this.camera.left = -this.zoom * aspect
+    const halfH = SHARED_ORTHO_CAMERA_CONFIG.frustumSize / 2
+    this.camera.top = halfH
+    this.camera.bottom = -halfH
+    this.camera.right = halfH * aspect
+    this.camera.left = -halfH * aspect
+    this.camera.zoom = this.cameraZoom
     this.camera.updateProjectionMatrix()
 
     const horiz = Math.cos(this.elevation) * CAMERA_DISTANCE
