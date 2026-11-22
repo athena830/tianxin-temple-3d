@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { Chibi } from './chibi'
 import { RAPIER, type Physics } from '../engine/physics'
 import type { LampId, OfferingId } from './temple-data'
-import { FrontCourtyard, GOLD_FURNACE, LOTUS_POND, PAVILION, STAND, WISH_POOL } from './temple-courtyard'
+import { FrontCourtyard, GOLD_FURNACE, LOTUS_POND, PAVILION, STAND } from './temple-courtyard'
 import { NpcManager } from './npc-system'
 
 export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
@@ -4429,15 +4429,13 @@ export class TempleWorld {
       const d = Math.hypot(point.position.x - position.x, point.position.z - position.z)
       if (d <= point.radius && d < best) { nearest = point; best = d }
     }
-    // Also support wishing-pool trigger when approaching either the right-side lotus pond (LOTUS_POND) or left-side wish pool (WISH_POOL)
+    // Support wishing-pool trigger when approaching the east-side grand lotus pond (LOTUS_POND)
     const wishPoint = this.points.find(p => p.id === 'wishing-pool')
     if (wishPoint) {
       const dLotus = Math.hypot(LOTUS_POND.x - 5.8 - position.x, LOTUS_POND.z - position.z)
-      const dWish = Math.hypot(WISH_POOL.x + 3.9 - position.x, WISH_POOL.z - position.z)
-      const minD = Math.min(dLotus, dWish)
-      if (minD <= 4.8 && minD < best) {
+      if (dLotus <= 4.8 && dLotus < best) {
         nearest = wishPoint
-        best = minD
+        best = dLotus
       }
     }
     return nearest
@@ -4863,21 +4861,7 @@ export class TempleWorld {
   }
 
   private initRestingCoins(): void {
-    // 1. Scatter authentic resting coins in the left wish pool (WISH_POOL)
-    for (let i = 0; i < 16; i++) {
-      const coin = this.createCoinMesh()
-      const ang = Math.random() * Math.PI * 2
-      const rad = 0.3 + Math.random() * 1.4
-      const x = WISH_POOL.x + Math.cos(ang) * rad
-      const z = WISH_POOL.z + Math.sin(ang) * rad
-      const y = 0.038 + Math.random() * 0.015
-      coin.position.set(x, y, z)
-      coin.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.25)
-      this.scene.add(coin)
-      this.restingCoins.push(coin)
-    }
-
-    // 2. Scatter authentic resting coins in the grand right-side lotus pond (LOTUS_POND)
+    // Scatter authentic resting coins in the grand right-side lotus pond (LOTUS_POND)
     for (let i = 0; i < 28; i++) {
       const coin = this.createCoinMesh()
       const ang = Math.random() * Math.PI * 2
@@ -4895,17 +4879,8 @@ export class TempleWorld {
 
   private tossWishCoin(fromPos?: THREE.Vector3, onSplash?: () => void): void {
     const coin = this.createCoinMesh()
-
-    // Determine target pool (LOTUS_POND vs WISH_POOL)
-    let isWest = false
-    if (fromPos) {
-      const dEast = Math.hypot(fromPos.x - LOTUS_POND.x, fromPos.z - LOTUS_POND.z)
-      const dWest = Math.hypot(fromPos.x - WISH_POOL.x, fromPos.z - WISH_POOL.z)
-      if (dWest < dEast && dWest < 10) {
-        isWest = true
-      }
-    }
-    const pool = isWest ? WISH_POOL : LOTUS_POND
+    const isWest = false
+    const pool = LOTUS_POND
 
     // Determine landing point in wishing pool
     const inCenterBowl = Math.random() < 0.35

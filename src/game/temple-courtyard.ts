@@ -80,7 +80,6 @@ export class FrontCourtyard {
     this.addGateArch()
     this.addScreenWall()
     this.addPavilion()
-    this.addWishingPool()
     this.addLotusPond()
     this.addGoldFurnace()
     this.addPlanting()
@@ -706,48 +705,6 @@ export class FrontCourtyard {
     top.position.y = s * 0.75
     g.add(pod, top)
     return g
-  }
-
-  /** Lotus wishing pool, moved off the central road to the left side of the courtyard. */
-  private addWishingPool(): void {
-    const { x, z } = WISH_POOL
-    const pool = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.4, 0.68, 32), this.c.mat('#b4a07d'))
-    pool.position.set(x, -0.08, z)
-    this.add(pool)
-    const water = new THREE.Mesh(new THREE.CircleGeometry(2.2, 36), new THREE.MeshStandardMaterial({ color: PAL.water, roughness: 0.25, metalness: 0.18, transparent: true, opacity: 0.9 }))
-    water.rotation.x = -Math.PI / 2
-    water.position.set(x, 0.28, z)
-    this.c.scene.add(water)
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(2.38, 0.16, 10, 40), this.c.mat(PAL.gold, 0.42, 0.36))
-    rim.rotation.x = Math.PI / 2
-    rim.position.set(x, 0.32, z)
-    this.c.scene.add(rim)
-
-    // Center Sacred Lotus Pedestal & Treasure Bowl (池心八寶聚寶蓮台)
-    const centerPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 0.38, 16), this.c.mat('#8f8670', 0.8))
-    centerPedestal.position.set(x, 0.15, z)
-    this.c.scene.add(centerPedestal)
-    const centerBowl = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.28, 0.14, 16), this.c.mat(PAL.gold, 0.35, 0.5))
-    centerBowl.position.set(x, 0.35, z)
-    this.c.scene.add(centerBowl)
-    // Sacred golden lotus flower blooming in the center
-    this.c.scene.add(this.lotusFlower(x, 0.42, z, 0.28, '#ffdf78'))
-
-    this.addLotusPads(x, z, 1.8, 12, 5)
-    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.04, z), 2.42, 0.6)
-  }
-
-  private addLotusPads(x: number, z: number, spread: number, pads: number, flowers: number, sx = 1): void {
-    for (let i = 0; i < pads; i += 1) {
-      const a = i * 2.39996 + 0.4
-      const rr = spread * (0.45 + 0.55 * ((i * 7) % 5) / 4)
-      const pad = new THREE.Mesh(new THREE.CircleGeometry(0.32 + (i % 3) * 0.06, 14, 0.3, Math.PI * 2 - 0.3), this.c.mat(PAL.lotusPad, 0.7))
-      pad.rotation.x = -Math.PI / 2
-      pad.rotation.z = a
-      pad.position.set(x + Math.cos(a) * rr * sx, 0.3, z + Math.sin(a) * rr)
-      this.c.scene.add(pad)
-      if (i < flowers) this.c.scene.add(this.lotusFlower(pad.position.x, 0.31, pad.position.z, 0.2))
-    }
   }
 
   /**

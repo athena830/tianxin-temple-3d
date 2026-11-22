@@ -7,7 +7,7 @@ import type { Renderer } from '../engine/renderer'
 import type { Quality } from '../engine/save'
 import { CONFIG } from './config'
 import { TEMPLE_MODEL_URLS } from './temple-assets'
-import { LOTUS_POND, WISH_POOL } from './temple-courtyard'
+import { LOTUS_POND } from './temple-courtyard'
 import { POINT_TARGETS, TempleWorld, type ShrinePoint, type ShrinePointId } from './temple-world'
 import { disposeWorldScene } from './world-dispose'
 
@@ -225,13 +225,11 @@ export class TempleGame {
     this.input.clearHeld()
   }
 
-  /** Position visitor and frame cinematic camera towards the Lotus Wishing Pool (defaults to the magnificent East Lotus Pond). */
+  /** Position visitor and frame cinematic camera towards the East Lotus Wishing Pond. */
   frameWishingPool(): void {
     const p = this.body.translation()
-    const distEast = Math.hypot(p.x - LOTUS_POND.x, p.z - LOTUS_POND.z)
-    const distWest = Math.hypot(p.x - WISH_POOL.x, p.z - WISH_POOL.z)
-    const isWest = distWest < distEast && distWest < 8.0
-    const targetPool = isWest ? WISH_POOL : LOTUS_POND
+    const isWest = false
+    const targetPool = LOTUS_POND
 
     const poolX = targetPool.x
     const poolZ = targetPool.z

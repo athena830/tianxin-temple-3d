@@ -199,8 +199,8 @@ export const TEMPLE_WAYPOINTS: TempleWaypoint[] = [
   { name: '主殿龍邊', zone: 'courtyard', pos: new THREE.Vector3(4.5, 0, 1.2), isWorship: true, worshipTarget: new THREE.Vector3(4.5, 0, -4.5) },
   // 4. 觀音大殿虎邊前
   { name: '主殿虎邊', zone: 'courtyard', pos: new THREE.Vector3(-4.5, 0, 1.2), isWorship: true, worshipTarget: new THREE.Vector3(-4.5, 0, -4.5) },
-  // 5. 蓮花許願池
-  { name: '許願池', zone: 'courtyard', pos: new THREE.Vector3(-5.8, 0, 39.5), isWorship: true, worshipTarget: new THREE.Vector3(-9.5, 0, 39.5) },
+  // 5. 蓮花許願池（統一引導至東側盛景蓮花許願池）
+  { name: '許願池', zone: 'courtyard', pos: new THREE.Vector3(6.2, 0, 39.2), isWorship: true, worshipTarget: new THREE.Vector3(12.0, 0, 38.0) },
   // 5b. 前庭東側盛景蓮花池
   { name: '盛景蓮花池', zone: 'courtyard', pos: new THREE.Vector3(5.6, 0, 38.0), isWorship: false },
   // 6. 八角金亭
@@ -1198,11 +1198,6 @@ export class NpcInstance {
     const distToLotus = Math.hypot(pos.x - 12.0, pos.z - 38.0)
     if (distToLotus < 6.8) {
       return 'lotusPond'
-    }
-    // 5. 蓮花許願池（x ~ -9.5, z ~ 39.5）
-    const distToWish = Math.hypot(pos.x - (-9.5), pos.z - 39.5)
-    if (distToWish < 4.8) {
-      return 'wishPool'
     }
     // 6. 八角金亭（x ~ -19.5, z ~ 38.0）
     const distToFurnace = Math.hypot(pos.x - (-19.5), pos.z - 38.0)
