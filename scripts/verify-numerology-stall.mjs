@@ -12,7 +12,7 @@ async function waitForServer(targetUrl, timeoutMs = 15000) {
     try {
       const res = await fetch(targetUrl)
       if (res.ok) return
-    } catch {}
+    } catch { }
     await new Promise(r => setTimeout(r, 300))
   }
   throw new Error('Preview server timed out')
@@ -44,28 +44,32 @@ async function run() {
 
     // Enter Market
     await page.evaluate(() => window.__game?.sceneManager?.enterMarket())
-    await page.waitForTimeout(2500)
+    await page.waitForTimeout(2800)
 
-    // Click "平視攤位" button
-    const eyeBtn = await page.$('button[data-market-cam="eye-level"]')
-    if (eyeBtn) {
-      await eyeBtn.click()
-      await page.waitForTimeout(1500)
-    }
-
-    // Tilt camera slightly up to frame the upper neon signs directly
+    // Switch to eye-level view via MarketGame API
     await page.evaluate(() => {
       const sm = window.__game?.sceneManager
-      if (sm?.current && 'tiltCamera' in sm.current) {
+      if (sm?.current && 'setEyeLevelView' in sm.current) {
+        sm.current.setEyeLevelView()
         sm.current.tiltCamera(-0.18)
       }
     })
-    await page.waitForTimeout(1500)
+    await page.waitForTimeout(1800)
 
     // Capture eye-level screenshot showing stalls and signs face-on
     const eyeLevelPath = join(artifactDir, 'verify_eye_level_signs.png')
     await page.screenshot({ path: eyeLevelPath })
     console.log('Saved eye-level screenshot:', eyeLevelPath)
+
+    // Switch to overview to inspect 3D compass plinth from oblique/bird's-eye angle
+    const overBtn = await page.$('button[data-market-cam="overview"]')
+    if (overBtn) {
+      await overBtn.click()
+      await page.waitForTimeout(1600)
+    }
+    const overviewPath = join(artifactDir, 'verify_overview_compass.png')
+    await page.screenshot({ path: overviewPath })
+    console.log('Saved overview screenshot:', overviewPath)
 
     // Check life-numerology button
     const numBtn = await page.$('button[data-market-target="life-numerology"]')

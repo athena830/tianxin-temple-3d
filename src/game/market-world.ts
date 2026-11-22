@@ -713,23 +713,24 @@ export class MarketWorld {
   }
 
   /**
-   * 方案三：玄學羅盤與漂浮塔羅（深淵神秘學視覺裝飾）
-   * - 位於街道地面下方的深邃黑曜石暖銅金羅盤底座（y = -2.1）
-   * - 漂浮發光塔羅牌（星、月、太陽、魔術師、命運之輪、女祭司）
-   * - 低面數紫水晶簇與暖黃發光小蠟燭
-   * - 深淵星點微粒粒子（y = -1.5 ~ -8.5）
+   * 方案三：立體環形玄學羅盤底座與深淵占卜空間（純視覺裝飾）
+   * - 緊貼市集街道下方（y = -0.06 ~ -2.35）的立體橢圓環形黑曜石暖銅金羅盤外框與內凹深淵
+   * - 放大版漂浮發光塔羅牌（平視與斜視皆清晰可見）
+   * - 加大比例之低面數紫水晶簇與三支組暖黃發光儀式蠟燭
+   * - 紫藍與暖金交織之深淵星點粒子（y = -0.65 ~ -7.0）
    */
   private buildAbyssOccultCompass(): void {
-    // 1. 深淵微弱發光星點粒子（y = -1.5 至 -8.5 空間）
-    this.abyssStarfield = createAbyssStarfield(420)
+    // 1. 深淵星點粒子（紫藍與暖金微光星塵）
+    this.abyssStarfield = createAbyssStarfield(520)
     this.scene.add(this.abyssStarfield)
 
-    // 2. 玄學羅盤底座（黑曜石基座 + 暖銅金月相與黃道十二宮刻紋，位於市集下方 y = -2.1）
-    this.occultCompassGroup = createOccultCompassPlinth(19.5)
-    this.occultCompassGroup.position.set(0, -2.1, 1.2)
+    // 2. 立體環形玄學羅盤底座（橢圓貼合街道輪廓，平視可見立體環壁與暖金月相星象浮雕，斜視可見內凹深淵盤面）
+    this.occultCompassGroup = createOccultCompassPlinth(20.4)
+    this.occultCompassGroup.scale.set(1.0, 1.0, 0.64)
+    this.occultCompassGroup.position.set(0, 0, 2.2)
     this.scene.add(this.occultCompassGroup)
 
-    // 3. 漂浮占卜塔羅牌（半透明發光古典牌面，分佈於街道南側與邊緣深淵）
+    // 3. 放大版漂浮占卜塔羅牌（完整框列於羅盤中下環之間的深淵空間 y = -1.10，絕不超出 y = 0 街道面）
     const tarotConfigs: {
       titleZh: string
       titleEn: string
@@ -744,12 +745,12 @@ export class MarketWorld {
       speed: number
       amp: number
     }[] = [
-      { titleZh: '星星', titleEn: 'THE STAR', num: 'XVII', type: 'star', x: -6.8, y: -1.45, z: 8.6, rotX: 0.22, rotY: 0.15, rotZ: -0.1, speed: 1.2, amp: 0.14 },
-      { titleZh: '月亮', titleEn: 'THE MOON', num: 'XVIII', type: 'moon', x: -1.8, y: -1.65, z: 9.2, rotX: 0.18, rotY: -0.18, rotZ: 0.08, speed: 1.0, amp: 0.16 },
-      { titleZh: '太陽', titleEn: 'THE SUN', num: 'XIX', type: 'sun', x: 3.6, y: -1.5, z: 8.8, rotX: 0.24, rotY: 0.12, rotZ: -0.06, speed: 1.15, amp: 0.15 },
-      { titleZh: '魔術師', titleEn: 'THE MAGICIAN', num: 'I', type: 'magician', x: 9.2, y: -1.75, z: 8.5, rotX: 0.16, rotY: -0.18, rotZ: 0.12, speed: 0.95, amp: 0.14 },
-      { titleZh: '命運之輪', titleEn: 'WHEEL OF FORTUNE', num: 'X', type: 'fortune', x: -13.2, y: -1.85, z: 7.8, rotX: 0.25, rotY: 0.25, rotZ: -0.15, speed: 1.05, amp: 0.15 },
-      { titleZh: '女祭司', titleEn: 'THE PRIESTESS', num: 'II', type: 'moon', x: 14.5, y: -1.7, z: 7.6, rotX: 0.2, rotY: -0.22, rotZ: 0.1, speed: 1.1, amp: 0.13 },
+      { titleZh: '命運之輪', titleEn: 'WHEEL OF FORTUNE', num: 'X', type: 'fortune', x: -8.8, y: -1.12, z: 13.0, rotX: 0.1, rotY: 0.22, rotZ: -0.07, speed: 1.05, amp: 0.08 },
+      { titleZh: '星星', titleEn: 'THE STAR', num: 'XVII', type: 'star', x: -4.2, y: -1.1, z: 14.0, rotX: 0.08, rotY: 0.14, rotZ: -0.06, speed: 1.15, amp: 0.08 },
+      { titleZh: '月亮', titleEn: 'THE MOON', num: 'XVIII', type: 'moon', x: -1.3, y: -1.12, z: 14.4, rotX: 0.08, rotY: -0.1, rotZ: 0.05, speed: 0.98, amp: 0.09 },
+      { titleZh: '太陽', titleEn: 'THE SUN', num: 'XIX', type: 'sun', x: 1.8, y: -1.1, z: 14.3, rotX: 0.08, rotY: 0.12, rotZ: -0.05, speed: 1.1, amp: 0.08 },
+      { titleZh: '魔術師', titleEn: 'THE MAGICIAN', num: 'I', type: 'magician', x: 4.8, y: -1.12, z: 13.9, rotX: 0.08, rotY: -0.16, rotZ: 0.06, speed: 0.95, amp: 0.08 },
+      { titleZh: '女祭司', titleEn: 'THE PRIESTESS', num: 'II', type: 'moon', x: 9.2, y: -1.12, z: 12.8, rotX: 0.1, rotY: -0.22, rotZ: 0.07, speed: 1.08, amp: 0.08 },
     ]
 
     for (const t of tarotConfigs) {
@@ -769,11 +770,12 @@ export class MarketWorld {
       })
     }
 
-    // 4. 低面數紫水晶簇（分佈於羅盤外圈邊緣深淵）
+    // 4. 加大比例之低面數紫水晶簇（擺放於羅盤下層前緣 y = -1.70，晶峰高至 y ≈ -0.52）
     for (const [cx, cy, cz, rotY] of [
-      [-4.8, -1.9, 8.4, 0.4],
-      [2.2, -1.9, 8.8, -0.3],
-      [8.6, -1.9, 8.2, 0.8],
+      [-6.5, -1.7, 13.6, 0.35],
+      [-2.7, -1.7, 14.3, -0.25],
+      [3.3, -1.7, 14.2, 0.55],
+      [7.2, -1.7, 13.4, -0.45],
     ] as const) {
       const crystal = createAmethystCrystalCluster()
       crystal.position.set(cx, cy, cz)
@@ -781,12 +783,13 @@ export class MarketWorld {
       this.scene.add(crystal)
     }
 
-    // 5. 暖黃發光小蠟燭（分佈於占卜物件與羅盤旁）
+    // 5. 暖黃發光儀式蠟燭組（高低錯落擺放於深淵前緣與羅盤內緣 y = -1.70）
     for (const [kx, ky, kz] of [
-      [-5.8, -1.9, 8.1],
-      [-1.0, -1.9, 9.4],
-      [4.8, -1.9, 8.7],
-      [10.2, -1.9, 8.3],
+      [-5.3, -1.7, 13.9],
+      [-0.1, -1.7, 14.5],
+      [0.7, -1.7, 14.4],
+      [6.0, -1.7, 13.7],
+      [10.4, -1.7, 12.4],
     ] as const) {
       const candle = createOccultCandle()
       candle.group.position.set(kx, ky, kz)
@@ -864,13 +867,13 @@ export class MarketWorld {
     southCurb.receiveShadow = true
     this.scene.add(southCurb)
 
-    // 5. 延伸暗色街道地坪，避免遠景邊緣懸空穿幫
+    // 5. 街道底板（精準對齊市集街道範圍 36 × 19.8，不遮擋下方與外圍的立體玄學羅盤底座與深淵空間）
     const outerGround = new THREE.Mesh(
-      new THREE.PlaneGeometry(120, 80),
+      new THREE.PlaneGeometry(36.2, 19.9),
       new THREE.MeshStandardMaterial({ color: '#111018', roughness: 0.85, metalness: 0.08 }),
     )
     outerGround.rotation.x = -Math.PI / 2
-    outerGround.position.set(0, -0.02, 2.0)
+    outerGround.position.set(0, -0.02, 2.2)
     outerGround.receiveShadow = true
     this.scene.add(outerGround)
   }
@@ -2053,7 +2056,7 @@ export class MarketWorld {
 
     // 5d. 方案三：深淵占卜蠟燭微弱燭光搖曳
     for (const c of this.abyssCandles) {
-      c.light.intensity = 0.42 + Math.sin(this.time * 8.5 + c.phase) * 0.08
+      c.light.intensity = 0.95 + Math.sin(this.time * 8.5 + c.phase) * 0.14
     }
 
     // 6. 電影級細雨粒子與水窪漣漪（僅在雨天時運算與渲染）
