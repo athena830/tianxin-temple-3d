@@ -30,6 +30,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           entryFileNames: 'assets/index-[hash].js',
+          manualChunks(id) {
+            if (id.includes('node_modules/three')) return 'three.core'
+            if (id.includes('node_modules/@dimforge/rapier3d-compat')) return 'rapier.core'
+          },
           assetFileNames: assetInfo => {
             if (assetInfo.name && assetInfo.name.endsWith('.css')) return 'assets/index.css'
             return 'assets/[name]-[hash][extname]'

@@ -6,7 +6,7 @@ import { GameLoop } from './engine/loop'
 import { initPhysics } from './engine/physics'
 import { SAVE_KEY, SaveStore } from './engine/save'
 import { TempleStore, type LampId, type OfferingId } from './game/temple-data'
-import type { TempleGame } from './game/temple-game'
+import { TempleGame } from './game/temple-game'
 import { MarketGame } from './game/market-game'
 import type { MarketVenueId } from './game/market-world'
 import { SceneManager, type WorldId } from './game/scene-manager'
@@ -204,8 +204,7 @@ async function boot(): Promise<void> {
   let loaded = 0
   const track = <T>(p: Promise<T>): Promise<T> => p.then(v => (ui.setBootProgress(0.1 + (++loaded / 3) * 0.6), v))
   ui.setBootProgress(0.1)
-  const [{ TempleGame }, { Renderer, suggestQuality }] = await Promise.all([
-    track(import('./game/temple-game')),
+  const [{ Renderer, suggestQuality }] = await Promise.all([
     track(import('./engine/renderer')),
     track(Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 400))])),
   ])
@@ -385,7 +384,6 @@ async function boot(): Promise<void> {
     input,
     audio,
     createTemple: async () => {
-      const { TempleGame } = await import('./game/temple-game')
       const next = new TempleGame(renderer, input, audio)
       configureTemple(next)
       next.setMainHallScale(initialScale)
