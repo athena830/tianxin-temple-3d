@@ -1088,3 +1088,413 @@ export function createHDREnvironmentTexture(): THREE.CanvasTexture {
   tex.colorSpace = THREE.SRGBColorSpace
   return tex
 }
+
+/* ========================================================
+   7. 方案三：玄學羅盤與漂浮塔羅 (Occult Compass & Floating Tarot Abyss)
+   ======================================================== */
+
+/**
+ * 建立「方案三：玄學羅盤與漂浮塔羅」之深淵黑曜石與暖銅金羅盤底座。
+ * 包含同心圓星象圈、8 個古典月相刻紋、黃道十二宮符號與八芒星羅盤指針。
+ */
+export function createOccultCompassPlinth(radius = 19.5): THREE.Group {
+  const group = new THREE.Group()
+
+  // 1. 黑曜石基座厚圓盤
+  const baseMat = new THREE.MeshStandardMaterial({
+    color: '#0d0b16',
+    roughness: 0.45,
+    metalness: 0.65,
+  })
+  const plinth = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius + 1.2, 0.48, 64),
+    baseMat,
+  )
+  plinth.receiveShadow = true
+  group.add(plinth)
+
+  // 2. 羅盤表面古典刻紋 Canvas 貼圖
+  const s = 1024
+  const { canvas, ctx } = makeCanvas(s, s)
+  const center = s / 2
+
+  // 底色黑曜石放射漸層
+  const bgGrad = ctx.createRadialGradient(center, center, 40, center, center, center)
+  bgGrad.addColorStop(0, '#161324')
+  bgGrad.addColorStop(0.65, '#0d0b16')
+  bgGrad.addColorStop(1.0, '#06050b')
+  ctx.fillStyle = bgGrad
+  ctx.fillRect(0, 0, s, s)
+
+  // 繪製暖銅金色刻紋線條
+  ctx.strokeStyle = '#d4a359'
+  ctx.fillStyle = '#d4a359'
+  ctx.lineWidth = 4
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+
+  // 同心刻度環
+  const rings = [485, 445, 395, 320, 240, 150]
+  for (const r of rings) {
+    ctx.beginPath()
+    ctx.arc(center, center, r, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+
+  // 外圈細密刻度 (360 度，每 5 度小刻度，每 15 度大刻度)
+  for (let deg = 0; deg < 360; deg += 5) {
+    const rad = (deg * Math.PI) / 180
+    const isMajor = deg % 15 === 0
+    const rIn = isMajor ? 445 : 465
+    const rOut = 485
+    ctx.lineWidth = isMajor ? 3 : 1.5
+    ctx.beginPath()
+    ctx.moveTo(center + Math.cos(rad) * rIn, center + Math.sin(rad) * rIn)
+    ctx.lineTo(center + Math.cos(rad) * rOut, center + Math.sin(rad) * rOut)
+    ctx.stroke()
+  }
+
+  // 十二星象符號環 (半徑 420)
+  const zodiacSymbols = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓']
+  ctx.font = '700 24px "Segoe UI Symbol", "Apple Symbols", sans-serif'
+  for (let i = 0; i < 12; i++) {
+    const rad = (i * 30 * Math.PI) / 180 - Math.PI / 2
+    const x = center + Math.cos(rad) * 420
+    const y = center + Math.sin(rad) * 420
+    ctx.fillText(zodiacSymbols[i], x, y)
+  }
+
+  // 八個古典月相環 (半徑 358)
+  for (let i = 0; i < 8; i++) {
+    const rad = (i * 45 * Math.PI) / 180
+    const mx = center + Math.cos(rad) * 358
+    const my = center + Math.sin(rad) * 358
+    const mr = 16
+    // 月相外圈
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(mx, my, mr, 0, Math.PI * 2)
+    ctx.stroke()
+    // 月相亮面
+    ctx.beginPath()
+    if (i === 4) {
+      // 滿月
+      ctx.arc(mx, my, mr, 0, Math.PI * 2)
+      ctx.fill()
+    } else if (i !== 0) {
+      // 弦月/凸月
+      ctx.arc(mx, my, mr, -Math.PI / 2, Math.PI / 2, false)
+      ctx.fill()
+    }
+  }
+
+  // 內圈八芒星神聖幾何陣
+  for (let k = 0; k < 2; k++) {
+    const offset = (k * Math.PI) / 4
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    for (let p = 0; p < 4; p++) {
+      const a = (p * Math.PI) / 2 + offset
+      const px = center + Math.cos(a) * 240
+      const py = center + Math.sin(a) * 240
+      if (p === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    }
+    ctx.closePath()
+    ctx.stroke()
+  }
+
+  // 中心八角指針羅盤花 (Compass Rose)
+  for (let p = 0; p < 8; p++) {
+    const a = (p * Math.PI) / 4 - Math.PI / 2
+    const isCardinal = p % 2 === 0
+    const len = isCardinal ? 140 : 92
+    const w = isCardinal ? 16 : 10
+    const perp = a + Math.PI / 2
+    ctx.fillStyle = isCardinal ? '#f3cb82' : '#c99645'
+    ctx.beginPath()
+    ctx.moveTo(center, center)
+    ctx.lineTo(center + Math.cos(perp) * w, center + Math.sin(perp) * w)
+    ctx.lineTo(center + Math.cos(a) * len, center + Math.sin(a) * len)
+    ctx.closePath()
+    ctx.fill()
+
+    ctx.fillStyle = isCardinal ? '#996e2b' : '#694819'
+    ctx.beginPath()
+    ctx.moveTo(center, center)
+    ctx.lineTo(center - Math.cos(perp) * w, center - Math.sin(perp) * w)
+    ctx.lineTo(center + Math.cos(a) * len, center + Math.sin(a) * len)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  const compassTex = new THREE.CanvasTexture(canvas)
+  compassTex.colorSpace = THREE.SRGBColorSpace
+
+  const faceMat = new THREE.MeshStandardMaterial({
+    map: compassTex,
+    emissiveMap: compassTex,
+    emissive: new THREE.Color('#7a5822'),
+    emissiveIntensity: 0.28,
+    roughness: 0.35,
+    metalness: 0.55,
+  })
+  const face = new THREE.Mesh(new THREE.CircleGeometry(radius - 0.05, 64), faceMat)
+  face.rotation.x = -Math.PI / 2
+  face.position.y = 0.245
+  face.receiveShadow = true
+  group.add(face)
+
+  return group
+}
+
+export type TarotCardInfo = {
+  mesh: THREE.Mesh
+  baseY: number
+  baseRotX: number
+  baseRotY: number
+  baseRotZ: number
+  speed: number
+  phase: number
+  amp: number
+}
+
+/** 建立漂浮發光塔羅牌物件（Canvas 繪製精緻古典金色邊框、神秘學象徵符號與牌名） */
+export function createFloatingTarotCard(
+  titleZh: string,
+  titleEn: string,
+  romanNum: string,
+  symbolType: 'star' | 'moon' | 'sun' | 'magician' | 'fortune',
+): THREE.Mesh {
+  const w = 256
+  const h = 420
+  const { canvas, ctx } = makeCanvas(w, h)
+
+  // 牌面底色（深邃午夜星夜深藍紫）
+  const grad = ctx.createLinearGradient(0, 0, 0, h)
+  grad.addColorStop(0, '#0c0e22')
+  grad.addColorStop(0.5, '#16122d')
+  grad.addColorStop(1, '#090818')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, w, h)
+
+  // 雙重暖金法式雕花邊框
+  ctx.strokeStyle = '#dfb15b'
+  ctx.lineWidth = 4
+  ctx.strokeRect(10, 10, w - 20, h - 20)
+  ctx.lineWidth = 1.5
+  ctx.strokeRect(16, 16, w - 32, h - 32)
+
+  // 羅馬數字
+  ctx.fillStyle = '#f0ca7d'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.font = '700 22px "Times New Roman", serif'
+  ctx.fillText(romanNum, w / 2, 38)
+
+  // 中央神祕象徵插畫
+  const cx = w / 2
+  const cy = h / 2 - 12
+  ctx.strokeStyle = '#ffd875'
+  ctx.fillStyle = '#ffd875'
+
+  if (symbolType === 'star') {
+    // 八芒星與小星芒
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    for (let p = 0; p < 8; p++) {
+      const a = (p * Math.PI) / 4 - Math.PI / 2
+      const rOut = p % 2 === 0 ? 54 : 26
+      const x = cx + Math.cos(a) * rOut
+      const y = cy + Math.sin(a) * rOut
+      if (p === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    ctx.closePath()
+    ctx.stroke()
+    ctx.fill()
+  } else if (symbolType === 'moon') {
+    // 古典彎月
+    ctx.beginPath()
+    ctx.arc(cx - 8, cy, 44, -Math.PI * 0.42, Math.PI * 0.42, false)
+    ctx.arc(cx + 8, cy, 36, Math.PI * 0.42, -Math.PI * 0.42, true)
+    ctx.closePath()
+    ctx.fill()
+  } else if (symbolType === 'sun') {
+    // 太陽與放射光芒
+    ctx.beginPath()
+    ctx.arc(cx, cy, 28, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.lineWidth = 2.5
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+      ctx.beginPath()
+      ctx.moveTo(cx + Math.cos(a) * 35, cy + Math.sin(a) * 35)
+      ctx.lineTo(cx + Math.cos(a) * 52, cy + Math.sin(a) * 52)
+      ctx.stroke()
+    }
+  } else if (symbolType === 'magician') {
+    // 無限符號 (Lemniscate) 與法杖
+    ctx.font = '700 68px "Times New Roman", serif'
+    ctx.fillText('∞', cx, cy - 8)
+    ctx.fillRect(cx - 2, cy + 24, 4, 42)
+  } else {
+    // 命運之輪 (Wheel of Fortune)
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(cx, cy, 42, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(cx, cy, 20, 0, Math.PI * 2)
+    ctx.stroke()
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+      ctx.beginPath()
+      ctx.moveTo(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20)
+      ctx.lineTo(cx + Math.cos(a) * 42, cy + Math.sin(a) * 42)
+      ctx.stroke()
+    }
+  }
+
+  // 底部卡牌名稱
+  ctx.font = '700 20px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
+  ctx.fillStyle = '#fff0cd'
+  ctx.fillText(titleZh, cx, h - 54)
+  ctx.font = '600 13px "Segoe UI", sans-serif'
+  ctx.fillStyle = '#dfb15b'
+  ctx.fillText(titleEn, cx, h - 30)
+
+  const map = new THREE.CanvasTexture(canvas)
+  map.colorSpace = THREE.SRGBColorSpace
+
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    emissiveMap: map,
+    emissive: new THREE.Color('#ffd875'),
+    emissiveIntensity: 0.24,
+    roughness: 0.28,
+    metalness: 0.35,
+    transparent: true,
+    opacity: 0.92,
+    side: THREE.DoubleSide,
+  })
+
+  const card = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.25, 0.012), mat)
+  return card
+}
+
+/** 建立低面數紫水晶簇（晶瑩剔透六棱尖錐群） */
+export function createAmethystCrystalCluster(): THREE.Group {
+  const group = new THREE.Group()
+
+  const crystalMat = new THREE.MeshStandardMaterial({
+    color: '#8b4cd9',
+    emissive: '#5c1fa8',
+    emissiveIntensity: 0.38,
+    roughness: 0.16,
+    metalness: 0.2,
+    transparent: true,
+    opacity: 0.88,
+    flatShading: true,
+  })
+
+  // 叢聚 5 根粗細長短不一的六棱晶錐
+  const configs = [
+    { r: 0.14, h: 0.72, x: 0, z: 0, rx: 0.05, rz: -0.06 },
+    { r: 0.11, h: 0.58, x: -0.16, z: 0.12, rx: -0.22, rz: -0.18 },
+    { r: 0.12, h: 0.52, x: 0.18, z: -0.08, rx: 0.18, rz: 0.24 },
+    { r: 0.09, h: 0.42, x: 0.12, z: 0.18, rx: -0.15, rz: 0.28 },
+    { r: 0.08, h: 0.36, x: -0.18, z: -0.14, rx: 0.26, rz: -0.22 },
+  ]
+
+  for (const c of configs) {
+    const geo = new THREE.CylinderGeometry(0, c.r, c.h, 6)
+    const m = new THREE.Mesh(geo, crystalMat)
+    m.position.set(c.x, c.h / 2, c.z)
+    m.rotation.set(c.rx, Math.random() * Math.PI, c.rz)
+    group.add(m)
+  }
+
+  // 微弱紫晶輝光小點光源
+  const light = new THREE.PointLight('#a35aff', 0.5, 3.2, 2.0)
+  light.position.set(0, 0.45, 0)
+  group.add(light)
+
+  return group
+}
+
+export type OccultCandleInfo = {
+  group: THREE.Group
+  light: THREE.PointLight
+  phase: number
+}
+
+/** 建立暖黃發光小蠟燭 */
+export function createOccultCandle(): OccultCandleInfo {
+  const group = new THREE.Group()
+
+  // 蠟身
+  const waxMat = new THREE.MeshStandardMaterial({
+    color: '#f5edd6',
+    roughness: 0.65,
+    metalness: 0.05,
+  })
+  const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.07, 0.26, 8), waxMat)
+  wax.position.y = 0.13
+  group.add(wax)
+
+  // 燭芯
+  const wickMat = new THREE.MeshBasicMaterial({ color: '#2a1a0f' })
+  const wick = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.06, 4), wickMat)
+  wick.position.y = 0.28
+  group.add(wick)
+
+  // 暖黃火苗
+  const flameMat = new THREE.MeshBasicMaterial({ color: '#ffbe42' })
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.09, 6), flameMat)
+  flame.position.y = 0.33
+  group.add(flame)
+
+  // 微弱暖黃微光
+  const light = new THREE.PointLight('#ffa834', 0.42, 2.4, 2.0)
+  light.position.set(0, 0.36, 0)
+  group.add(light)
+
+  return {
+    group,
+    light,
+    phase: Math.random() * Math.PI * 2,
+  }
+}
+
+/** 建立深淵微弱發光星點粒子（y = -1.5 至 -8.5） */
+export function createAbyssStarfield(count = 420): THREE.Points {
+  const geo = new THREE.BufferGeometry()
+  const pos = new Float32Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    pos[i * 3 + 0] = (Math.random() - 0.5) * 44
+    pos[i * 3 + 1] = -1.5 - Math.random() * 7.0 // y: -1.5 ~ -8.5
+    pos[i * 3 + 2] = (Math.random() - 0.5) * 34
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+
+  const { canvas, ctx } = makeCanvas(32, 32)
+  const g = ctx.createRadialGradient(16, 16, 1, 16, 16, 15)
+  g.addColorStop(0, '#ffffff')
+  g.addColorStop(0.35, '#c7d6ff')
+  g.addColorStop(1, 'rgba(120, 140, 220, 0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 32, 32)
+  const tex = new THREE.CanvasTexture(canvas)
+
+  const mat = new THREE.PointsMaterial({
+    map: tex,
+    size: 0.22,
+    color: '#b6c8ff',
+    transparent: true,
+    opacity: 0.65,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  })
+
+  const points = new THREE.Points(geo, mat)
+  return points
+}
