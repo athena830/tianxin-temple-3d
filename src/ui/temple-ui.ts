@@ -20,6 +20,7 @@ import type { HumanDesignChart, HumanDesignInput } from '../game/human-design-en
 import { listHumanDesignCharts, saveHumanDesignChart, clearHumanDesignCharts } from '../game/human-design-storage'
 import { TOPIC_LABELS, drawThreeCards, getDailyCard, type CardTopic, type ThreeCardSpread } from '../game/card-engine'
 import { POS_META, type ChessPos } from '../divination'
+import { calculateNumerology, NINE_GRID_META, type NumerologyResult } from '../game/numerology-engine'
 import type { MusicTrack } from '../engine/audio'
 import { APP_VERSION } from '../version'
 import {
@@ -100,6 +101,9 @@ export class TempleUi {
   private humanDesignError = ''
   private humanDesignSavedCount = 0
   private serviceDeskMemo = ''
+  private numerologyDate = '1996-08-22'
+  private numerologyResult: NumerologyResult | null = null
+  private numerologyError = ''
 
   constructor(private readonly store: TempleStore, private readonly actions: TempleUiActions) {
     const initReal = getRealWorldTimeOfDay().mode
@@ -193,6 +197,7 @@ export class TempleUi {
             <button type="button" data-act="market-walk" data-market-target="moon-meditation">靈氣療癒 Reiki</button>
             <button type="button" data-act="market-walk" data-market-target="card-house">塔羅占卜 Tarot</button>
             <button type="button" data-act="market-walk" data-market-target="chess-guide">問事／心靈諮詢</button>
+            <button type="button" data-act="market-walk" data-market-target="life-numerology">生命靈數 Numerology</button>
             <button type="button" data-act="market-walk" data-market-target="service-desk">市集服務台</button>
             <button type="button" class="ro-return" data-act="market-walk" data-market-target="return-temple">返回天心宮</button>
           </div>
@@ -226,6 +231,7 @@ export class TempleUi {
       const form = e.target as HTMLFormElement
       if (form.matches('.ziwei-form')) { void this.generateZiwei(form); return }
       if (form.matches('.hd-form')) { void this.generateHumanDesign(form); return }
+      if (form.matches('.num-calc-form')) { this.handleNumerologySubmit(form); return }
       const text = (form.elements.namedItem('wish') as HTMLTextAreaElement).value
       const wish = this.store.submitWish(text)
       if (!wish) { this.toast('請先寫下你的心願'); return }
@@ -352,7 +358,7 @@ export class TempleUi {
     // Both the temple portal and the market return portal expose a clear CTA.
     const id = (point as { id: string }).id
     const isPortal = id === 'market-portal' || id === 'unicorn-portal' || id === 'return-temple'
-    const isMarketVenue = ['birth-chart-hall', 'card-house', 'moon-meditation', 'chess-guide', 'service-desk'].includes(id)
+    const isMarketVenue = ['birth-chart-hall', 'card-house', 'moon-meditation', 'chess-guide', 'service-desk', 'life-numerology'].includes(id)
     action.classList.toggle('portal-entry', isPortal || isMarketVenue)
     action.textContent = id === 'market-portal' ? '進入市集' : id === 'unicorn-portal' ? '踏入聖域' : id === 'return-temple' ? '返回天心宮' : isMarketVenue ? '進入攤位' : '互動'
   }
@@ -376,6 +382,9 @@ export class TempleUi {
         break
       case 'service-desk':
         this.openServiceDeskExperience()
+        break
+      case 'life-numerology':
+        this.openNumerologyExperience()
         break
     }
   }
@@ -1032,6 +1041,147 @@ export class TempleUi {
     `
   }
 
+  openNumerologyExperience(): void {
+    this.setMarketDialogTitle('天心靈光市集・生命靈數館')
+    if (!this.numerologyResult && this.numerologyDate) {
+      try {
+        this.numerologyResult = calculateNumerology(this.numerologyDate)
+      } catch {
+        // keep null
+      }
+    }
+    this.renderNumerologyExperience()
+  }
+
+  private renderNumerologyExperience(): void {
+    this.setMarketDialogTitle('天心靈光市集・生命靈數館')
+    const content = this.root.querySelector<HTMLElement>('[data-market-panel-content]')!
+    const res = this.numerologyResult
+    const dateVal = this.numerologyDate || '1996-08-22'
+
+    let matrixHtml = ''
+    if (res) {
+      matrixHtml = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => {
+        const count = res.gridCounts[n] || 0
+        const meta = NINE_GRID_META.find(m => m.num === n)
+        const isLifePath = n === res.lifePathNumber
+        const isTalent = res.talentNumbers.includes(n)
+        const activeClass = count > 0 ? 'active' : 'empty'
+        const lifeClass = isLifePath ? 'is-lifepath' : ''
+        const badge = isLifePath ? '<span class="cell-badge life">主命</span>' : isTalent ? '<span class="cell-badge talent">天賦</span>' : ''
+        const dots = count > 0 ? '●'.repeat(count) : '○'
+        return `
+          <div class="num-grid-cell ${activeClass} ${lifeClass}">
+            <div class="cell-head">
+              <span class="cell-num">${n}</span>
+              ${badge}
+            </div>
+            <div class="cell-dots">${dots}</div>
+            <div class="cell-count">${count > 0 ? `${count} 次` : '缺數'}</div>
+            <div class="cell-meta">${meta ? meta.label : ''}</div>
+          </div>
+        `
+      }).join('')
+    }
+
+    content.innerHTML = `
+      <p class="eyebrow">生命靈數館・畢達哥拉斯密碼</p>
+      <h2>生命靈數（Numerology）</h2>
+      <p class="venue-intro">在靈光市集探索你的生命主命數、天賦潛能與九宮格能量矩陣。所有出生資料僅於本機運算，不公開、不上傳。</p>
+
+      <form class="num-calc-form ro-form">
+        <div class="num-form-row">
+          <label class="num-form-label">
+            <span>西元出生年月日 (YYYY-MM-DD)</span>
+            <input type="date" class="num-date-input" name="birthdate" value="${dateVal}" required />
+          </label>
+          <button type="submit" class="btn primary num-submit-btn">開始測算</button>
+          <button type="button" class="btn" data-act="num-prefill" data-date="1996-08-22">範例 (1996-08-22)</button>
+        </div>
+        ${this.numerologyError ? `<div class="num-error">${esc(this.numerologyError)}</div>` : ''}
+      </form>
+
+      ${res ? `
+        <div class="num-result-box">
+          <article class="num-hero-card">
+            <div class="num-hero-top">
+              <div class="num-badge-circle">${res.lifePathNumber}</div>
+              <div class="num-hero-titles">
+                <span class="num-archetype">${res.profile.archetype}</span>
+                <h3 class="num-hero-title">${res.profile.title}</h3>
+                <span class="num-formula-tag">算式：${res.formula}</span>
+              </div>
+            </div>
+            <div class="num-talent-row">
+              <span>天賦數：</span>
+              <div class="num-talent-badges">
+                ${res.talentNumbers.map(tn => `<span class="talent-pill">${tn} 數</span>`).join('')}
+              </div>
+            </div>
+            <div class="num-keywords-wrap">
+              ${res.profile.keywords.map(k => `<span class="num-keyword-tag">#${k}</span>`).join('')}
+            </div>
+          </article>
+
+          <article class="num-section">
+            <h4 class="num-section-title">九宮格能量矩陣（1～9 出現頻率）</h4>
+            <p class="num-section-desc">數字出現次數代表該特質的能量充沛度；缺數代表此生可溫柔修煉的課題。</p>
+            <div class="num-grid-matrix">
+              ${matrixHtml}
+            </div>
+          </article>
+
+          <article class="num-section">
+            <h4 class="num-section-title">🌟 天賦特質與優勢</h4>
+            <ul class="num-strengths-list">
+              ${res.profile.strengths.map(s => `<li>✓ ${s}</li>`).join('')}
+            </ul>
+            <div class="num-career-callout">
+              <b>🌱 適合方向與潛能展現：</b>${res.profile.careerGifts}
+            </div>
+          </article>
+
+          <article class="num-healing-card">
+            <div class="num-healing-header">💖 天心仙姑療癒私語</div>
+            <p class="num-healing-text">${res.profile.healingMessage}</p>
+          </article>
+
+          <div class="row" style="margin-top: 10px; gap: 10px;">
+            <button type="button" class="btn primary" data-act="num-consult">預約深度解讀</button>
+            <button type="button" class="btn" data-act="market-panel-close">繼續探索市集</button>
+          </div>
+        </div>
+      ` : `
+        <div style="padding: 24px; text-align: center; color: #64748b;">
+          <p>請輸入西元出生年月日並點擊「開始測算」，即刻探索您的生命靈數。</p>
+        </div>
+      `}
+
+      <div class="row" style="margin-top: 14px;">
+        <button class="btn" data-act="market-panel-close">返回市集街道</button>
+      </div>
+    `
+  }
+
+  private handleNumerologySubmit(form: HTMLFormElement): void {
+    const input = form.elements.namedItem('birthdate') as HTMLInputElement | null
+    const val = input ? input.value.trim() : ''
+    if (!val) {
+      this.numerologyError = '請輸入出生年月日'
+      this.renderNumerologyExperience()
+      return
+    }
+    try {
+      this.numerologyDate = val
+      this.numerologyResult = calculateNumerology(val)
+      this.numerologyError = ''
+      this.toast(`已完成 ${val} 生命靈數排盤！`)
+    } catch (err: any) {
+      this.numerologyError = err?.message || '計算失敗，請確認日期格式'
+    }
+    this.renderNumerologyExperience()
+  }
+
   private npcDialogueTimer = 0
 
   showNpcDialogue(speaker: string, text: string, ms = 4800): void {
@@ -1562,6 +1712,19 @@ export class TempleUi {
     else if (act === 'service-memo-clear') {
       this.clearServiceDeskMemo()
       this.renderServiceDeskExperience()
+    }
+    else if (act === 'num-prefill') {
+      const d = t.dataset.date || '1996-08-22'
+      this.numerologyDate = d
+      try {
+        this.numerologyResult = calculateNumerology(d)
+        this.numerologyError = ''
+        this.toast(`已帶入範例日期 ${d}`)
+      } catch {}
+      this.renderNumerologyExperience()
+    }
+    else if (act === 'num-consult') {
+      this.toast('已為您記錄預約諮詢意向！可至「市集服務台」或天心宮官方 LINE 洽詢仙姑深度解讀。')
     }
     else if (act === 'card-draw-spread') this.drawCardSpread((t.dataset.cardTopic as CardTopic) || 'inner-state')
     else if (act === 'card-save-note') void this.saveCardNote()

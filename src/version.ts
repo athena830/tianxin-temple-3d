@@ -1,2 +1,2 @@
-/** VER 3.71.5 — 移除靈光市集整體建築比例微調（lil-gui）暫時性除錯面板，完成市集人物與建築比例定案；市集維持標準 1.00x 基準比例。 */
-export const APP_VERSION = 'VER 3.71.5'
+/** VER 3.71.6 — 靈光市集新增「生命靈數」（Numerology）3D 攤位與互動測算功能；完整保留現有低面數風格、角色與視角。 */
+export const APP_VERSION = 'VER 3.71.6'

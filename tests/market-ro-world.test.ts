@@ -31,12 +31,12 @@ describe('RO-style Aura Market world', () => {
     await initPhysics()
   })
 
-  it('builds all 5 market venues, return warp portal, central fountain, and animated RO sprites', () => {
+  it('builds all 6 market venues, return warp portal, central fountain, and animated RO sprites', () => {
     const physics = new Physics(-24)
     const world = new MarketWorld(physics)
 
-    expect(world.venuePoints).toHaveLength(5)
-    expect(world.points).toHaveLength(6)
+    expect(world.venuePoints).toHaveLength(6)
+    expect(world.points).toHaveLength(7)
     expect(world.returnPoint.id).toBe('return-temple')
 
     // Verify nearestPoint detects each venue and the return warp portal
@@ -46,7 +46,7 @@ describe('RO-style Aura Market world', () => {
     }
 
     // Verify hotspots & hover highlight feedback
-    expect(world.hotspotMeshes.length).toBe(6)
+    expect(world.hotspotMeshes.length).toBe(7)
     world.setHoveredPoint('birth-chart-hall')
     world.setHoveredPoint('card-house')
     world.setHoveredPoint(null)
@@ -92,7 +92,7 @@ describe('RO-style Aura Market world', () => {
     // Verify Market NPCs (stall keepers and passersby) exist and use unified createCharacter
     const npcs = (world as any).marketNpcs as any[]
     expect(npcs).toBeDefined()
-    expect(npcs.length).toBe(8) // 5 stall keepers + 3 visitors
+    expect(npcs.length).toBe(9) // 6 stall keepers + 3 visitors
     for (const npc of npcs) {
       expect(npc.chibi).toBeDefined()
       const box = new THREE.Box3().setFromObject(npc.chibi.root)

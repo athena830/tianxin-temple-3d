@@ -37,7 +37,7 @@ const PALETTE = {
   stoolBlue: '#356bb3',
 }
 
-export type MarketVenueId = 'birth-chart-hall' | 'card-house' | 'moon-meditation' | 'chess-guide' | 'service-desk'
+export type MarketVenueId = 'birth-chart-hall' | 'card-house' | 'moon-meditation' | 'chess-guide' | 'service-desk' | 'life-numerology'
 export type MarketPointId = 'return-temple' | MarketVenueId
 export type MarketPoint = { id: MarketPointId; title: string; subtitle: string; position: THREE.Vector3; radius: number }
 
@@ -88,7 +88,7 @@ export async function fetchTaichungWeather(): Promise<TaichungWeatherInfo> {
   }
 }
 
-type StallStyle = 'ziwei' | 'reiki' | 'tarot' | 'consultation' | 'info'
+type StallStyle = 'ziwei' | 'reiki' | 'tarot' | 'consultation' | 'info' | 'numerology'
 
 type StallSpec = {
   id: MarketVenueId
@@ -251,6 +251,30 @@ function makeNeonSignTexture(
 
       ctx.fillStyle = '#472518'
       ctx.font = '700 24px "Segoe UI", sans-serif'
+      ctx.fillText(en, 256, 120)
+    } else if (style === 'numerology') {
+      // 生命靈數發光招牌：湖水青藍（#00e5ff）大字配暖金（#ffd54f）小字與霓虹邊框
+      ctx.fillStyle = '#0b1924'
+      ctx.fillRect(0, 0, 512, 160)
+      ctx.strokeStyle = '#ffd54f'
+      ctx.lineWidth = 9
+      ctx.strokeRect(10, 10, 492, 140)
+      ctx.strokeStyle = '#00e5ff'
+      ctx.lineWidth = 3
+      ctx.strokeRect(22, 22, 468, 116)
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.shadowColor = '#00e5ff'
+      ctx.shadowBlur = 18
+      ctx.fillStyle = '#00e5ff'
+      ctx.font = '700 56px "Microsoft JhengHei", "Noto Sans TC", sans-serif'
+      ctx.fillText(zh, 256, 68)
+
+      ctx.shadowColor = '#ffd54f'
+      ctx.shadowBlur = 12
+      ctx.fillStyle = '#ffd54f'
+      ctx.font = '700 28px "Segoe UI", sans-serif'
       ctx.fillText(en, 256, 120)
     } else if (style === 'info') {
       // 市集服務台燈箱
@@ -456,6 +480,21 @@ export class MarketWorld {
       accentHex: PALETTE.neonAmber,
       secondaryHex: PALETTE.lanternRed,
       style: 'consultation',
+    },
+    {
+      id: 'life-numerology',
+      title: '生命靈數 Numerology',
+      subtitle: '數字能量與天賦密碼',
+      signZh: '生命靈數',
+      signEn: 'Numerology',
+      x: 13.0,
+      z: -3.4,
+      interactX: 13.0,
+      interactZ: -1.1,
+      rotY: 0,
+      accentHex: '#00e5ff',
+      secondaryHex: '#ffd54f',
+      style: 'numerology',
     },
     {
       id: 'service-desk',
@@ -715,9 +754,9 @@ export class MarketWorld {
     this.physics.addStaticBox(new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(44, 1, 30))
     // 街道四側透明碰撞邊界，防止角色走出街道
     this.physics.addStaticBox(new THREE.Vector3(-16.5, 1.5, 1.5), new THREE.Vector3(0.8, 3, 18))
-    this.physics.addStaticBox(new THREE.Vector3(16.5, 1.5, 1.5), new THREE.Vector3(0.8, 3, 18))
-    this.physics.addStaticBox(new THREE.Vector3(0, 1.5, -7.2), new THREE.Vector3(34, 3, 0.8))
-    this.physics.addStaticBox(new THREE.Vector3(0, 1.5, 10.2), new THREE.Vector3(34, 3, 0.8))
+    this.physics.addStaticBox(new THREE.Vector3(18.8, 1.5, 1.5), new THREE.Vector3(0.8, 3, 18))
+    this.physics.addStaticBox(new THREE.Vector3(0, 1.5, -7.2), new THREE.Vector3(39, 3, 0.8))
+    this.physics.addStaticBox(new THREE.Vector3(0, 1.5, 10.2), new THREE.Vector3(39, 3, 0.8))
 
     // 2. 柏油路（晴天為乾淨啞光柏油，雨天則呈現微反光濕潤質感）
     const asphaltTex = makeWetAsphaltTexture()
@@ -1717,6 +1756,46 @@ export class MarketWorld {
 
       group.add(this.createStool(-0.85, 0.24, depth / 2 + 0.55, PALETTE.stoolBlue))
       group.add(this.createStool(0.85, 0.24, depth / 2 + 0.55, PALETTE.stoolRed))
+    } else if (spec.style === 'numerology') {
+      // 生命靈數：青藍發光幾何數字圓盤 + 暖金九宮能量牌卡 + 藍金柔光檯燈 + 攤內微弱藍金點光源 + 攤前小板凳
+      const disc = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.36, 0.36, 0.05, 24),
+        new THREE.MeshStandardMaterial({
+          color: '#0d2230',
+          emissive: '#00e5ff',
+          emissiveIntensity: 0.85,
+          roughness: 0.28,
+        }),
+      )
+      disc.position.set(-0.55, 0.94, depth / 2 - 0.5)
+      group.add(disc)
+
+      const gridPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.52, 0.06, 0.38),
+        new THREE.MeshLambertMaterial({ color: '#c29b38' }),
+      )
+      gridPlate.position.set(0.65, 0.94, depth / 2 - 0.5)
+      group.add(gridPlate)
+
+      const lamp = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.18, 0.26, 8),
+        new THREE.MeshStandardMaterial({
+          color: '#ffd54f',
+          emissive: '#00e5ff',
+          emissiveIntensity: 1.8,
+        }),
+      )
+      lamp.position.set(0, 1.05, depth / 2 - 0.52)
+      group.add(lamp)
+
+      // 攤位內微弱的藍金色點光源（呼應心靈探討主題）
+      const innerBlueGoldLight = new THREE.PointLight('#00e5ff', 2.2, 5.5, 1.8)
+      innerBlueGoldLight.position.set(0, height * 0.65, depth / 2 - 0.5)
+      group.add(innerBlueGoldLight)
+
+      // 攤前兩張台式小板凳
+      group.add(this.createStool(-0.85, 0.24, depth / 2 + 0.55, PALETTE.stoolRed))
+      group.add(this.createStool(0.85, 0.24, depth / 2 + 0.55, PALETTE.stoolBlue))
     } else {
       // 市集服務台：藍白小檯燈
       const deskLamp = new THREE.Mesh(
@@ -1835,9 +1914,9 @@ export class MarketWorld {
     })
     const polePositions: [number, number][] = [
       [-14.5, -1.6],
-      [14.5, -1.6],
+      [17.5, -1.6],
       [-14.5, 9.6],
-      [14.5, 9.6],
+      [17.5, 9.6],
     ]
 
     const poleTops: THREE.Vector3[] = []
@@ -1901,8 +1980,8 @@ export class MarketWorld {
     // 跨街復古紅燈籠串（懸掛於上方高處 y = 4.2m，美觀且不遮擋攤位招牌與平視視角）
     const lanternSpan = new THREE.QuadraticBezierCurve3(
       new THREE.Vector3(-14.5, 5.2, -1.6),
-      new THREE.Vector3(0, 4.35, -1.6),
-      new THREE.Vector3(14.5, 5.2, -1.6),
+      new THREE.Vector3(1.5, 4.35, -1.6),
+      new THREE.Vector3(17.5, 5.2, -1.6),
     )
     this.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lanternSpan.getPoints(20)), wireMat))
     for (let i = 1; i <= 9; i += 1) {
@@ -1918,7 +1997,7 @@ export class MarketWorld {
       [-11.8, -0.75],
       [-5.2, -0.85],
       [5.2, -0.85],
-      [11.8, -0.75],
+      [16.8, -0.75],
       [-4.2, 7.25],
       [8.2, 7.25],
     ]
@@ -2131,6 +2210,7 @@ export class MarketWorld {
       { id: 'keeper-reiki', name: '靈氣導師', palette: 'teal', x: -2.6, z: -3.7, yaw: 0 },
       { id: 'keeper-tarot', name: '塔羅仙子', palette: 'lavender', x: 2.6, z: -3.7, yaw: 0 },
       { id: 'keeper-chess', name: '問事棋翁', palette: 'monk', x: 7.8, z: -3.7, yaw: 0 },
+      { id: 'keeper-numerology', name: '靈數導師', palette: 'pine', x: 13.0, z: -3.7, yaw: 0 },
       { id: 'keeper-info', name: '服務台嚮導', palette: 'azure', x: 10.6, z: 6.0, yaw: Math.PI },
     ]
 
