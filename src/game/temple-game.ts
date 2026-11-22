@@ -142,7 +142,7 @@ export class TempleGame {
   onClickResult: (result: ClickResult) => void = () => undefined
 
   constructor(private readonly renderer: Renderer, private readonly input: Input, private readonly audio: Audio) {
-    this.world = new TempleWorld(this.physics)
+    this.world = new TempleWorld(this.physics, this.renderer.gl)
     const markerGeo = new THREE.RingGeometry(0.18, 0.44, 24)
     markerGeo.rotateX(-Math.PI / 2)
     this.clickMarker = new THREE.Mesh(
@@ -275,7 +275,10 @@ export class TempleGame {
   get worshipping(): boolean { return this.ritualLeft > 0 }
   get inTemple(): boolean { return this.mode === 'browse' || this.mode === 'explore' || this.mode === 'panel' }
 
-  setQuality(quality: Quality): void { this.renderer.applyQuality(quality) }
+  setQuality(quality: Quality): void {
+    this.renderer.applyQuality(quality)
+    this.world.applyQuality(quality)
+  }
 
   /** Used after returning from MarketWorld; the destination is beside the portal, not inside it. */
   enterFromMarket(): void {

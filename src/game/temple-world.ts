@@ -1,9 +1,11 @@
 import * as THREE from 'three'
 import { Chibi } from './chibi'
 import { RAPIER, type Physics } from '../engine/physics'
+import type { Quality } from '../engine/save'
 import type { LampId, OfferingId } from './temple-data'
 import { FrontCourtyard, GOLD_FURNACE, LOTUS_POND, PAVILION, STAND } from './temple-courtyard'
 import { NpcManager } from './npc-system'
+import { TemplePbrLibrary, createTempleIblTexture } from './temple-pbr-materials'
 
 export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
 
@@ -496,25 +498,40 @@ export class TempleWorld {
 
   private lunarPhaseInfo: LunarPhaseInfo = getLunarPhaseInfo()
   private lunarCheckTimer = 0
+  readonly pbr = new TemplePbrLibrary()
+  private iblTexture: THREE.Texture | null = null
+  private targetEnvIntensity = 0.68
+  private readonly shadowHalfExtent = 34
+  private shadowMapResolution = 2048
+  private readonly rearHallLights: THREE.PointLight[] = []
 
-  constructor(private readonly physics: Physics) {
+  constructor(private readonly physics: Physics, renderer?: THREE.WebGLRenderer) {
     // Elegant warm celestial sky & gentle horizon fog (澄澈淡碧與暖金宮闕天空色調)
     this.scene.background = new THREE.Color('#98b8cb')
     this.scene.fog = new THREE.Fog('#bfd4df', 65, 175)
-    this.hemiLight = new THREE.HemisphereLight('#fbf4e8', '#636b69', 1.1)
+
+    // 程序化東方天空 PMREM IBL 環境反射（受 scene.environmentIntensity 控制並隨日夜聯動，避免過曝）
+    this.iblTexture = createTempleIblTexture(renderer)
+    if (this.iblTexture) {
+      this.scene.environment = this.iblTexture
+      this.scene.environmentIntensity = 0.68
+    }
+
+    this.hemiLight = new THREE.HemisphereLight('#fbf4e8', '#636b69', 1.02)
     this.scene.add(this.hemiLight)
     this.sun = new THREE.DirectionalLight('#fff0d0', 1.35)
     this.sun.position.set(-18, 34, 30)
     this.sun.target.position.set(0, 0, 12)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(2048, 2048)
-    this.sun.shadow.camera.left = -88
-    this.sun.shadow.camera.right = 40
-    this.sun.shadow.camera.top = 56
-    this.sun.shadow.camera.bottom = -40
+    this.sun.shadow.camera.left = -this.shadowHalfExtent
+    this.sun.shadow.camera.right = this.shadowHalfExtent
+    this.sun.shadow.camera.top = this.shadowHalfExtent
+    this.sun.shadow.camera.bottom = -this.shadowHalfExtent
     this.sun.shadow.camera.near = 1
     this.sun.shadow.camera.far = 110
-    this.sun.shadow.normalBias = 0.035
+    this.sun.shadow.bias = -0.0004
+    this.sun.shadow.normalBias = 0.025
     this.scene.add(this.sun, this.sun.target)
 
     this.addSkyDome()
@@ -530,6 +547,7 @@ export class TempleWorld {
       scene: this.scene, physics: this.physics, mat: makeMat,
       roof: (w, d, e, pk) => this.createRoof(w, d, e, pk),
       text: (t, fg, bg) => this.textMaterial(t, fg, bg),
+      pbr: this.pbr,
     })
     this.addMainHall()
     this.addRearHall()
@@ -571,12 +589,13 @@ export class TempleWorld {
     hall.position.set(0, 0, this.mainHallZ)
     hall.scale.set(this.mainHallScale, this.mainHallScale, this.mainHallScale)
     this.scene.add(hall)
-    const red = makeMat(C.vermilion)
-    const redDark = makeMat('#792a20', 0.85)
-    const wood = makeMat(C.wood)
-    const darkWood = makeMat(C.darkWood, 0.88)
-    const gold = makeMat(C.gold, 0.48, 0.2)
-    const stonePlinth = makeMat('#9e9382', 0.94)
+    const red = this.pbr.get('vermilionWood', 1, 2)
+    const redDark = makeMat('#792a20', 0.82)
+    const wood = this.pbr.get('darkTimber', 2, 1)
+    const darkWood = this.pbr.get('darkTimber', 2, 1)
+    const gold = this.pbr.get('gildedGold', 1, 1)
+    const stonePlinth = this.pbr.get('plinthStone', 6, 4)
+    const stepStone = this.pbr.get('plinthStone', 2, 1)
 
     // 1. Raised Hall Podium & Steps (大殿台基月台、漢白玉欄杆與御路龍陛石雕)
     const podium = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.28, 14.8), stonePlinth)
@@ -586,44 +605,54 @@ export class TempleWorld {
 
     // Front approach stone steps (龍門入口踏步、中央雲龍陛、虎門出口踏步)
     // 右邊龍門（入口）專屬登殿石階
-    const stepRight1 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.8), stonePlinth)
+    const stepRight1 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.8), stepStone)
     stepRight1.position.set(6.75, 0.07, 7.5)
     stepRight1.receiveShadow = true
     hall.add(stepRight1)
-    const stepRight2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.5), stonePlinth)
+    const stepRight2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.5), stepStone)
     stepRight2.position.set(6.75, 0.21, 6.9)
     stepRight2.receiveShadow = true
     hall.add(stepRight2)
 
     // 左邊虎門（出口）專屬離殿石階
-    const stepLeft1 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.8), stonePlinth)
+    const stepLeft1 = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.8), stepStone)
     stepLeft1.position.set(-6.75, 0.07, 7.5)
     stepLeft1.receiveShadow = true
     hall.add(stepLeft1)
-    const stepLeft2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.5), stonePlinth)
+    const stepLeft2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.5), stepStone)
     stepLeft2.position.set(-6.75, 0.21, 6.9)
     stepLeft2.receiveShadow = true
     hall.add(stepLeft2)
 
     // 中央中門御路兩側登殿石階（左側與右側御道踏步）
     for (const side of [-1, 1]) {
-      const stepCenter1 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.14, 0.8), stonePlinth)
+      const stepCenter1 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.14, 0.8), stepStone)
       stepCenter1.position.set(side * 1.6, 0.07, 7.5)
       stepCenter1.receiveShadow = true
       hall.add(stepCenter1)
 
-      const stepCenter2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.14, 0.5), stonePlinth)
+      const stepCenter2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.14, 0.5), stepStone)
       stepCenter2.position.set(side * 1.55, 0.21, 6.9)
       stepCenter2.receiveShadow = true
       hall.add(stepCenter2)
     }
 
-    // Imperial Dragon Path Stone Relief (大殿中央中門御路龍陛石雕 / 丹墀雲龍階石)
-    const dragonRamp = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.25), makeMat('#5f7169', 0.88, 0.15))
+    // Imperial Dragon Path Stone Relief (大殿中央中門御路龍陛石雕 / 丹墀雲龍階石與立體階沿石框)
+    const dragonRamp = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.25), makeMat('#5f7169', 0.72, 0.18))
     dragonRamp.position.set(0, 0.16, 7.15)
     dragonRamp.rotation.x = -0.19
     dragonRamp.receiveShadow = true
     hall.add(dragonRamp)
+    // 丹墀御路兩側立體漢白玉階沿石與鎏金飾條（純視覺雕塑，不改變碰撞體）
+    const rampCurbGeo = new THREE.BoxGeometry(0.12, 0.13, 1.32)
+    for (const side of [-1, 1]) {
+      const curb = new THREE.Mesh(rampCurbGeo, stepStone)
+      curb.position.set(side * 0.92, 0.18, 7.15)
+      curb.rotation.x = -0.19
+      curb.castShadow = true
+      curb.receiveShadow = true
+      hall.add(curb)
+    }
     const dragonRelief = new THREE.Mesh(
       new THREE.PlaneGeometry(1.7, 1.1),
       this.textMaterial('丹 墀 雲 龍 陛', '#dfc47b', '#35433d')
@@ -1443,11 +1472,13 @@ export class TempleWorld {
     const rearLight = new THREE.PointLight('#fff3c4', 2.6, 28, 1.4)
     rearLight.position.set(0, 4.6, throneZ + 1.2)
     rear.add(rearLight)
+    this.rearHallLights.push(rearLight)
 
     // Central Lingxiao Palace Grand Illumination (凌霄寶殿中央天心萬聖金光華燈，廣布大殿前堂)
     const rearCenterLight = new THREE.PointLight('#fff4d6', 2.8, 28, 1.4)
     rearCenterLight.position.set(0, 5.2, 1.5)
     rear.add(rearCenterLight)
+    this.rearHallLights.push(rearCenterLight)
 
     // Flanking imperial column lanterns (後殿金柱原神璃月祥雲托架護持宮燈群)
     for (const side of [-1, 1]) {
@@ -1477,10 +1508,12 @@ export class TempleWorld {
       const colGlow = new THREE.PointLight('#ffca75', 1.8, 18, 1.5)
       colGlow.position.set(side * 7.5, 4.2, 1.5)
       rear.add(colGlow)
+      this.rearHallLights.push(colGlow)
 
       const throneColGlow = new THREE.PointLight('#ffd280', 1.8, 18, 1.5)
       throneColGlow.position.set(side * 7.5, 4.2, -4.5)
       rear.add(throneColGlow)
+      this.rearHallLights.push(throneColGlow)
     }
 
     // 8. Jade Imperial Offering Table (重簷九龍玉案供桌)
@@ -1667,25 +1700,70 @@ export class TempleWorld {
   }
 
   private addRitualProps(): void {
-    const bronze = makeMat('#80623c', 0.38, 0.52)
-    const gold = makeMat(C.gold, 0.42, 0.36)
-    const red = makeMat(C.vermilion)
-    const wood = makeMat(C.darkWood)
+    const bronze = this.pbr.get('agedBronze', 2, 1)
+    const gold = this.pbr.get('gildedGold', 1, 1)
+    const red = this.pbr.get('vermilionWood', 1, 1)
+    const wood = this.pbr.get('darkTimber', 1, 1)
+    const plinthStone = this.pbr.get('plinthStone', 1, 1)
 
-    // Main incense urn and three slender sticks.
+    // 天公爐（Main Tiangong Bronze Tripod Incense Urn）：八角花崗岩石座、三足鼎立、古銅浮雕爐身、鎏金腰帶與雙龍耳
     const urn = new THREE.Group()
     this.outdoorUrn = urn
     const stepsFrontEdge = this.mainHallZ + 7.9 * this.mainHallScale
     const urnZ = Math.max(0.4, stepsFrontEdge + 3.0)
     urn.position.set(0, 0, urnZ)
-    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.83, 0.65, 0.72, 12), bronze)
-    bowl.position.y = 0.6
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.79, 0.09, 8, 20), gold)
+
+    // 1. 八角花崗岩須彌石座
+    const stoneBase = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 1.02, 0.16, 8), plinthStone)
+    stoneBase.position.y = 0.08
+    stoneBase.castShadow = true
+    stoneBase.receiveShadow = true
+    const stoneTrim = new THREE.Mesh(new THREE.CylinderGeometry(0.84, 0.88, 0.06, 8), gold)
+    stoneTrim.position.y = 0.19
+    urn.add(stoneBase, stoneTrim)
+
+    // 2. 三足鼎立古銅爐腳（三隻圓弧銅足支撐爐腹）
+    const legGeo = new THREE.CylinderGeometry(0.11, 0.14, 0.42, 8)
+    for (let i = 0; i < 3; i++) {
+      const ang = (i * Math.PI * 2) / 3 + Math.PI / 6
+      const leg = new THREE.Mesh(legGeo, bronze)
+      leg.position.set(Math.cos(ang) * 0.46, 0.36, Math.sin(ang) * 0.46)
+      leg.rotation.z = -Math.cos(ang) * 0.16
+      leg.rotation.x = Math.sin(ang) * 0.16
+      leg.castShadow = true
+      urn.add(leg)
+    }
+
+    // 3. 古銅飽滿爐腹、鎏金腰帶與外翻爐口
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.84, 0.62, 0.64, 20), bronze)
+    bowl.position.y = 0.72
+    bowl.castShadow = true
+    bowl.receiveShadow = true
+    const waistBand = new THREE.Mesh(new THREE.TorusGeometry(0.76, 0.045, 8, 24), gold)
+    waistBand.rotation.x = Math.PI / 2
+    waistBand.position.y = 0.74
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.095, 10, 24), gold)
     rim.rotation.x = Math.PI / 2
-    rim.position.y = 0.98
-    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.53, 0.62, 0.25, 12), bronze)
-    foot.position.y = 0.12
-    urn.add(bowl, rim, foot)
+    rim.position.y = 1.06
+    rim.castShadow = true
+    const ashBed = new THREE.Mesh(new THREE.CircleGeometry(0.74, 20), makeMat('#5a5147', 0.96))
+    ashBed.rotation.x = -Math.PI / 2
+    ashBed.position.y = 1.04
+    urn.add(bowl, waistBand, rim, ashBed)
+
+    // 4. 兩側立體鎏金沖天雙龍耳（經典台灣宮廟天公爐耳飾）
+    const earGeo = new THREE.TorusGeometry(0.24, 0.055, 8, 16, Math.PI * 1.25)
+    const earFinialGeo = new THREE.SphereGeometry(0.085, 8, 8)
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(earGeo, bronze)
+      ear.position.set(side * 0.86, 1.02, 0)
+      ear.rotation.z = side === 1 ? -0.45 : Math.PI + 0.45
+      ear.castShadow = true
+      const finial = new THREE.Mesh(earFinialGeo, gold)
+      finial.position.set(side * 0.98, 1.24, 0)
+      urn.add(ear, finial)
+    }
+
     for (const x of [-0.18, 0, 0.18]) {
       const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1.22, 6), makeMat('#c89154'))
       stick.position.set(x, 1.72, 0)
@@ -2138,34 +2216,80 @@ export class TempleWorld {
     const group = new THREE.Group()
     const half = width / 2
     const slope = Math.atan2(peakY - eaveY, half)
+    const slopeLen = Math.hypot(half, peakY - eaveY)
+    const tileMat = this.pbr.get('glazedRoofTile', Math.max(2, Math.round(depth / 1.6)), Math.max(2, Math.round(slopeLen / 1.6)))
+    const fasciaMat = this.pbr.get('darkTimber', Math.max(2, Math.round(depth / 2)), 1)
+    const goldMat = this.pbr.get('gildedGold', 2, 1)
+    const ridgeGoldMat = this.pbr.get('gildedGold', 1, 1)
+
     for (const side of [-1, 1]) {
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(half + 0.32, 0.46, depth), makeMat(C.roof, 0.82))
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(slopeLen + 0.45, 0.44, depth), tileMat)
       wing.position.set(side * half / 2, (peakY + eaveY) / 2, 0)
       wing.rotation.z = -side * slope
       wing.castShadow = true
       wing.receiveShadow = true
       group.add(wing)
-      const fascia = new THREE.Mesh(new THREE.BoxGeometry(half + 0.42, 0.18, depth + 0.32), makeMat(C.roofLight, 0.72))
-      fascia.position.set(side * half / 2, eaveY - 0.11, 0)
+
+      // 深木色屋簷封簷板與底部飛椽結構層
+      const fascia = new THREE.Mesh(new THREE.BoxGeometry(slopeLen + 0.52, 0.16, depth + 0.34), fasciaMat)
+      fascia.position.set(side * half / 2, eaveY - 0.1, 0)
       fascia.rotation.z = -side * slope
       group.add(fascia)
-      const ridge = new THREE.Mesh(new THREE.BoxGeometry(half + 0.35, 0.12, 0.13), makeMat(C.gold, 0.6, 0.12))
-      ridge.position.set(side * half / 2, (peakY + eaveY) / 2 + 0.24, 0)
-      ridge.rotation.z = -side * slope
-      group.add(ridge)
+
+      // 斜垂脊鎏金線條（前後兩側垂脊）
+      const ridgeGeo = new THREE.BoxGeometry(slopeLen + 0.42, 0.14, 0.16)
+      for (const rz of [-depth / 2 + 0.08, depth / 2 - 0.08]) {
+        const ridge = new THREE.Mesh(ridgeGeo, goldMat)
+        ridge.position.set(side * half / 2, (peakY + eaveY) / 2 + 0.25, rz)
+        ridge.rotation.z = -side * slope
+        group.add(ridge)
+      }
+
+      // 屋簷下緣立體瓦當飾條（以輕量幾何沿簷口呈現琉璃滴水層次）
+      const eaveLip = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, depth + 0.26, 8), ridgeGoldMat)
+      eaveLip.rotation.x = Math.PI / 2
+      eaveLip.position.set(side * (half + 0.16), eaveY - 0.02, 0)
+      group.add(eaveLip)
     }
-    const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, depth + 0.6, 10), makeMat(C.gold, 0.5, 0.18))
+
+    // 正脊主脊樑、雙層金脊飾與中央「火珠」寶頂
+    const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, depth + 0.72, 12), goldMat)
     spine.rotation.x = Math.PI / 2
-    spine.position.set(0, peakY + 0.12, 0)
+    spine.position.set(0, peakY + 0.16, 0)
+    spine.castShadow = true
     group.add(spine)
+
+    const ridgeCrest = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.26, depth + 0.45), ridgeGoldMat)
+    ridgeCrest.position.set(0, peakY + 0.3, 0)
+    group.add(ridgeCrest)
+
+    // 正脊中央琉璃金火珠與底座
+    const pearlBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 0.18, 8), ridgeGoldMat)
+    pearlBase.position.set(0, peakY + 0.48, 0)
+    const centerPearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), ridgeGoldMat)
+    centerPearl.position.set(0, peakY + 0.72, 0)
+    group.add(pearlBase, centerPearl)
+
+    // 正脊前後雙端燕尾翹起脊飾
+    const tailGeo = new THREE.ConeGeometry(0.16, 0.62, 6)
+    for (const tz of [-depth / 2 - 0.32, depth / 2 + 0.32]) {
+      const tail = new THREE.Mesh(tailGeo, ridgeGoldMat)
+      tail.position.set(0, peakY + 0.42, tz)
+      tail.rotation.x = tz < 0 ? -0.45 : 0.45
+      group.add(tail)
+    }
+
+    // 四角飛簷燕尾翹角與鎏金仙人走獸圓珠
+    const cornerTipGeo = new THREE.ConeGeometry(0.24, 0.88, 8)
+    const cornerOrbGeo = new THREE.SphereGeometry(0.14, 10, 8)
     for (const x of [-half, half]) for (const z of [-depth / 2, depth / 2]) {
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.23, 0.7, 8), makeMat(C.roofLight))
-      tip.position.set(x * 1.04, eaveY + 0.4, z * 1.04)
-      tip.rotation.z = x < 0 ? 0.72 : -0.72
-      tip.rotation.x = z < 0 ? -0.25 : 0.25
+      const tip = new THREE.Mesh(cornerTipGeo, tileMat)
+      tip.position.set(x * 1.05, eaveY + 0.44, z * 1.05)
+      tip.rotation.z = x < 0 ? 0.78 : -0.78
+      tip.rotation.x = z < 0 ? -0.28 : 0.28
       group.add(tip)
-      const ornament = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), makeMat(C.gold, 0.4, 0.18))
-      ornament.position.set(x * 1.04, eaveY + 0.78, z * 1.04)
+      const ornament = new THREE.Mesh(cornerOrbGeo, ridgeGoldMat)
+      ornament.position.set(x * 1.07, eaveY + 0.88, z * 1.07)
       group.add(ornament)
     }
     return group
@@ -4205,7 +4329,23 @@ export class TempleWorld {
     this.setTimeSetting(mode, immediate)
   }
 
+  /** 依畫質檔位（low / medium / high）調整 PBR 貼圖細節與陰影解析度 */
+  applyQuality(quality: Quality): void {
+    this.pbr.applyQuality(quality)
+    const mapSize = quality === 'low' ? 512 : quality === 'medium' ? 1024 : 2048
+    if (this.shadowMapResolution !== mapSize) {
+      this.shadowMapResolution = mapSize
+      this.sun.shadow.mapSize.set(mapSize, mapSize)
+      if (this.sun.shadow.map) {
+        this.sun.shadow.map.dispose()
+        this.sun.shadow.map = null
+      }
+    }
+  }
+
   private applyTimeConfig(cfg: TimeConfig, immediate = false): void {
+    this.targetEnvIntensity =
+      this.timeOfDay === 'night' ? 0.24 : this.timeOfDay === 'dawn' ? 0.52 : this.timeOfDay === 'dusk' ? 0.56 : 0.68
     this.targetBgColor.set(cfg.bgColor)
     this.targetFogColor.set(cfg.fogColor)
     this.targetFogNear = cfg.fogNear
@@ -4244,6 +4384,7 @@ export class TempleWorld {
       this.hemiLight.color.copy(this.targetHemiColor)
       this.hemiLight.groundColor.copy(this.targetHemiGroundColor)
       this.hemiLight.intensity = this.targetHemiIntensity
+      if (this.iblTexture) this.scene.environmentIntensity = this.targetEnvIntensity
       if (this.cloudMat) {
         this.cloudMat.color.copy(this.targetCloudColor)
         this.cloudMat.opacity = this.targetCloudOpacity
@@ -4486,6 +4627,21 @@ export class TempleWorld {
     this.roof.visible = !insideHall
     const insideRear = playerPosition.z < -16.5 && playerPosition.z > -33.5 && Math.abs(playerPosition.x) < 12.0
     this.rearRoof.visible = !insideRear
+
+    // 分區 PointLight 最佳化：遠離後殿（z > 10m）時暫停後殿內部點光，進入前庭中後段與主殿即自動開啟，完全保留原有照明
+    const enableRearLights = playerPosition.z < 10.0
+    for (const light of this.rearHallLights) {
+      light.visible = enableRearLights
+    }
+
+    // 跟隨式紋素對齊陰影（Texel-Snapped Following Shadow Camera）：維持 ±34m 高密度陰影並防止移動時陰影抖動閃爍
+    const texelSize = (this.shadowHalfExtent * 2) / Math.max(512, this.shadowMapResolution)
+    const snapX = Math.round(playerPosition.x / texelSize) * texelSize
+    const snapZ = Math.round(playerPosition.z / texelSize) * texelSize
+    const sunOffset = this.targetSunPos
+    this.sun.target.position.set(snapX, 0, snapZ)
+    this.sun.position.set(snapX + sunOffset.x, sunOffset.y, snapZ + sunOffset.z)
+    this.sun.target.updateMatrixWorld()
     this.incenseGlow.intensity = THREE.MathUtils.damp(this.incenseGlow.intensity, 0.22, 1.4, dt)
     this.courtyard.update(dt, time)
     this.npcs.update(dt, time, playerPosition, camera)
@@ -4522,6 +4678,9 @@ export class TempleWorld {
       this.hemiLight.color.lerp(this.targetHemiColor, alpha)
       this.hemiLight.groundColor.lerp(this.targetHemiGroundColor, alpha)
       this.hemiLight.intensity = THREE.MathUtils.lerp(this.hemiLight.intensity, this.targetHemiIntensity, alpha)
+      if (this.iblTexture) {
+        this.scene.environmentIntensity = THREE.MathUtils.lerp(this.scene.environmentIntensity, this.targetEnvIntensity, alpha)
+      }
       if (this.cloudMat) {
         this.cloudMat.color.lerp(this.targetCloudColor, alpha)
         this.cloudMat.opacity = THREE.MathUtils.lerp(this.cloudMat.opacity, this.targetCloudOpacity, alpha)

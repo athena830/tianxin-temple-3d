@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Physics } from '../engine/physics'
+import type { TemplePbrLibrary } from './temple-pbr-materials'
 
 /**
  * Stage 2A: entrance arch, front courtyard, Tiangong urn and the Tianxin Xiangu consultation pavilion.
@@ -21,6 +22,7 @@ export type BuildContext = {
   mat: (color: string, roughness?: number, metalness?: number) => THREE.MeshStandardMaterial
   roof: (width: number, depth: number, eaveY: number, peakY: number) => THREE.Group
   text: (text: string, fg: string, bg: string) => THREE.MeshBasicMaterial
+  pbr?: TemplePbrLibrary
 }
 
 const PAL = {
@@ -105,10 +107,12 @@ export class FrontCourtyard {
   private addGround(): void {
     const { halfX, back, front } = SITE
     const depth = front - back
-    const floor = this.box(halfX * 2, 0.8, depth, this.c.mat(PAL.stone, 0.96), 0, -0.42, (front + back) / 2, true)
+    const floorMat = this.c.pbr ? this.c.pbr.get('courtyardStone', 15, 22) : this.c.mat(PAL.stone, 0.96)
+    const floor = this.box(halfX * 2, 0.8, depth, floorMat, 0, -0.42, (front + back) / 2, true)
     floor.castShadow = false
     // Entrance plaza outside the arch, where the visitor first appears.
-    const plaza = this.box(26, 0.8, 8, this.c.mat(PAL.paving, 0.95), 0, -0.42, front + 4, true)
+    const plazaMat = this.c.pbr ? this.c.pbr.get('plinthStone', 7, 2) : this.c.mat(PAL.paving, 0.95)
+    const plaza = this.box(26, 0.8, 8, plazaMat, 0, -0.42, front + 4, true)
     plaza.castShadow = false
     const outside = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), this.c.mat(PAL.ground, 1))
     outside.rotation.x = -Math.PI / 2
@@ -156,7 +160,8 @@ export class FrontCourtyard {
   }
 
   private pillar(x: number, z: number, h: number, r: number, collide = false, color = PAL.red): void {
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r, h, 12), this.c.mat(color, 0.72))
+    const pillarMat = color === PAL.red && this.c.pbr ? this.c.pbr.get('vermilionWood', 1, 2) : this.c.mat(color, 0.72)
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r, h, 14), pillarMat)
     p.position.set(x, h / 2, z)
     this.add(p)
     if (collide) this.c.physics.addStaticCylinder(new THREE.Vector3(x, h / 2, z), r, h)
@@ -166,19 +171,23 @@ export class FrontCourtyard {
     const start = -8.5
     const end = GATE_Z + 7.5
     const len = end - start
-    const road = new THREE.Mesh(new THREE.BoxGeometry(ROAD_HALF * 2 + 0.1, 0.035, len), this.c.mat(PAL.road, 0.92))
+    const roadMat = this.c.pbr ? this.c.pbr.get('imperialRoad', 1.5, 22) : this.c.mat(PAL.road, 0.92)
+    const road = new THREE.Mesh(new THREE.BoxGeometry(ROAD_HALF * 2 + 0.1, 0.035, len), roadMat)
     road.position.set(0, 0.015, (start + end) / 2)
     road.receiveShadow = true
     this.c.scene.add(road)
-    const line = this.c.mat(PAL.roadLine, 0.88)
+    const lineMat = this.c.pbr ? this.c.pbr.get('plinthStone', 2, 1) : this.c.mat(PAL.roadLine, 0.88)
+    const tileGeo = new THREE.BoxGeometry(ROAD_HALF * 2 - 0.1, 0.025, 0.16)
     for (let z = end - 1.5; z > start; z -= 3) {
-      const tile = new THREE.Mesh(new THREE.BoxGeometry(ROAD_HALF * 2 - 0.1, 0.025, 0.16), line)
+      const tile = new THREE.Mesh(tileGeo, lineMat)
       tile.position.set(0, 0.04, z)
+      tile.receiveShadow = true
       this.c.scene.add(tile)
     }
     // Low curb stones along both edges, flush enough to step over (purely visual).
+    const curbMat = this.c.pbr ? this.c.pbr.get('plinthStone', 1, 16) : this.c.mat('#b9aa91', 0.9)
     for (const side of [-1, 1]) {
-      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, GATE_Z - 1), this.c.mat('#b9aa91', 0.9))
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, GATE_Z - 1), curbMat)
       curb.position.set(side * (ROAD_HALF + 0.12), 0.04, GATE_Z / 2 - 0.5)
       curb.receiveShadow = true
       this.c.scene.add(curb)
@@ -188,14 +197,52 @@ export class FrontCourtyard {
   /** Three-bay entrance arch. All three bays are walkable; lanterns hang only over the side bays, above 4.2 m. */
   private addGateArch(): void {
     const z = GATE_Z
-    const gold = this.c.mat(PAL.gold, 0.5, 0.18)
+    const gold = this.c.pbr ? this.c.pbr.get('gildedGold', 1, 1) : this.c.mat(PAL.gold, 0.5, 0.18)
+    const vermilion = this.c.pbr ? this.c.pbr.get('vermilionWood', 2, 1) : this.c.mat(PAL.red, 0.72)
+    const darkTimber = this.c.pbr ? this.c.pbr.get('darkTimber', 2, 1) : this.c.mat('#30231a', 0.85)
+    const plinthStone = this.c.pbr ? this.c.pbr.get('plinthStone', 1, 1) : this.c.mat('#a8a08f', 0.95)
+    const collarGeo = new THREE.CylinderGeometry(1, 1, 0.18, 16)
+    const baseOctGeo = new THREE.CylinderGeometry(0.68, 0.76, 0.32, 8)
     for (const [x, h, r] of [[-6, 5.6, 0.4], [-2.6, 6.4, 0.46], [2.6, 6.4, 0.46], [6, 5.6, 0.4]] as const) {
       this.pillar(x, z, h, r, true)
-      this.box(1.25, 0.4, 1.25, gold, x, 0.2, z)
+      this.box(1.25, 0.34, 1.25, plinthStone, x, 0.17, z)
+      // 覆盆八角石柱礎與柱頭金箍（純視覺立體細節，不影響碰撞）
+      const octBase = new THREE.Mesh(baseOctGeo, gold)
+      octBase.position.set(x, 0.42, z)
+      this.add(octBase)
+      const capCollar = new THREE.Mesh(collarGeo, gold)
+      capCollar.scale.set(r * 1.12, 1, r * 1.12)
+      capCollar.position.set(x, h - 0.55, z)
+      this.add(capCollar)
     }
-    this.box(5.9, 0.6, 0.95, PAL.red, 0, 6.15, z)
-    for (const side of [-1, 1]) this.box(3.9, 0.5, 0.85, PAL.red, side * 4.3, 5.35, z)
-    const plaque = this.box(3.8, 1.05, 0.24, '#30231a', 0, 5.4, z + 0.5)
+    this.box(5.9, 0.6, 0.95, vermilion, 0, 6.15, z)
+    this.box(6.1, 0.14, 1.06, gold, 0, 5.84, z)
+    for (const side of [-1, 1]) {
+      this.box(3.9, 0.5, 0.85, vermilion, side * 4.3, 5.35, z)
+      this.box(4.05, 0.12, 0.94, gold, side * 4.3, 5.08, z)
+    }
+    // 山門飛簷斗栱組（共用幾何體實例，強化傳統大木作立體輪廓）
+    const dgBaseGeo = new THREE.BoxGeometry(0.32, 0.14, 0.32)
+    const dgArmGeo = new THREE.BoxGeometry(0.66, 0.12, 0.2)
+    const dgBeakGeo = new THREE.BoxGeometry(0.18, 0.12, 0.64)
+    const addGateDougong = (dx: number, dy: number) => {
+      for (const faceDir of [-1, 1]) {
+        const dg = new THREE.Group()
+        dg.position.set(dx, dy, z + faceDir * 0.52)
+        const b = new THREE.Mesh(dgBaseGeo, gold)
+        const arm = new THREE.Mesh(dgArmGeo, vermilion)
+        arm.position.y = 0.12
+        const beak = new THREE.Mesh(dgBeakGeo, gold)
+        beak.position.set(0, 0.2, faceDir * 0.12)
+        beak.rotation.x = faceDir * 0.18
+        dg.add(b, arm, beak)
+        this.add(dg)
+      }
+    }
+    for (const dx of [-1.8, -0.6, 0.6, 1.8]) addGateDougong(dx, 6.32)
+    for (const dx of [-5.1, -3.5, 3.5, 5.1]) addGateDougong(dx, 5.5)
+
+    const plaque = this.box(3.8, 1.05, 0.24, darkTimber, 0, 5.4, z + 0.5)
     plaque.castShadow = false
     for (const dz of [0.63, -0.63]) {
       const face = new THREE.Mesh(new THREE.PlaneGeometry(3.45, 0.82), this.c.text('玉 皇 宮', '#e5c57d', '#38251b'))
