@@ -14,5 +14,18 @@
     <canvas id="game"></canvas>
     <div id="ui"></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      // Fallback for static hosting (GitHub Pages main branch) where /src/main.ts is not served
+      (function () {
+        var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.port === '3000' || location.port === '5173';
+        if (!isLocal) {
+          var s = document.createElement('script');
+          s.type = 'module';
+          s.crossOrigin = '';
+          s.src = './assets/index.js';
+          document.head.appendChild(s);
+        }
+      })();
+    </script>
   </body>
 </html>
