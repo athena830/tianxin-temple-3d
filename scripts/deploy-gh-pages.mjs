@@ -26,6 +26,7 @@ for (const file of distFiles) {
 const entryHashed = [...distFiles].find(f => f.startsWith('index-') && f.endsWith('.js'))
 if (entryHashed) {
   cpSync(join(distDir, 'assets', entryHashed), join(rootAssetsDir, 'index.js'), { force: true })
+  cpSync(join(distDir, 'assets', entryHashed), join(distDir, 'assets', 'index.js'), { force: true })
 }
 
 // Add cache-busting timestamp/version ONLY to index.css in dist/index.html.

@@ -6,7 +6,17 @@ export { RAPIER }
 /** Initialise the Rapier WASM module once, before creating any `Physics`. */
 let ready: Promise<void> | undefined
 export function initPhysics(): Promise<void> {
-  ready ??= RAPIER.init()
+  if (!ready) {
+    ready = RAPIER.init()
+      .then(() => {
+        console.log('[Physics] Rapier WASM module initialized successfully.')
+      })
+      .catch(err => {
+        console.error('[Physics] Failed to initialize Rapier WASM module:', err)
+        ready = undefined
+        throw err
+      })
+  }
   return ready
 }
 
@@ -30,7 +40,12 @@ export class Physics {
     if (!RAPIER || typeof (RAPIER as any).World !== 'function') {
       throw new Error('Rapier WASM module not initialized. Await initPhysics() first.')
     }
-    this.world = new RAPIER.World({ x: 0, y: gravity, z: 0 })
+    try {
+      this.world = new RAPIER.World({ x: 0, y: gravity, z: 0 })
+    } catch (err: any) {
+      console.error('[Physics] Error initializing Rapier World:', err)
+      throw new Error(`物理引擎初始化異常，請重新整理頁面。(${err?.message || err})`)
+    }
   }
 
   step(stepSeconds: number): void {
