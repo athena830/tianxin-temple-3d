@@ -182,14 +182,6 @@ export class TempleUi {
       <div class="npc-dialogue-bar" hidden><span class="npc-icon">💬</span><b class="npc-name"></b><span class="npc-text"></span></div>
       <div class="toast" hidden></div>
       <div class="market-ro-hud" hidden>
-        <section class="ro-window ro-basic-info" aria-label="旅人狀態">
-          <header class="ro-win-bar"><span>✦ 天心靈光市集</span><small data-market-weather>📍 台中即時連線中</small></header>
-          <div class="ro-win-body">
-            <div class="ro-char-row"><b>靈光旅人</b><span>漫步模式</span></div>
-            <div class="ro-stat-bar"><label>靜心</label><i><em style="width:100%"></em></i><span>100%</span></div>
-            <div class="ro-stat-bar sp"><label>靈光</label><i><em style="width:100%"></em></i><span>100%</span></div>
-          </div>
-        </section>
         <section class="ro-window ro-mini-nav" aria-label="市集快速導覽">
           <header class="ro-win-bar"><span>🏮 攤位導覽</span><small>點擊走動</small></header>
           <div class="ro-nav-grid">
