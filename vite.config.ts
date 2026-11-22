@@ -13,8 +13,11 @@ export default defineConfig(({ mode }) => {
       manusGameTuning(),
       {
         name: 'html-entry-transform',
-        transformIndexHtml(html) {
-          return html.replace('./assets/index.js', '/src/main.ts')
+        transformIndexHtml: {
+          order: 'pre',
+          handler(html) {
+            return html.replace(/\.\/assets\/index[^"']*\.js/, '/src/main.ts')
+          },
         },
       },
     ],

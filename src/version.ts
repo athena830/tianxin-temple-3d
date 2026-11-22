@@ -1,2 +1,2 @@
-/** VER 3.71.7 — 徹底清除 index.html 冗餘動態腳本，修復雙重模組載入導致的 Rapier WASM 崩潰（rawintegrationparameters_new）與黑屏問題；dist/assets/ 同步產出 index.js 相容別名。 */
-export const APP_VERSION = 'VER 3.71.7'
+/** VER 3.72.0 — 靈光市集全面升級為「電影級 PBR 寫實畫質」：高解析度法線貼圖濕潤柏油路與即時鏡面倒影探針、360° HDRI 環境光照、實體 3D 霓虹燈管招牌、生鏽波浪鐵皮與紅磚攤位、台式 125cc 機車、變壓器電線桿、台灣公寓街景背景與電影級細雨粒子系統。 */
+export const APP_VERSION = 'VER 3.72.0'

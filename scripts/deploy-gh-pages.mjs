@@ -22,11 +22,16 @@ for (const file of distFiles) {
   cpSync(join(distDir, 'assets', file), join(rootAssetsDir, file), { recursive: true })
 }
 
-// Also provide an assets/index.js compatibility alias for any legacy links
+// Also provide an assets/index.js compatibility alias for any legacy links,
+// and update root index.html to point directly to the latest hashed entry bundle (for GitHub Pages main branch).
 const entryHashed = [...distFiles].find(f => f.startsWith('index-') && f.endsWith('.js'))
 if (entryHashed) {
   cpSync(join(distDir, 'assets', entryHashed), join(rootAssetsDir, 'index.js'), { force: true })
   cpSync(join(distDir, 'assets', entryHashed), join(distDir, 'assets', 'index.js'), { force: true })
+  const rootIndexPath = join(rootDir, 'index.html')
+  const rootHtml = readFileSync(rootIndexPath, 'utf-8')
+  const updatedRootHtml = rootHtml.replace(/\.\/assets\/index[^"']*\.js/, `./assets/${entryHashed}`)
+  writeFileSync(rootIndexPath, updatedRootHtml, 'utf-8')
 }
 
 // Add cache-busting timestamp/version ONLY to index.css in dist/index.html.

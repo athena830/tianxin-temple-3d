@@ -841,10 +841,22 @@ export function createRealisticApartmentBlock(
       win.position.set(wx, fy + 0.85, depth / 2 + 0.02)
       building.add(win)
 
-      // 經典台灣不鏽鋼 / 鍛鐵防盜鐵窗花 (Burglar Bars)
-      const cage = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.35, 0.32), ironMat)
-      cage.position.set(wx, fy + 0.85, depth / 2 + 0.18)
-      building.add(cage)
+      // 經典台灣不鏽鋼 / 鍛鐵防盜鐵窗花 (Open Burglar Bars，透出溫暖室內窗光)
+      const cageGroup = new THREE.Group()
+      cageGroup.position.set(wx, fy + 0.85, depth / 2 + 0.14)
+      const topBar = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.06, 0.24), ironMat)
+      topBar.position.y = 0.66
+      const botBar = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.06, 0.24), ironMat)
+      botBar.position.y = -0.66
+      const midBar = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.04, 0.04), ironMat)
+      midBar.position.z = 0.1
+      cageGroup.add(topBar, botBar, midBar)
+      for (let b = -3; b <= 3; b++) {
+        const vBar = new THREE.Mesh(new THREE.BoxGeometry(0.035, 1.32, 0.035), ironMat)
+        vBar.position.set(b * 0.26, 0, 0.1)
+        cageGroup.add(vBar)
+      }
+      building.add(cageGroup)
 
       // 冷氣室外機（掛於窗台邊緣）
       if (isLit) {
@@ -870,27 +882,72 @@ export function createRealisticApartmentBlock(
    4. 現代化雨夜反射探針與即時地面鏡面系統 (Ground Reflector)
    ======================================================== */
 
-/** 建立雨夜柏油路即時螢幕反射探針平面 (Planar Reflector) */
+/** 建立雨夜柏油路即時螢幕反射探針平面 (Planar Reflector，支援 uOpacity 透明混合透出底層 PBR 濕潤柏油與斑馬線) */
 export function createWetRoadReflector(
   width = 36,
   height = 9.2,
   options?: { opacity?: number; color?: number },
 ): Reflector {
   const geo = new THREE.PlaneGeometry(width, height)
+  const initialOpacity = options?.opacity ?? 0.38
+  const customShader = {
+    name: 'WetRoadReflectorShader',
+    uniforms: {
+      color: { value: null },
+      tDiffuse: { value: null },
+      textureMatrix: { value: null },
+      uOpacity: { value: initialOpacity },
+    },
+    vertexShader: /* glsl */`
+      uniform mat4 textureMatrix;
+      varying vec4 vUv;
+      #include <common>
+      #include <logdepthbuf_pars_vertex>
+      void main() {
+        vUv = textureMatrix * vec4( position, 1.0 );
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+        #include <logdepthbuf_vertex>
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform vec3 color;
+      uniform sampler2D tDiffuse;
+      uniform float uOpacity;
+      varying vec4 vUv;
+
+      #include <logdepthbuf_pars_fragment>
+
+      float blendOverlay( float base, float blend ) {
+        return( base < 0.5 ? ( 2.0 * base * blend ) : ( 1.0 - 2.0 * ( 1.0 - base ) * ( 1.0 - blend ) ) );
+      }
+
+      vec3 blendOverlay( vec3 base, vec3 blend ) {
+        return vec3( blendOverlay( base.r, blend.r ), blendOverlay( base.g, blend.g ), blendOverlay( base.b, blend.b ) );
+      }
+
+      void main() {
+        #include <logdepthbuf_fragment>
+        vec4 base = texture2DProj( tDiffuse, vUv );
+        gl_FragColor = vec4( blendOverlay( base.rgb, color ), uOpacity );
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }
+    `,
+  }
+
   const reflector = new Reflector(geo, {
     clipBias: 0.003,
     textureWidth: 1024,
     textureHeight: 512,
-    color: options?.color ?? 0x556070,
+    color: options?.color ?? 0x62708a,
+    shader: customShader,
   })
   reflector.rotation.x = -Math.PI / 2
-  reflector.position.set(0, 0.008, 3.2) // 略高於柏油路面 0.003m 產生濕潤反光層
+  reflector.position.set(0, 0.009, 3.2) // 略高於柏油路面產生濕潤反光層
 
-  // 調整材質屬性與透明混合度
   const mat = reflector.material as THREE.ShaderMaterial
   if (mat) {
     mat.transparent = true
-    mat.opacity = options?.opacity ?? 0.48
     mat.depthWrite = false
   }
 
