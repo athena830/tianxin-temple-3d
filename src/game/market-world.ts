@@ -722,15 +722,20 @@ export class MarketWorld {
   private buildAbyssOccultCompass(): void {
     // 1. 深淵星點粒子（紫藍與暖金微光星塵）
     this.abyssStarfield = createAbyssStarfield(520)
+    // 保留星點在深淵中的垂直縱深；不可把 y 壓成平面，否則平視時會退化為帶狀裝飾。
+    this.abyssStarfield.scale.set(0.37, 0.22, 0.17)
+    this.abyssStarfield.position.set(0, 0.12, 9.55)
     this.scene.add(this.abyssStarfield)
 
     // 2. 立體環形玄學羅盤底座（橢圓貼合街道輪廓，平視可見立體環壁與暖金月相星象浮雕，斜視可見內凹深淵盤面）
     this.occultCompassGroup = createOccultCompassPlinth(20.4)
-    this.occultCompassGroup.scale.set(1.0, 1.0, 0.64)
-    this.occultCompassGroup.position.set(0, 0, 2.2)
+    // 橢圓羅盤置於街道下緣：頂緣僅略高於地面，厚度則完全向下延伸，
+    // 不遮擋攤位或熱區，平視與斜視仍可讀出環壁、內凹與底座層次。
+    this.occultCompassGroup.scale.set(0.4, 0.62, 0.2)
+    this.occultCompassGroup.position.set(0, 0.12, 9.55)
     this.scene.add(this.occultCompassGroup)
 
-    // 3. 放大版漂浮占卜塔羅牌（完整框列於羅盤中下環之間的深淵空間 y = -1.10，絕不超出 y = 0 街道面）
+    // 3. 放大版漂浮占卜塔羅牌（排列於下方羅盤內圈，保留街道與攤位熱區淨空）
     const tarotConfigs: {
       titleZh: string
       titleEn: string
@@ -753,10 +758,21 @@ export class MarketWorld {
       { titleZh: '女祭司', titleEn: 'THE PRIESTESS', num: 'II', type: 'moon', x: 9.2, y: -1.12, z: 12.8, rotX: 0.1, rotY: -0.22, rotZ: 0.07, speed: 1.08, amp: 0.08 },
     ]
 
+    const tarotVisibleLayout = [
+      { x: -4.7, y: -0.08, z: 9.15, amp: 0.07 },
+      { x: -2.8, y: -0.01, z: 9.8, amp: 0.075 },
+      { x: -0.9, y: 0.06, z: 10.15, amp: 0.08 },
+      { x: 0.9, y: 0.04, z: 10.08, amp: 0.075 },
+      { x: 2.8, y: -0.02, z: 9.72, amp: 0.07 },
+      { x: 4.7, y: -0.09, z: 9.05, amp: 0.07 },
+    ] as const
+    tarotConfigs.forEach((config, index) => Object.assign(config, tarotVisibleLayout[index]))
+
     for (const t of tarotConfigs) {
       const card = createFloatingTarotCard(t.titleZh, t.titleEn, t.num, t.type)
       card.position.set(t.x, t.y, t.z)
       card.rotation.set(t.rotX, t.rotY, t.rotZ)
+      card.scale.setScalar(1.3)
       this.scene.add(card)
       this.floatingTarotCards.push({
         mesh: card,
@@ -770,29 +786,31 @@ export class MarketWorld {
       })
     }
 
-    // 4. 加大比例之低面數紫水晶簇（擺放於羅盤下層前緣 y = -1.70，晶峰高至 y ≈ -0.52）
+    // 4. 加大比例之低面數紫水晶簇（擺放於羅盤內緣前段）
     for (const [cx, cy, cz, rotY] of [
-      [-6.5, -1.7, 13.6, 0.35],
-      [-2.7, -1.7, 14.3, -0.25],
-      [3.3, -1.7, 14.2, 0.55],
-      [7.2, -1.7, 13.4, -0.45],
+      [-3.7, 0.1, 10.9, 0.35],
+      [-1.2, 0.1, 11.45, -0.25],
+      [1.3, 0.1, 11.42, 0.55],
+      [3.8, 0.1, 10.85, -0.45],
     ] as const) {
       const crystal = createAmethystCrystalCluster()
       crystal.position.set(cx, cy, cz)
       crystal.rotation.y = rotY
+      crystal.scale.setScalar(1.38)
       this.scene.add(crystal)
     }
 
-    // 5. 暖黃發光儀式蠟燭組（高低錯落擺放於深淵前緣與羅盤內緣 y = -1.70）
+    // 5. 暖黃發光儀式蠟燭組（高低錯落擺放於深淵前緣與羅盤內緣）
     for (const [kx, ky, kz] of [
-      [-5.3, -1.7, 13.9],
-      [-0.1, -1.7, 14.5],
-      [0.7, -1.7, 14.4],
-      [6.0, -1.7, 13.7],
-      [10.4, -1.7, 12.4],
+      [-4.9, 0.11, 9.0],
+      [-2.4, 0.12, 10.55],
+      [0, 0.12, 10.9],
+      [2.4, 0.12, 10.5],
+      [4.9, 0.11, 8.95],
     ] as const) {
       const candle = createOccultCandle()
       candle.group.position.set(kx, ky, kz)
+      candle.group.scale.setScalar(1.34)
       this.scene.add(candle.group)
       this.abyssCandles.push(candle)
     }
