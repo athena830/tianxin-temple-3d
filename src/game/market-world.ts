@@ -9,6 +9,7 @@ import {
   PLAYER_TARGET_HEIGHT,
   normalizeScaleToHeight,
 } from './sceneConfig'
+import { Chibi, createCharacter } from './createCharacter'
 
 /** 台灣雨夜霓虹 × Low-Poly 市集配色（純市集版本） */
 const PALETTE = {
@@ -523,18 +524,30 @@ export class MarketWorld {
     colliderBaseSize?: THREE.Vector3
   }[] = []
 
-  // Q 版低面數角色與 GLTFLoader 佔位節點
+  // Q 版低面數角色與 GLTFLoader 佔位節點（全面採用與玉皇宮一致的共用 createCharacter 模組）
+  chibi!: Chibi
+  get avatarBodyGroup(): THREE.Group | THREE.Object3D | undefined {
+    return this.chibi?.root
+  }
   private avatarVisualRoot = new THREE.Group()
-  private avatarBodyGroup?: THREE.Group
-  private avatarBaseY = 0
-  private avatarLeftLeg?: THREE.Mesh
-  private avatarRightLeg?: THREE.Mesh
-  private avatarLeftArm?: THREE.Mesh
-  private avatarRightArm?: THREE.Mesh
   private avatarHasCustomModel = false
   private avatarYaw = 0
-  private walkCycle = 0
+  private currentPaletteId = 'jade'
   private time = 0
+
+  // 市集 NPC（各攤位攤主與路人訪客，與玉皇宮採用 100% 一致的人物外觀、頭身比與五官風格）
+  private readonly marketNpcs: {
+    id: string
+    name: string
+    chibi: Chibi
+    baseX: number
+    baseZ: number
+    facingYaw: number
+    isWalking?: boolean
+    walkAmp?: number
+    walkSpeed?: number
+    phase: number
+  }[] = []
 
   constructor(private readonly physics: Physics) {
     this.venuePoints = this.stallSpecs.map(spec => ({
@@ -565,6 +578,7 @@ export class MarketWorld {
     this.buildRainSystem()
     this.buildGroundCursor()
     this.buildChibiAvatar()
+    this.buildMarketNpcs()
     this.applyWeather(this.currentWeather)
   }
 
@@ -651,13 +665,21 @@ export class MarketWorld {
 
     this.avatarVisualRoot.clear()
     this.avatarVisualRoot.add(model)
-    this.avatarBodyGroup = undefined
-    this.avatarLeftLeg = undefined
-    this.avatarRightLeg = undefined
-    this.avatarLeftArm = undefined
-    this.avatarRightArm = undefined
     this.avatarHasCustomModel = true
     return model
+  }
+
+  /** 恢復為共用 Q 版手繪黏土幾何體風格 */
+  restoreProceduralModel(): void {
+    this.avatarVisualRoot.clear()
+    this.avatarVisualRoot.add(this.chibi.root)
+    this.avatarHasCustomModel = false
+  }
+
+  /** 同步設定角色色盤（素心行者 jade / 丹心行者 vermillion / 月照行者 moon） */
+  setCharacter(id: string): void {
+    this.currentPaletteId = id
+    this.chibi?.setPalette(id)
   }
 
   private setupAtmosphere(): void {
@@ -2073,7 +2095,7 @@ export class MarketWorld {
     this.scene.add(this.groundCursor)
   }
 
-  /** 低面數 Q 版幾何佔位角色（預留 loadCharacterModel 替換 GLTF 模型） */
+  /** 與玉皇宮 100% 一致之 Q 版啞光黏土風格角色（共用 createCharacter 模組） */
   private buildChibiAvatar(): void {
     // 腳底柔和陰影圓盤
     const shadow = new THREE.Mesh(
@@ -2084,77 +2106,95 @@ export class MarketWorld {
     shadow.position.y = 0.02
     this.avatar.add(shadow)
 
-    const bodyGroup = new THREE.Group()
-    const skinMat = new THREE.MeshLambertMaterial({ color: '#f7d3b5' })
-    const hairMat = new THREE.MeshLambertMaterial({ color: '#2b2236', flatShading: true })
-    const coatMat = new THREE.MeshLambertMaterial({ color: '#3b6d96', flatShading: true })
-    const scarfMat = new THREE.MeshLambertMaterial({ color: '#f2b857' })
-    const bootMat = new THREE.MeshLambertMaterial({ color: '#2d242a' })
-    const eyeMat = new THREE.MeshBasicMaterial({ color: '#1b1520' })
+    // 使用共用模組建立二頭身水滴大眼手辦黏土角色（套用共用 PLAYER_TARGET_HEIGHT，腳底貼地 y = 0）
+    this.chibi = createCharacter({
+      palette: this.currentPaletteId,
+      targetHeight: PLAYER_TARGET_HEIGHT,
+      groundY: 0,
+    })
 
-    // 雙腳
-    const legGeo = new THREE.BoxGeometry(0.16, 0.34, 0.16)
-    const leftLeg = new THREE.Mesh(legGeo, bootMat)
-    leftLeg.position.set(-0.13, 0.17, 0)
-    leftLeg.castShadow = true
-    const rightLeg = new THREE.Mesh(legGeo, bootMat)
-    rightLeg.position.set(0.13, 0.17, 0)
-    rightLeg.castShadow = true
-    bodyGroup.add(leftLeg, rightLeg)
-
-    // 外套身體
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 0.58, 7), coatMat)
-    torso.position.y = 0.62
-    torso.castShadow = true
-    bodyGroup.add(torso)
-
-    // 暖黃圍巾
-    const scarf = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.27, 0.12, 8), scarfMat)
-    scarf.position.y = 0.9
-    bodyGroup.add(scarf)
-
-    // 雙手
-    const armGeo = new THREE.BoxGeometry(0.12, 0.34, 0.12)
-    const leftArm = new THREE.Mesh(armGeo, coatMat)
-    leftArm.position.set(-0.33, 0.66, 0)
-    leftArm.castShadow = true
-    const rightArm = new THREE.Mesh(armGeo, coatMat)
-    rightArm.position.set(0.33, 0.66, 0)
-    rightArm.castShadow = true
-    bodyGroup.add(leftArm, rightArm)
-
-    // Q 版大頭與髮型
-    const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.34, 1), skinMat)
-    head.position.y = 1.24
-    head.castShadow = true
-    bodyGroup.add(head)
-
-    const hair = new THREE.Mesh(new THREE.DodecahedronGeometry(0.36, 1), hairMat)
-    hair.position.set(0, 1.32, -0.05)
-    hair.scale.set(1.02, 0.88, 1.02)
-    bodyGroup.add(hair)
-
-    // 眼睛
-    const eyeGeo = new THREE.BoxGeometry(0.05, 0.07, 0.04)
-    const leftEye = new THREE.Mesh(eyeGeo, eyeMat)
-    leftEye.position.set(-0.11, 1.24, 0.31)
-    const rightEye = new THREE.Mesh(eyeGeo, eyeMat)
-    rightEye.position.set(0.11, 1.24, 0.31)
-    bodyGroup.add(leftEye, rightEye)
-
-    this.avatarBodyGroup = bodyGroup
-    this.avatarLeftLeg = leftLeg
-    this.avatarRightLeg = rightLeg
-    this.avatarLeftArm = leftArm
-    this.avatarRightArm = rightArm
-
-    // 套用共用 PLAYER_TARGET_HEIGHT，確保市集人物與玉皇宮角色身高 100% 一致並腳底精準貼地 y = 0
-    normalizeScaleToHeight(bodyGroup, PLAYER_TARGET_HEIGHT, 0)
-    this.avatarBaseY = bodyGroup.position.y
-
-    this.avatarVisualRoot.add(bodyGroup)
+    this.avatarVisualRoot.add(this.chibi.root)
     this.avatar.add(this.avatarVisualRoot)
     this.scene.add(this.avatar)
+  }
+
+  /**
+   * 建立靈光市集各攤位攤主與漫步路人訪客：
+   * 全部改用與主場景「玉皇宮」100% 完全一致的 Q 版手繪黏土角色外觀（createCharacter 模組），
+   * 包含相同二頭身比、水滴大眼、靈動高光、蜜桃腮紅、微笑表情與消光溫潤 MeshLambertMaterial，
+   * 僅微調古典色盤以區分職能（紫微、靈氣、塔羅、問事、服務台與漫步訪客），並延續 PLAYER_TARGET_HEIGHT 高度標準。
+   */
+  private buildMarketNpcs(): void {
+    // 1. 各攤位專業駐店攤主
+    const stallKeepers: { id: string; name: string; palette: string; x: number; z: number; yaw: number }[] = [
+      { id: 'keeper-ziwei', name: '紫微長老', palette: 'scholar', x: -7.8, z: -3.7, yaw: 0 },
+      { id: 'keeper-reiki', name: '靈氣導師', palette: 'teal', x: -2.6, z: -3.7, yaw: 0 },
+      { id: 'keeper-tarot', name: '塔羅仙子', palette: 'lavender', x: 2.6, z: -3.7, yaw: 0 },
+      { id: 'keeper-chess', name: '問事棋翁', palette: 'monk', x: 7.8, z: -3.7, yaw: 0 },
+      { id: 'keeper-info', name: '服務台嚮導', palette: 'azure', x: 10.6, z: 6.0, yaw: Math.PI },
+    ]
+
+    for (const k of stallKeepers) {
+      const chibi = createCharacter({
+        palette: k.palette,
+        targetHeight: PLAYER_TARGET_HEIGHT,
+        groundY: 0.08, // 攤位木台基高度
+      })
+      chibi.root.position.set(k.x, chibi.root.position.y, k.z)
+      chibi.root.rotation.y = k.yaw
+      this.scene.add(chibi.root)
+
+      this.marketNpcs.push({
+        id: k.id,
+        name: k.name,
+        chibi,
+        baseX: k.x,
+        baseZ: k.z,
+        facingYaw: k.yaw,
+        phase: Math.random() * Math.PI * 2,
+      })
+    }
+
+    // 2. 市集漫步路人訪客（熱鬧台式雨夜夜市氛圍）
+    const visitors: {
+      id: string
+      name: string
+      palette: string
+      x: number
+      z: number
+      yaw: number
+      isWalking?: boolean
+      walkAmp?: number
+      walkSpeed?: number
+    }[] = [
+      { id: 'visitor-peach', name: '市集訪客・桃', palette: 'peach', x: 0.3, z: 1.2, yaw: -0.3 },
+      { id: 'visitor-rose', name: '市集訪客・丹', palette: 'rose', x: -5.0, z: 0.6, yaw: 0.2, isWalking: true, walkAmp: 0.8, walkSpeed: 0.6 },
+      { id: 'visitor-pine', name: '市集訪客・松', palette: 'pine', x: 5.2, z: 1.5, yaw: -0.2, isWalking: true, walkAmp: 0.7, walkSpeed: 0.5 },
+    ]
+
+    for (const v of visitors) {
+      const chibi = createCharacter({
+        palette: v.palette,
+        targetHeight: PLAYER_TARGET_HEIGHT,
+        groundY: 0,
+      })
+      chibi.root.position.set(v.x, chibi.root.position.y, v.z)
+      chibi.root.rotation.y = v.yaw
+      this.scene.add(chibi.root)
+
+      this.marketNpcs.push({
+        id: v.id,
+        name: v.name,
+        chibi,
+        baseX: v.x,
+        baseZ: v.z,
+        facingYaw: v.yaw,
+        isWalking: v.isWalking,
+        walkAmp: v.walkAmp,
+        walkSpeed: v.walkSpeed,
+        phase: Math.random() * Math.PI * 2,
+      })
+    }
   }
 
   nearestPoint(position: THREE.Vector3): MarketPoint | null {
@@ -2174,7 +2214,7 @@ export class MarketWorld {
   update(dt: number, moveSpeed = 0, facingYaw?: number): void {
     this.time += dt
 
-    // 1. Q 版角色走路循環與面向平滑轉向
+    // 1. Q 版角色走路循環與面向平滑轉向（與玉皇宮完全一致的 Chibi 彈跳、擺臂、小碎步）
     const isMoving = moveSpeed > 0.2
     if (facingYaw !== undefined && isMoving) {
       const diff = Math.atan2(Math.sin(facingYaw - this.avatarYaw), Math.cos(facingYaw - this.avatarYaw))
@@ -2182,21 +2222,22 @@ export class MarketWorld {
       this.avatarVisualRoot.rotation.y = this.avatarYaw
     }
 
-    if (!this.avatarHasCustomModel && this.avatarBodyGroup) {
-      if (isMoving) {
-        this.walkCycle += dt * Math.min(12, 6 + moveSpeed * 1.1)
-        const swing = Math.sin(this.walkCycle) * 0.55
-        if (this.avatarLeftLeg) this.avatarLeftLeg.rotation.x = swing
-        if (this.avatarRightLeg) this.avatarRightLeg.rotation.x = -swing
-        if (this.avatarLeftArm) this.avatarLeftArm.rotation.x = -swing * 0.8
-        if (this.avatarRightArm) this.avatarRightArm.rotation.x = swing * 0.8
-        this.avatarBodyGroup.position.y = this.avatarBaseY + Math.abs(Math.sin(this.walkCycle)) * 0.06
+    if (!this.avatarHasCustomModel && this.chibi) {
+      this.chibi.animate(dt, this.time, moveSpeed, false, 0)
+    }
+
+    // 1b. 市集 NPC（攤主與路人訪客）待機呼吸與散步循環
+    for (const npc of this.marketNpcs) {
+      if (npc.isWalking && npc.walkAmp && npc.walkSpeed) {
+        const t = this.time * npc.walkSpeed + npc.phase
+        const step = Math.sin(t) * npc.walkAmp
+        npc.chibi.root.position.x = npc.baseX + step
+        const movingRight = Math.cos(t) > 0
+        npc.chibi.root.rotation.y = movingRight ? Math.PI / 2 : -Math.PI / 2
+        npc.chibi.animate(dt, this.time + npc.phase, 1.1, false, 0)
       } else {
-        if (this.avatarLeftLeg) this.avatarLeftLeg.rotation.x *= 0.82
-        if (this.avatarRightLeg) this.avatarRightLeg.rotation.x *= 0.82
-        if (this.avatarLeftArm) this.avatarLeftArm.rotation.x *= 0.82
-        if (this.avatarRightArm) this.avatarRightArm.rotation.x *= 0.82
-        this.avatarBodyGroup.position.y = this.avatarBaseY + Math.sin(this.time * 2.5) * 0.02
+        npc.chibi.root.rotation.y = npc.facingYaw
+        npc.chibi.animate(dt, this.time + npc.phase, 0, false, 0)
       }
     }
 

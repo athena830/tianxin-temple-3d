@@ -85,6 +85,11 @@ export class MarketGame {
     void this.syncLiveWeather()
   }
 
+  /** 同步設定角色色盤（素心行者 / 丹心行者 / 月照行者） */
+  setCharacter(id: string): void {
+    this.world.setCharacter(id)
+  }
+
   /** 預留介面：透過 GLTFLoader 替換真實 3D 角色模型 */
   loadCharacterModel(url: string, targetHeight = PLAYER_TARGET_HEIGHT): Promise<THREE.Object3D> {
     return this.world.loadCharacterModel(url, targetHeight)

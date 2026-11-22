@@ -52,7 +52,8 @@ describe('RO-style Aura Market world', () => {
     world.setHoveredPoint(null)
 
     // Verify Market avatar matches PLAYER_TARGET_HEIGHT at rest pose before walking animation
-    const avatarBody = (world as any).avatarBodyGroup as THREE.Group
+    expect(world.chibi).toBeDefined()
+    const avatarBody = ((world as any).avatarBodyGroup ?? world.chibi.root) as THREE.Object3D
     expect(avatarBody).toBeDefined()
     avatarBody.updateMatrixWorld(true)
     const avatarBox = new THREE.Box3().setFromObject(avatarBody)
@@ -87,6 +88,22 @@ describe('RO-style Aura Market world', () => {
     expect(world.getMarketBuildingScale()).toBeCloseTo(0.7, 3)
     world.setMarketBuildingScale(1.0)
     expect(MARKET_STALL_TARGET_HEIGHT).toBeCloseTo(PLAYER_TARGET_HEIGHT * 2.3, 3)
+
+    // Verify Market NPCs (stall keepers and passersby) exist and use unified createCharacter
+    const npcs = (world as any).marketNpcs as any[]
+    expect(npcs).toBeDefined()
+    expect(npcs.length).toBe(8) // 5 stall keepers + 3 visitors
+    for (const npc of npcs) {
+      expect(npc.chibi).toBeDefined()
+      const box = new THREE.Box3().setFromObject(npc.chibi.root)
+      expect(Math.abs(box.max.y - box.min.y - PLAYER_TARGET_HEIGHT)).toBeLessThan(0.1)
+    }
+
+    // Verify player character palette switching
+    world.setCharacter('vermillion')
+    expect((world as any).currentPaletteId).toBe('vermillion')
+    world.setCharacter('moon')
+    expect((world as any).currentPaletteId).toBe('moon')
 
     physics.dispose()
   })

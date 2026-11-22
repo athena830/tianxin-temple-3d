@@ -55,7 +55,12 @@ async function boot(): Promise<void> {
       game?.showSelect()
       ui.show('select')
     },
-    choose: id => { store.setCharacter(id); game?.world.setCharacter(id); audio.play('ui') },
+    choose: id => {
+      store.setCharacter(id)
+      game?.world.setCharacter(id)
+      activeMarketGame?.setCharacter(id)
+      audio.play('ui')
+    },
     enter: () => {
       audio.unlock()
       if (!getUserMuted()) audio.startMusic()
@@ -407,6 +412,7 @@ async function boot(): Promise<void> {
     createMarket: async () => {
       const next = new MarketGame(renderer, input, audio)
       next.onNear = point => ui.near(point)
+      next.setCharacter(store.data.character)
       next.setMarketBuildingScale(marketGuiParams.marketBuildingScale)
       return next
     },
@@ -420,6 +426,7 @@ async function boot(): Promise<void> {
       } else {
         game = undefined
         activeMarketGame = active as MarketGame
+        activeMarketGame.setCharacter(store.data.character)
         activeMarketGame.setMarketBuildingScale(marketGuiParams.marketBuildingScale)
       }
       ui.setMode(active.mode)
