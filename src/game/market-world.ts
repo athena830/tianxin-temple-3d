@@ -28,13 +28,6 @@ import {
   createTaiwaneseScooter,
   createWeatheredWoodMaterial,
   createWetRoadReflector,
-  createOccultCompassPlinth,
-  createFloatingTarotCard,
-  createAmethystCrystalCluster,
-  createOccultCandle,
-  createAbyssStarfield,
-  type TarotCardInfo,
-  type OccultCandleInfo,
 } from './market-pbr-assets'
 
 /** 台灣雨夜霓虹 × Low-Poly 市集配色（純市集版本） */
@@ -484,10 +477,6 @@ export class MarketWorld {
   private cinematicRain?: CinematicRain
   private envMapTexture?: THREE.CanvasTexture
   private roadReflector?: Reflector
-  private readonly floatingTarotCards: TarotCardInfo[] = []
-  private readonly abyssCandles: OccultCandleInfo[] = []
-  private abyssStarfield?: THREE.Points
-  private occultCompassGroup?: THREE.Group
 
   currentWeather: TaichungWeatherInfo = {
     condition: 'rainy',
@@ -563,8 +552,6 @@ export class MarketWorld {
 
     this.setupAtmosphere()
     this.buildStreetGround()
-    // 方案三：玄學羅盤與漂浮塔羅（深淵神秘學視覺裝飾）
-    this.buildAbyssOccultCompass()
     // 電影級 PBR 台灣雨夜公寓街景背景（二丁掛外牆、防盜鐵窗花、冷氣室外機與暖黃窗光）
     this.buildTaiwaneseApartmentBackdrop()
     for (const spec of this.stallSpecs) {
@@ -680,9 +667,8 @@ export class MarketWorld {
   }
 
   private setupAtmosphere(): void {
-    // 方案三：夜空與深淵底色統一為深邃午夜星夜紫黑（#090814），消除原本淺藍背景造成的視覺斷層
-    this.scene.background = new THREE.Color('#090814')
-    this.scene.fog = new THREE.FogExp2('#090814', 0.012)
+    this.scene.background = new THREE.Color('#12101d')
+    this.scene.fog = new THREE.FogExp2('#12101d', 0.011)
 
     // HDRI 360° 台灣雨夜環境貼圖 (IBL)，賦予濕潤柏油、金屬招牌與機車烤漆真實菲涅爾反光
     this.envMapTexture = createHDREnvironmentTexture()
@@ -710,110 +696,6 @@ export class MarketWorld {
     this.fillLight = new THREE.DirectionalLight('#ffb87a', 0.48)
     this.fillLight.position.set(-14, 12, 14)
     this.scene.add(this.fillLight)
-  }
-
-  /**
-   * 方案三：立體環形玄學羅盤底座與深淵占卜空間（純視覺裝飾）
-   * - 緊貼市集街道下方（y = -0.06 ~ -2.35）的立體橢圓環形黑曜石暖銅金羅盤外框與內凹深淵
-   * - 放大版漂浮發光塔羅牌（平視與斜視皆清晰可見）
-   * - 加大比例之低面數紫水晶簇與三支組暖黃發光儀式蠟燭
-   * - 紫藍與暖金交織之深淵星點粒子（y = -0.65 ~ -7.0）
-   */
-  private buildAbyssOccultCompass(): void {
-    // 1. 深淵星點粒子（紫藍與暖金微光星塵）
-    this.abyssStarfield = createAbyssStarfield(520)
-    // 保留星點在深淵中的垂直縱深；不可把 y 壓成平面，否則平視時會退化為帶狀裝飾。
-    this.abyssStarfield.scale.set(0.37, 0.22, 0.17)
-    this.abyssStarfield.position.set(0, 0.12, 9.55)
-    this.scene.add(this.abyssStarfield)
-
-    // 2. 立體環形玄學羅盤底座（橢圓貼合街道輪廓，平視可見立體環壁與暖金月相星象浮雕，斜視可見內凹深淵盤面）
-    this.occultCompassGroup = createOccultCompassPlinth(20.4)
-    // 橢圓羅盤置於街道下緣：頂緣僅略高於地面，厚度則完全向下延伸，
-    // 不遮擋攤位或熱區，平視與斜視仍可讀出環壁、內凹與底座層次。
-    this.occultCompassGroup.scale.set(0.4, 0.62, 0.2)
-    this.occultCompassGroup.position.set(0, 0.12, 9.55)
-    this.scene.add(this.occultCompassGroup)
-
-    // 3. 放大版漂浮占卜塔羅牌（排列於下方羅盤內圈，保留街道與攤位熱區淨空）
-    const tarotConfigs: {
-      titleZh: string
-      titleEn: string
-      num: string
-      type: 'star' | 'moon' | 'sun' | 'magician' | 'fortune'
-      x: number
-      y: number
-      z: number
-      rotX: number
-      rotY: number
-      rotZ: number
-      speed: number
-      amp: number
-    }[] = [
-      { titleZh: '命運之輪', titleEn: 'WHEEL OF FORTUNE', num: 'X', type: 'fortune', x: -8.8, y: -1.12, z: 13.0, rotX: 0.1, rotY: 0.22, rotZ: -0.07, speed: 1.05, amp: 0.08 },
-      { titleZh: '星星', titleEn: 'THE STAR', num: 'XVII', type: 'star', x: -4.2, y: -1.1, z: 14.0, rotX: 0.08, rotY: 0.14, rotZ: -0.06, speed: 1.15, amp: 0.08 },
-      { titleZh: '月亮', titleEn: 'THE MOON', num: 'XVIII', type: 'moon', x: -1.3, y: -1.12, z: 14.4, rotX: 0.08, rotY: -0.1, rotZ: 0.05, speed: 0.98, amp: 0.09 },
-      { titleZh: '太陽', titleEn: 'THE SUN', num: 'XIX', type: 'sun', x: 1.8, y: -1.1, z: 14.3, rotX: 0.08, rotY: 0.12, rotZ: -0.05, speed: 1.1, amp: 0.08 },
-      { titleZh: '魔術師', titleEn: 'THE MAGICIAN', num: 'I', type: 'magician', x: 4.8, y: -1.12, z: 13.9, rotX: 0.08, rotY: -0.16, rotZ: 0.06, speed: 0.95, amp: 0.08 },
-      { titleZh: '女祭司', titleEn: 'THE PRIESTESS', num: 'II', type: 'moon', x: 9.2, y: -1.12, z: 12.8, rotX: 0.1, rotY: -0.22, rotZ: 0.07, speed: 1.08, amp: 0.08 },
-    ]
-
-    const tarotVisibleLayout = [
-      { x: -4.7, y: -0.08, z: 9.15, amp: 0.07 },
-      { x: -2.8, y: -0.01, z: 9.8, amp: 0.075 },
-      { x: -0.9, y: 0.06, z: 10.15, amp: 0.08 },
-      { x: 0.9, y: 0.04, z: 10.08, amp: 0.075 },
-      { x: 2.8, y: -0.02, z: 9.72, amp: 0.07 },
-      { x: 4.7, y: -0.09, z: 9.05, amp: 0.07 },
-    ] as const
-    tarotConfigs.forEach((config, index) => Object.assign(config, tarotVisibleLayout[index]))
-
-    for (const t of tarotConfigs) {
-      const card = createFloatingTarotCard(t.titleZh, t.titleEn, t.num, t.type)
-      card.position.set(t.x, t.y, t.z)
-      card.rotation.set(t.rotX, t.rotY, t.rotZ)
-      card.scale.setScalar(1.3)
-      this.scene.add(card)
-      this.floatingTarotCards.push({
-        mesh: card,
-        baseY: t.y,
-        baseRotX: t.rotX,
-        baseRotY: t.rotY,
-        baseRotZ: t.rotZ,
-        speed: t.speed,
-        phase: Math.random() * Math.PI * 2,
-        amp: t.amp,
-      })
-    }
-
-    // 4. 加大比例之低面數紫水晶簇（擺放於羅盤內緣前段）
-    for (const [cx, cy, cz, rotY] of [
-      [-3.7, 0.1, 10.9, 0.35],
-      [-1.2, 0.1, 11.45, -0.25],
-      [1.3, 0.1, 11.42, 0.55],
-      [3.8, 0.1, 10.85, -0.45],
-    ] as const) {
-      const crystal = createAmethystCrystalCluster()
-      crystal.position.set(cx, cy, cz)
-      crystal.rotation.y = rotY
-      crystal.scale.setScalar(1.38)
-      this.scene.add(crystal)
-    }
-
-    // 5. 暖黃發光儀式蠟燭組（高低錯落擺放於深淵前緣與羅盤內緣）
-    for (const [kx, ky, kz] of [
-      [-4.9, 0.11, 9.0],
-      [-2.4, 0.12, 10.55],
-      [0, 0.12, 10.9],
-      [2.4, 0.12, 10.5],
-      [4.9, 0.11, 8.95],
-    ] as const) {
-      const candle = createOccultCandle()
-      candle.group.position.set(kx, ky, kz)
-      candle.group.scale.setScalar(1.34)
-      this.scene.add(candle.group)
-      this.abyssCandles.push(candle)
-    }
   }
 
   private buildStreetGround(): void {
@@ -885,13 +767,13 @@ export class MarketWorld {
     southCurb.receiveShadow = true
     this.scene.add(southCurb)
 
-    // 5. 街道底板（精準對齊市集街道範圍 36 × 19.8，不遮擋下方與外圍的立體玄學羅盤底座與深淵空間）
+    // 5. 延伸暗色街道地坪，避免遠景邊緣懸空穿幫
     const outerGround = new THREE.Mesh(
-      new THREE.PlaneGeometry(36.2, 19.9),
+      new THREE.PlaneGeometry(120, 80),
       new THREE.MeshStandardMaterial({ color: '#111018', roughness: 0.85, metalness: 0.08 }),
     )
     outerGround.rotation.x = -Math.PI / 2
-    outerGround.position.set(0, -0.02, 2.2)
+    outerGround.position.set(0, -0.02, 2.0)
     outerGround.receiveShadow = true
     this.scene.add(outerGround)
   }
@@ -947,25 +829,28 @@ export class MarketWorld {
       }
     }
 
-    // 方案三：夜空與深淵底色統一為深邃午夜星夜紫黑（#090814），消除原本淺藍背景造成的視覺斷層
-    this.scene.background = new THREE.Color('#090814')
-    this.scene.fog = new THREE.FogExp2('#090814', 0.012)
-
     if (info.isDay) {
-      // 台中日間天氣（光照適度提亮，維持深邃午夜星空背景）
+      // 台中日間天氣
       if (isRain) {
+        this.scene.background = new THREE.Color('#4c5563')
+        this.scene.fog = new THREE.FogExp2('#4c5563', 0.012)
         this.hemiLight.color.set('#9eb0c2')
         this.hemiLight.groundColor.set('#434852')
         this.hemiLight.intensity = 1.15
         this.mainLight.color.set('#c8d5e0')
         this.mainLight.intensity = 0.85
       } else if (info.condition === 'cloudy') {
+        this.scene.background = new THREE.Color('#8ea7bd')
+        this.scene.fog = new THREE.FogExp2('#8ea7bd', 0.007)
         this.hemiLight.color.set('#cde2f2')
         this.hemiLight.groundColor.set('#6b747d')
         this.hemiLight.intensity = 1.25
         this.mainLight.color.set('#fdf0db')
         this.mainLight.intensity = 1.15
       } else {
+        // 台中白日晴天：清爽蔚藍天幕與溫暖日光（適度淡霧讓遠景天空之城清晰可辨）
+        this.scene.background = new THREE.Color('#78b7e6')
+        this.scene.fog = new THREE.FogExp2('#8cc4ec', 0.0036)
         this.hemiLight.color.set('#e8f6ff')
         this.hemiLight.groundColor.set('#7a7060')
         this.hemiLight.intensity = 1.5
@@ -975,18 +860,25 @@ export class MarketWorld {
     } else {
       // 台中夜間天氣
       if (isRain) {
+        this.scene.background = new THREE.Color('#1f1c2c')
+        this.scene.fog = new THREE.FogExp2('#1f1c2c', 0.011)
         this.hemiLight.color.set('#8e84b8')
         this.hemiLight.groundColor.set('#242033')
         this.hemiLight.intensity = 1.2
         this.mainLight.color.set('#c2c6ff')
         this.mainLight.intensity = 0.85
       } else if (info.condition === 'cloudy') {
+        this.scene.background = new THREE.Color('#1d1a29')
+        this.scene.fog = new THREE.FogExp2('#1d1a29', 0.007)
         this.hemiLight.color.set('#968bb8')
         this.hemiLight.groundColor.set('#282238')
         this.hemiLight.intensity = 1.25
         this.mainLight.color.set('#d0d4ff')
         this.mainLight.intensity = 0.95
       } else {
+        // 台中晴夜：清澈深紫夜色，微風無雨，攤位霓虹長明
+        this.scene.background = new THREE.Color('#151222')
+        this.scene.fog = new THREE.FogExp2('#151222', 0.004)
         this.hemiLight.color.set('#9e91cc')
         this.hemiLight.groundColor.set('#2b243d')
         this.hemiLight.intensity = 1.35
@@ -1608,7 +1500,6 @@ export class MarketWorld {
       [17.5, 9.6],
     ]
 
-    const poleTops: THREE.Vector3[] = []
     for (const [px, pz] of polePositions) {
       const poleGroup = createRealisticUtilityPole()
       poleGroup.position.set(px, 0, pz)
@@ -1623,37 +1514,15 @@ export class MarketWorld {
         baseTargetHeight: poleTargetHeight,
         groundY: 0,
       })
-      poleTops.push(new THREE.Vector3(px, poleTargetHeight * 0.9, pz))
       this.physics.addStaticCylinder(new THREE.Vector3(px, 1.4, pz), 0.24, 2.8)
     }
 
-    // 雙層糾結垂弧黑色電線連接四角電線桿（中央視角完全無阻擋）
-    const wireMat = new THREE.LineBasicMaterial({ color: '#0c0b14' })
-    const wirePairs: [number, number][] = [
-      [0, 1],
-      [0, 2],
-      [1, 3],
-      [2, 3],
-    ]
-    for (const [a, b] of wirePairs) {
-      for (const offset of [-0.25, 0.25]) {
-        const start = poleTops[a].clone().add(new THREE.Vector3(0, offset * 0.4, offset))
-        const end = poleTops[b].clone().add(new THREE.Vector3(0, offset * 0.4, offset))
-        const mid = start.clone().lerp(end, 0.5)
-        mid.y -= 0.72 + Math.abs(offset) * 0.35
-        const curve = new THREE.QuadraticBezierCurve3(start, mid, end)
-        const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(18))
-        this.scene.add(new THREE.Line(geo, wireMat))
-      }
-    }
-
-    // 跨街復古紅燈籠串（懸掛於上方高處 y = 4.6m，美觀且不遮擋攤位招牌與平視視角）
+    // 跨街復古紅燈籠串（懸掛於上方高處 y = 4.6m；已移除橫跨畫面的黑色電線）
     const lanternSpan = new THREE.QuadraticBezierCurve3(
       new THREE.Vector3(-14.5, 5.4, -1.6),
       new THREE.Vector3(1.5, 4.55, -1.6),
       new THREE.Vector3(17.5, 5.4, -1.6),
     )
-    this.scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(lanternSpan.getPoints(20)), wireMat))
     for (let i = 1; i <= 9; i += 1) {
       const p = lanternSpan.getPoint(i / 10)
       const lantern = this.createLantern(PALETTE.lanternRed, 0.2, 0.3)
@@ -2062,19 +1931,6 @@ export class MarketWorld {
       }
       const attr = this.skyMotes.geometry.getAttribute('position') as THREE.BufferAttribute
       attr.needsUpdate = true
-    }
-
-    // 5c. 方案三：漂浮塔羅牌緩慢上下漂浮與微幅傾斜
-    for (const card of this.floatingTarotCards) {
-      const t = this.time * card.speed + card.phase
-      card.mesh.position.y = card.baseY + Math.sin(t) * card.amp
-      card.mesh.rotation.z = card.baseRotZ + Math.sin(t * 0.8) * 0.06
-      card.mesh.rotation.x = card.baseRotX + Math.cos(t * 0.6) * 0.04
-    }
-
-    // 5d. 方案三：深淵占卜蠟燭微弱燭光搖曳
-    for (const c of this.abyssCandles) {
-      c.light.intensity = 0.95 + Math.sin(this.time * 8.5 + c.phase) * 0.14
     }
 
     // 6. 電影級細雨粒子與水窪漣漪（僅在雨天時運算與渲染）
