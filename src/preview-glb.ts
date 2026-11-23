@@ -17,7 +17,7 @@ const metricsList = document.getElementById('metrics-list')!
 const statusBadge = document.getElementById('status-badge')!
 
 const params = new URLSearchParams(window.location.search)
-const requestedModelUrl = params.get('model') || '/assets/models/test.glb'
+const requestedModelUrl = params.get('model') || '/assets/models/test_blender.glb'
 
 // 1. Scene & Renderer setup
 const scene = new THREE.Scene()
@@ -166,11 +166,20 @@ async function initPipelineTest() {
         const tris = geo.index ? geo.index.count / 3 : (geo.attributes.position ? geo.attributes.position.count / 3 : 0)
         modelTriCountPerInstance += tris
 
+        geo.computeBoundingBox()
+        const bbox = geo.boundingBox
+        const sizeVec = new THREE.Vector3()
+        bbox?.getSize(sizeVec)
+
         ;(results.meshInfo as Array<Record<string, unknown>>).push({
           name: m.name,
           vertices: geo.attributes.position ? geo.attributes.position.count : 0,
           triangles: tris,
           hasNormals: Boolean(geo.attributes.normal),
+          dimensionsThreeSpace: bbox ? [Number(sizeVec.x.toFixed(4)), Number(sizeVec.y.toFixed(4)), Number(sizeVec.z.toFixed(4))] : null,
+          boundingBoxMin: bbox ? [Number(bbox.min.x.toFixed(4)), Number(bbox.min.y.toFixed(4)), Number(bbox.min.z.toFixed(4))] : null,
+          boundingBoxMax: bbox ? [Number(bbox.max.x.toFixed(4)), Number(bbox.max.y.toFixed(4)), Number(bbox.max.z.toFixed(4))] : null,
+          orientationNote: 'Blender -Y forward / +Z up converted via glTF export_yup=True to Three.js +Z forward / +Y up',
           materialName: Array.isArray(mat) ? mat.map(x => x.name).join(', ') : mat.name
         })
 
@@ -187,14 +196,14 @@ async function initPipelineTest() {
       }
     })
 
-    // Acquire Instance 1 (Left, x = -1.3) and Instance 2 (Right, x = 1.3, mirrored)
+    // Acquire Instance 1 (Left, x = -1.65) and Instance 2 (Right, x = 1.65, mirrored)
     loadedModel1 = await assets.acquireGltfInstance(requestedModelUrl)
-    loadedModel1.position.set(-1.3, 0.4, 0)
+    loadedModel1.position.set(-1.65, 0.35, 0)
     loadedModel1.rotation.y = 0.15
     scene.add(loadedModel1)
 
     loadedModel2 = await assets.acquireGltfInstance(requestedModelUrl)
-    loadedModel2.position.set(1.3, 0.4, 0)
+    loadedModel2.position.set(1.65, 0.35, 0)
     loadedModel2.scale.set(-1, 1, 1) // Symmetrical mirror
     loadedModel2.rotation.y = -0.15
     scene.add(loadedModel2)
@@ -262,13 +271,13 @@ window.setView = (mode: 'front' | 'side' | 'angle45') => {
   if (btn) btn.classList.add('active')
 
   if (mode === 'front') {
-    camera.position.set(0, 0.8, 4.2)
-    camera.lookAt(0, 0.3, 0)
+    camera.position.set(0, 0.85, 5.2)
+    camera.lookAt(0, 0.25, 0)
   } else if (mode === 'side') {
-    camera.position.set(-4.2, 0.6, 0.5)
-    camera.lookAt(-0.5, 0.3, 0)
+    camera.position.set(-5.0, 0.65, 0.6)
+    camera.lookAt(-0.5, 0.25, 0)
   } else if (mode === 'angle45') {
-    camera.position.set(3.2, 2.2, 3.8)
+    camera.position.set(3.8, 2.4, 4.4)
     camera.lookAt(0, 0.2, 0)
   }
   renderer.render(scene, camera)

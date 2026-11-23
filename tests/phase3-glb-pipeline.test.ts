@@ -4,8 +4,8 @@ import { readFileSync, existsSync } from 'node:fs'
 import { Assets } from '../src/engine/assets'
 
 describe('Phase 3 Stage 1.5 GLB Asset Pipeline & Shared Resource Disposal Verification', () => {
-  it('verifies test.glb exists and has valid glTF 2.0 binary header', () => {
-    const glbPath = 'public/assets/models/test.glb'
+  it('verifies test_blender.glb exists, has valid glTF 2.0 binary header, and embeds Khronos glTF Blender I/O generator metadata', () => {
+    const glbPath = 'public/assets/models/test_blender.glb'
     expect(existsSync(glbPath)).toBe(true)
 
     const buffer = readFileSync(glbPath)
@@ -19,6 +19,16 @@ describe('Phase 3 Stage 1.5 GLB Asset Pipeline & Shared Resource Disposal Verifi
     expect(magic).toBe(0x46546c67) // 'glTF'
     expect(version).toBe(2)
     expect(length).toBe(buffer.length)
+
+    // Parse JSON chunk (Chunk 0) to verify genuine Blender export signature
+    const jsonChunkLength = buffer.readUInt32LE(12)
+    const jsonChunkType = buffer.readUInt32LE(16)
+    expect(jsonChunkType).toBe(0x4e4f534a) // 'JSON' in ASCII
+    const jsonText = buffer.subarray(20, 20 + jsonChunkLength).toString('utf8')
+    const gltfJson = JSON.parse(jsonText)
+
+    expect(gltfJson.asset?.version).toBe('2.0')
+    expect(gltfJson.asset?.generator).toMatch(/Blender/i)
   })
 
   it('verifies Assets class gltf() memoization cache and error clearing', async () => {

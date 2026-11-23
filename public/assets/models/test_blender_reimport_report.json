@@ -1,0 +1,86 @@
+{
+  "blenderVersion": "5.3.0",
+  "blenderBinary": "C:\\Program Files\\Blender Foundation\\Blender 5.3\\blender.exe",
+  "glbPath": "D:\\Tianxin-temple\\public\\assets\\models\\test_blender.glb",
+  "glbFileSize": 24780,
+  "glbHeader": {
+    "magic": "glTF",
+    "version": 2,
+    "length": 24780
+  },
+  "preExport": {
+    "name": "Suzanne_Blender_Test",
+    "vertices": 507,
+    "polygons": 500,
+    "dimensionsMeters": [
+      2.7344,
+      1.7031,
+      1.9688
+    ]
+  },
+  "reImport": {
+    "objectName": "Suzanne_Blender_Test",
+    "meshName": "Suzanne",
+    "vertices": 555,
+    "edges": 1522,
+    "polygons": 968,
+    "triangles": 968,
+    "normalsValid": true,
+    "normalLengthRange": [
+      1.0,
+      1.0
+    ],
+    "frontSnoutVertexBlenderSpace": {
+      "coord": [
+        0.2031,
+        -0.8516,
+        0.6172
+      ],
+      "normal": [
+        -0.1643,
+        -0.9735,
+        0.1591
+      ],
+      "orientationNote": "In Blender space, Suzanne faces -Y (snout at Y=-0.8516). With export_yup=True, glTF/Three.js converts -Y forward to +Z forward."
+    },
+    "dimensionsMeters": [
+      2.7344,
+      1.7031,
+      1.9688
+    ],
+    "boundingBoxMin": [
+      -1.3672,
+      -0.8516,
+      -0.9844
+    ],
+    "boundingBoxMax": [
+      1.3672,
+      0.8516,
+      0.9844
+    ],
+    "rotationEuler": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "materials": [
+      {
+        "name": "Suzanne_PBR_Material",
+        "use_nodes": true,
+        "base_color_rgba": [
+          0.784,
+          0.22,
+          0.157,
+          1.0
+        ],
+        "metallic": 0.35,
+        "roughness": 0.25
+      }
+    ]
+  }
+}
