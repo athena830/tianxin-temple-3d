@@ -1,7 +1,7 @@
 {
   "name": "yuhuang",
   "private": true,
-  "version": "3.73.4",
+  "version": "3.74.0",
   "type": "module",
   "scripts": {
     "dev": "node scripts/manus-game-assets/restore.mjs && vite",
