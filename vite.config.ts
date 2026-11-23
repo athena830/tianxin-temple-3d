@@ -9,13 +9,20 @@ export default defineConfig(({ mode }) => {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PORT')
   return {
     base: './',
-    resolve: {
-      alias: {
-        'lunar-typescript': new URL('./node_modules/lunar-typescript/dist/lib/index.mjs', import.meta.url).pathname,
-      },
-    },
     plugins: [
       manusGameTuning(),
+      {
+        // Point lunar-typescript at its ESM build wherever the package manager put it.
+        // npm hoists it to ./node_modules, but pnpm (used by the Manus build) only links it
+        // under iztro, so a fixed ./node_modules/lunar-typescript path fails there.
+        name: 'lunar-typescript-esm',
+        enforce: 'pre',
+        async resolveId(id, importer) {
+          if (id !== 'lunar-typescript') return null
+          const hit = await this.resolve(id, importer, { skipSelf: true })
+          return hit ? { ...hit, id: hit.id.replace(/index\.cjs$/, 'index.mjs') } : null
+        },
+      },
       {
         name: 'html-entry-transform',
         transformIndexHtml: {
