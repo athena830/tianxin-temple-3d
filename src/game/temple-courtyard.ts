@@ -630,33 +630,6 @@ export class FrontCourtyard {
     roofMesh.receiveShadow = true
     this.add(roofMesh)
 
-    // 低矮平順四角戧脊與微翹翼角 (Low-profile Corner Hip Ridges & Subtle Upturned Eave Corners)
-    for (let s = 0; s < 4; s += 1) {
-      const rot = (s * Math.PI) / 2 + Math.PI / 4
-      const hip = new THREE.Group()
-      hip.position.set(cx, eaveY, cz)
-      hip.rotation.y = rot
-
-      // 平貼於屋脊縫線上的低矮屋脊 (Low-profile ridge line matching roof slope)
-      const ridgeBeam = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.07, roofW * 0.58), darkGlaze)
-      ridgeBeam.position.set(0, 0.68, 0)
-      ridgeBeam.rotation.x = -0.42
-      hip.add(ridgeBeam)
-
-      // 角端平滑微翹 (Subtle elegant upturned corner tip)
-      const tipCurv = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), darkGlaze)
-      tipCurv.scale.set(1.0, 0.75, 1.8)
-      tipCurv.position.set(0, 0.10, roofW * 0.55)
-      tipCurv.rotation.x = 0.35
-      hip.add(tipCurv)
-
-      const goldBead = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 6), gold)
-      goldBead.position.set(0, 0.16, roofW * 0.57)
-      hip.add(goldBead)
-
-      this.add(hip)
-    }
-
     // 中央三疊鎏金寶頂 (Gilded Triple Gourd Pagoda Finial)
     const finialGroup = new THREE.Group()
     finialGroup.position.set(cx, apexY, cz)
@@ -718,32 +691,18 @@ export class FrontCourtyard {
       this.c.physics.addStaticBox(new THREE.Vector3(cx - span, railY, cz + dz), new THREE.Vector3(0.25, railH, 0.95))
     }
 
-    // 莊嚴深紅褐色木雕神龕背屏 (Deep Reddish-Brown Wood-Carved Altar Screen)
-    const screenFrameMat = this.c.mat('#4e2017', 0.65) // 深紅褐色實木外框
-    const screenPanelMat = this.c.mat('#6b291d', 0.60) // 沉穩紅木雕花底板
-    const goldReliefMat = this.c.mat(PAL.gold, 0.45, 0.25) // 低密度暗金色如意浮雕
+    // 莊嚴雙面深紅褐色木雕神龕背屏 (Double-Sided Deep Reddish-Brown Wood-Carved Altar Screen)
+    const screenFrameMat = new THREE.MeshStandardMaterial({ color: '#542217', roughness: 0.62, side: THREE.DoubleSide })
+    const screenPanelMat = new THREE.MeshStandardMaterial({ color: '#6e2b1e', roughness: 0.58, side: THREE.DoubleSide })
+    const goldReliefMat = new THREE.MeshStandardMaterial({ color: '#cba358', roughness: 0.45, metalness: 0.28, side: THREE.DoubleSide })
 
     const screenGroup = new THREE.Group()
     screenGroup.position.set(cx - 1.25, podH, cz)
 
-    // 深紅褐色木雕外框
+    // 1. 深紅褐色木雕主外框 (Main Timber Frame)
     const screenFrame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.30, 2.40), screenFrameMat)
     screenFrame.position.y = 1.15
     screenGroup.add(screenFrame)
-
-    // 內嵌深紅褐木雕壁板
-    const screenInner = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.10, 2.20), screenPanelMat)
-    screenInner.position.y = 1.15
-    screenGroup.add(screenInner)
-
-    // 金色如意雲紋邊框浮雕
-    const screenGoldBorder = new THREE.Mesh(new THREE.BoxGeometry(0.088, 1.95, 2.05), goldReliefMat)
-    screenGoldBorder.position.y = 1.15
-    screenGroup.add(screenGoldBorder)
-
-    const screenInnerField = new THREE.Mesh(new THREE.BoxGeometry(0.092, 1.85, 1.95), screenPanelMat)
-    screenInnerField.position.y = 1.15
-    screenGroup.add(screenInnerField)
 
     // 頂部木雕如意卷草頂冠 (Carved Ruyi Crest at Top)
     const screenCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 1.8, 12), screenFrameMat)
@@ -751,23 +710,77 @@ export class FrontCourtyard {
     screenCrown.position.set(0, 2.30, 0)
     screenGroup.add(screenCrown)
 
-    // 四角低密度如意雲紋飾徽 (Four Corner Ruyi Cloud Badges)
+    // 2. 正面神壇雕花飾板 (+X Face, facing fairy and front altar)
+    const frontInner = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.10, 2.20), screenPanelMat)
+    frontInner.position.set(0.04, 1.15, 0)
+    screenGroup.add(frontInner)
+
+    const frontGoldBorder = new THREE.Mesh(new THREE.BoxGeometry(0.045, 1.95, 2.05), goldReliefMat)
+    frontGoldBorder.position.set(0.04, 1.15, 0)
+    screenGroup.add(frontGoldBorder)
+
+    const frontField = new THREE.Mesh(new THREE.BoxGeometry(0.048, 1.85, 1.95), screenPanelMat)
+    frontField.position.set(0.04, 1.15, 0)
+    screenGroup.add(frontField)
+
+    // 正面四角如意雲紋飾徽
     for (const dy of [-0.68, 0.68]) {
       for (const dz of [-0.78, 0.78]) {
         const badge = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.02, 12), goldReliefMat)
         badge.rotation.z = Math.PI / 2
-        badge.position.set(0.05, 1.15 + dy, dz)
+        badge.position.set(0.065, 1.15 + dy, dz)
         screenGroup.add(badge)
       }
+    }
+
+    // 3. 背面木雕雕花飾板 (-X Face, facing the back of pavilion)
+    const rearInner = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.10, 2.20), screenPanelMat)
+    rearInner.position.set(-0.04, 1.15, 0)
+    screenGroup.add(rearInner)
+
+    // 背面上中下三道深紅木橫檻 (Horizontal Rails)
+    for (const hy of [0.25, 1.15, 2.05]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.11, 2.18), screenFrameMat)
+      rail.position.set(-0.045, hy, 0)
+      screenGroup.add(rail)
+    }
+
+    // 背面三道深紅木豎檻 (Vertical Stile Rails)
+    for (const rz of [-0.70, 0, 0.70]) {
+      const stile = new THREE.Mesh(new THREE.BoxGeometry(0.045, 2.08, 0.10), screenFrameMat)
+      stile.position.set(-0.045, 1.15, rz)
+      screenGroup.add(stile)
+    }
+
+    // 背面低對比暗金如意雲紋圓飾 (Low-Contrast Antique Gold Medallions facing Rear)
+    for (const rz of [-0.70, 0, 0.70]) {
+      const rearBadgeUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.02, 16), goldReliefMat)
+      rearBadgeUpper.rotation.z = Math.PI / 2
+      rearBadgeUpper.position.set(-0.068, 1.60, rz)
+      screenGroup.add(rearBadgeUpper)
+
+      const rearBadgeLower = new THREE.Mesh(new THREE.CylinderGeometry(0.070, 0.070, 0.02, 16), goldReliefMat)
+      rearBadgeLower.rotation.z = Math.PI / 2
+      rearBadgeLower.position.set(-0.068, 0.70, rz)
+      screenGroup.add(rearBadgeLower)
     }
 
     this.add(screenGroup)
     this.c.physics.addStaticBox(new THREE.Vector3(cx - 1.25, podH + 1.15, cz), new THREE.Vector3(0.3, 2.3, 2.4))
 
-    // 神龕背屏專屬溫潤洗牆光 (Warm Niche Wash Light - never pitch black)
+    // 正面神龕溫潤洗牆光 (Front Niche Warm Wash Light)
     const screenWashLight = new THREE.PointLight('#ffcf9e', 0.95, 4.0, 1.8)
     screenWashLight.position.set(cx - 0.95, podH + 1.65, cz)
     this.c.scene.add(screenWashLight)
+
+    // 背面專屬暖光照明 (Dedicated Rear Warm Illumination - guarantees warm reddish brown wood & gold visibility)
+    const rearWashLight = new THREE.PointLight('#ffd5a3', 1.25, 6.0, 1.6)
+    rearWashLight.position.set(cx - 2.8, podH + 1.80, cz)
+    this.c.scene.add(rearWashLight)
+
+    const rearWashLight2 = new THREE.PointLight('#ffbe78', 0.85, 5.0, 1.8)
+    rearWashLight2.position.set(cx - 2.2, podH + 2.40, cz)
+    this.c.scene.add(rearWashLight2)
 
     // 7. 神壇核心：仙姑須彌神案與低矮供桌 (Altar Throne & Low Offering Table)
     const throneX = cx - 0.72
