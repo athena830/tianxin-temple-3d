@@ -28,7 +28,7 @@ describe('Phase 2 Main Hall Stylized Realism 3D Roof & Eave Benchmark', () => {
       width: 20.6,
       depth: 16.2,
       eaveY: 5.35,
-      peakY: 8.2,
+      peakY: 9.8,
       pbr,
     })
 

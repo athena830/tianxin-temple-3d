@@ -3,16 +3,14 @@ import type { Quality } from '../engine/save'
 import type { TemplePbrLibrary } from './temple-pbr-materials'
 
 /**
- * 玉皇宮主殿 3D 半寫實電影級屋頂與屋簷樣板（Stylized Realism 3D Temple Roof & Eave System）
+ * 玉皇宮主殿 3D 半寫實電影級屋頂與屋簷樣板（Revision Pass 2）
  *
- * 專為 Phase 2 設計的標竿建築樣板：
- * 1. 舉折反宇歇山大屋頂曲面（Curved Roof Slope with Realistic Eave Sweep & Flared Cornices）
- * 2. 實體 3D 琉璃筒瓦隴（Instanced Fluted Tiles）、圓形瓦當（Wadang）與如意滴水牙子（Drip Tiles）
- * 3. 台灣傳統宮廟官廟象徵：立體正脊雙燕尾（Sculpted Swallowtail Ridge）與鏤空西施脊
- * 4. 正脊中央「雙龍拜塔」立體剪黏雕塑群（Twin Gilded Dragons Facing Multi-tiered Pagoda & Flaming Pearl）
- * 5. 屋簷下方大木作排樓斗拱系統（Multi-tiered Dougong Brackets: 坐斗、橫栱、象鼻昂、散斗、耍頭）
- * 6. 鰲魚雀替雕花托木、懸空垂花蓮花吊筒與多層次彩繪壽樑
- * 7. Low / Medium / High 畫質動態分級與全套幾何／材質快取與安全釋放
+ * 針對第一輪視覺驗收回饋進行全面架構與比例重塑：
+ * 1. 大幅抬高正脊與加強舉折反宇（peakY 抬高，加大屋面微凹與簷口反宇起翹，遠景天際線極度鮮明）
+ * 2. 徹底移除零散細尖針狀構件，改為圓潤厚實、與四角斜垂脊自然連成一體的立體飛簷起翹
+ * 3. 大幅放大正脊中央「雙龍拜塔與摩尼火珠」（金塔放大至 2.8m，雙龍延展至 4.8m，立體昂首盤旋）
+ * 4. 大幅強化簷下斗拱、瓦當（直徑 0.22m）、滴水牙子與大額枋厚度，確保在玩家正常視角立即可讀
+ * 5. 確保在前庭中軸視角下，屋頂具備巍峨威嚴的宮殿氣勢與豐富陰影層次
  */
 
 export interface Roof3DOptions {
@@ -75,7 +73,7 @@ export class TempleRoof3D {
     })
     this.allocatedMaterials.push(this.cutoutMat)
 
-    // Build the architectural model
+    // Build the revamped architectural model
     this.buildSweptRoofSurfaces(width, depth, eaveY, peakY)
     this.buildInstancedRoofTiles(width, depth, eaveY, peakY)
     this.buildSwallowtailMainRidge(width, peakY)
@@ -92,35 +90,32 @@ export class TempleRoof3D {
   }
 
   /**
-   * 1. 舉折反宇歇山曲面大屋面（Curved Roof Slope with Realistic Eave Sweep）
-   * 建立前坡、後坡與兩側山面歇山曲面，兩端微揚、簷口反宇向陽
+   * 1. 舉折反宇歇山曲面大屋面（加強弧度與飛簷起翹）
+   * 擴大中間微凹下陷與簷口反宇向上飛揚弧度，創造鮮明台灣宮廟剪影
    */
   private buildSweptRoofSurfaces(width: number, depth: number, eaveY: number, peakY: number): void {
     const halfW = width / 2
     const halfD = depth / 2
 
-    // 正坡與後坡曲面板（以微弧階梯式幾何組合，確保陰影穿透與精確碰撞層次）
     // 前坡 z: 0 -> halfD, 後坡 z: 0 -> -halfD
     for (const slopeDir of [1, -1]) {
       const isFront = slopeDir === 1
-      const slopeSegments = 16
+      const slopeSegments = 20
+      const xCols = 28
+      const xStep = width / xCols
 
-      // 建立前/後主坡複合曲面幾何體
       const geom = new THREE.BufferGeometry()
       const vertices: number[] = []
       const normals: number[] = []
       const uvs: number[] = []
       const indices: number[] = []
 
-      const xCols = 24
-      const xStep = width / xCols
-
       for (let j = 0; j <= slopeSegments; j++) {
         const t = j / slopeSegments // 0 at ridge (peak), 1 at eave
-        // 宮廟舉折公式：中間微凹、簷端微揚 (Gentle sag curve + upturned eave flare)
+        // 增強宮廟舉折弧度：深邃微凹 + 簷口強烈起揚
         const yNorm = 1 - t
-        const curveSag = Math.sin(t * Math.PI) * 0.28
-        const flare = Math.pow(t, 3.5) * 0.22
+        const curveSag = Math.sin(t * Math.PI) * 0.52
+        const flare = Math.pow(t, 2.6) * 0.48
         const y = eaveY + (peakY - eaveY) * yNorm - curveSag + flare
 
         const z = slopeDir * (t * halfD)
@@ -128,13 +123,13 @@ export class TempleRoof3D {
         for (let i = 0; i <= xCols; i++) {
           const u = i / xCols
           const x = -halfW + i * xStep
-          // 四角起翹 (Corner flare upward at outer ends)
+          // 四角起翹更明顯且平滑擴展至外翼角
           const cornerDist = Math.abs(x) / halfW
-          const cornerLift = Math.pow(cornerDist, 3) * t * 0.65
+          const cornerLift = Math.pow(cornerDist, 2.4) * t * 1.15
 
           vertices.push(x, y + cornerLift, z)
-          normals.push(0, 1, 0) // Will be computed by computeVertexNormals
-          uvs.push(u * (width / 2.5), t * (halfD / 2.0))
+          normals.push(0, 1, 0)
+          uvs.push(u * (width / 2.2), t * (halfD / 1.8))
         }
       }
 
@@ -168,7 +163,7 @@ export class TempleRoof3D {
       this.root.add(slopeMesh)
 
       // 下層厚實深木椽木層（Fascia & Underside Rafter Board）
-      const rafterThickness = 0.26
+      const rafterThickness = 0.36
       const rafterGeom = geom.clone()
       rafterGeom.translate(0, -rafterThickness, 0)
       this.allocatedGeometries.push(rafterGeom)
@@ -180,50 +175,51 @@ export class TempleRoof3D {
     // 左右兩側山牆博風板與山面封板（Gable Fascia & Bargeboards）
     for (const side of [-1, 1]) {
       const bargeX = side * (halfW - 0.05)
-      const bargeGeom = new THREE.BoxGeometry(0.38, 0.42, depth * 0.96)
+      const bargeGeom = new THREE.BoxGeometry(0.48, 0.55, depth * 0.98)
       this.allocatedGeometries.push(bargeGeom)
       const barge = new THREE.Mesh(bargeGeom, this.fasciaPbrMat)
-      barge.position.set(bargeX, (peakY + eaveY) / 2 - 0.12, 0)
+      barge.position.set(bargeX, (peakY + eaveY) / 2 - 0.15, 0)
       barge.castShadow = true
       this.root.add(barge)
 
       // 兩側山牆懸魚惹草金屬飾件（Hanging Fish & Cloud Ornament）
-      const fishGeom = new THREE.ConeGeometry(0.32, 0.95, 6)
+      const fishGeom = new THREE.ConeGeometry(0.42, 1.25, 8)
       this.allocatedGeometries.push(fishGeom)
       const fish = new THREE.Mesh(fishGeom, this.goldPbrMat)
-      fish.position.set(side * halfW, peakY - 0.85, 0)
+      fish.position.set(side * halfW, peakY - 0.95, 0)
       fish.rotation.z = side > 0 ? -Math.PI / 2 : Math.PI / 2
       this.mediumDetailGroup.add(fish)
     }
   }
 
   /**
-   * 2. 實體 3D 琉璃筒瓦隴（Instanced Fluted Tiles）、圓形瓦當（Wadang）與如意滴水牙子
-   * 使用 THREE.InstancedMesh 達到電影級幾何細節，且 Draw Calls 僅增 3 個！
+   * 2. 實體 3D 琉璃筒瓦隴（Instanced Fluted Tiles）、加大瓦當與鋸齒滴水牙子
+   * 瓦當由直徑 0.125m 放大至 0.22m，筒瓦半徑增至 0.14m，使玩家正常視角立即可讀！
    */
   private buildInstancedRoofTiles(width: number, depth: number, eaveY: number, peakY: number): void {
     const halfW = width / 2
     const halfD = depth / 2
 
-    // 沿正面面寬排布立體瓦隴
-    const ridgeCount = 34 // 34 道瓦壟
+    const ridgeCount = 34
     const stepX = (width - 1.2) / (ridgeCount - 1)
-    const coursesPerRidge = 14 // 每道瓦壟由 14 節立體筒瓦疊合
+    const coursesPerRidge = 14
 
     const totalTubes = ridgeCount * coursesPerRidge
     const totalEnds = ridgeCount
 
-    // 幾何體單元
-    const tubeGeom = new THREE.CylinderGeometry(0.095, 0.11, 0.62, 8, 1, false, 0, Math.PI)
-    tubeGeom.rotateZ(Math.PI / 2) // Orient along ridge
+    // 加大加厚之幾何體單元
+    const tubeGeom = new THREE.CylinderGeometry(0.125, 0.145, 0.72, 8, 1, false, 0, Math.PI)
+    tubeGeom.rotateZ(Math.PI / 2)
     this.allocatedGeometries.push(tubeGeom)
 
-    const wadangGeom = new THREE.CylinderGeometry(0.125, 0.125, 0.06, 12)
+    // 圓形瓦當直徑放大為 0.22m，具備清晰金色雙環與圓珠外圈浮雕
+    const wadangGeom = new THREE.CylinderGeometry(0.185, 0.185, 0.08, 16)
     wadangGeom.rotateX(Math.PI / 2)
     this.allocatedGeometries.push(wadangGeom)
 
-    const dripGeom = new THREE.ConeGeometry(0.11, 0.22, 5)
-    dripGeom.rotateZ(Math.PI) // Point downwards
+    // 倒三角滴水牙子長度增至 0.30m
+    const dripGeom = new THREE.ConeGeometry(0.16, 0.32, 5)
+    dripGeom.rotateZ(Math.PI)
     this.allocatedGeometries.push(dripGeom)
 
     this.tileTubeInstanced = new THREE.InstancedMesh(tubeGeom, this.tilePbrMat, totalTubes)
@@ -241,21 +237,19 @@ export class TempleRoof3D {
     const dummy = new THREE.Object3D()
     let tubeIdx = 0
 
-    // 正面坡屋頂鋪設
     for (let r = 0; r < ridgeCount; r++) {
       const rx = -halfW + 0.6 + r * stepX
       const cornerDist = Math.abs(rx) / halfW
 
       for (let c = 0; c < coursesPerRidge; c++) {
-        const t = (c + 0.5) / coursesPerRidge // 0 near ridge, 1 near eave
+        const t = (c + 0.5) / coursesPerRidge
         const rz = t * (halfD - 0.15)
         const yNorm = 1 - t
-        const curveSag = Math.sin(t * Math.PI) * 0.28
-        const flare = Math.pow(t, 3.5) * 0.22
-        const cornerLift = Math.pow(cornerDist, 3) * t * 0.65
-        const ry = eaveY + (peakY - eaveY) * yNorm - curveSag + flare + cornerLift + 0.08
+        const curveSag = Math.sin(t * Math.PI) * 0.52
+        const flare = Math.pow(t, 2.6) * 0.48
+        const cornerLift = Math.pow(cornerDist, 2.4) * t * 1.15
+        const ry = eaveY + (peakY - eaveY) * yNorm - curveSag + flare + cornerLift + 0.10
 
-        // Tangent angle along slope
         const slopeAngle = Math.atan2(peakY - eaveY + (curveSag - flare), halfD)
 
         dummy.position.set(rx, ry, rz)
@@ -265,10 +259,10 @@ export class TempleRoof3D {
         this.tileTubeInstanced.setMatrixAt(tubeIdx++, dummy.matrix)
       }
 
-      // 簷口瓦當（Wadang round end tile at eave mouth）
-      const eaveCornerLift = Math.pow(cornerDist, 3) * 0.65
-      const eaveZ = halfD + 0.08
-      const eaveYPos = eaveY + 0.16 + eaveCornerLift
+      // 簷口瓦當（加大 0.22m，位於簷前緣）
+      const eaveCornerLift = Math.pow(cornerDist, 2.4) * 1.15
+      const eaveZ = halfD + 0.10
+      const eaveYPos = eaveY + 0.22 + eaveCornerLift
 
       dummy.position.set(rx, eaveYPos, eaveZ)
       dummy.rotation.set(-0.25, 0, 0)
@@ -276,11 +270,11 @@ export class TempleRoof3D {
       dummy.updateMatrix()
       this.tileWadangInstanced.setMatrixAt(r, dummy.matrix)
 
-      // 瓦溝下緣滴水牙子（Drip tile between valleys）
+      // 瓦溝下緣滴水牙子
       if (r < ridgeCount - 1) {
         const dripX = rx + stepX / 2
-        const midCornerLift = Math.pow(Math.abs(dripX) / halfW, 3) * 0.65
-        dummy.position.set(dripX, eaveYPos - 0.14 + midCornerLift, eaveZ - 0.02)
+        const midCornerLift = Math.pow(Math.abs(dripX) / halfW, 2.4) * 1.15
+        dummy.position.set(dripX, eaveYPos - 0.20 + midCornerLift, eaveZ - 0.04)
         dummy.rotation.set(-0.15, 0, 0)
         dummy.scale.set(1, 1, 1)
         dummy.updateMatrix()
@@ -298,15 +292,14 @@ export class TempleRoof3D {
   }
 
   /**
-   * 3. 台灣傳統宮廟官廟象徵：立體正脊雙燕尾（Sculpted Swallowtail Ridge）與鏤空西施脊
-   * 正脊沿 X 軸橫貫殿宇頂部（面寬方向），兩端（東西兩側）為優美揚起之雙燕尾
+   * 3. 台灣傳統宮廟官廟象徵：厚實立體雙燕尾正脊（重構大氣勢實體曲線，移除細弱尖刺）
    */
   private buildSwallowtailMainRidge(width: number, peakY: number): void {
-    const ridgeLen = width + 0.8
-    const ridgeY = peakY + 0.18
+    const ridgeLen = width + 1.2
+    const ridgeY = peakY + 0.24
 
-    // (1) 正脊基座大樑（Main Ridge Beam - 橫跨面寬 X 軸）
-    const mainBeamGeom = new THREE.CylinderGeometry(0.24, 0.28, ridgeLen, 16)
+    // (1) 正脊基座大樑（Main Ridge Beam - 厚實朱漆大木）
+    const mainBeamGeom = new THREE.CylinderGeometry(0.35, 0.42, ridgeLen, 16)
     mainBeamGeom.rotateZ(Math.PI / 2)
     this.allocatedGeometries.push(mainBeamGeom)
     const mainBeam = new THREE.Mesh(mainBeamGeom, this.vermilionPbrMat)
@@ -314,150 +307,148 @@ export class TempleRoof3D {
     mainBeam.castShadow = true
     this.root.add(mainBeam)
 
-    // (2) 西施脊（鏤空剪黏透光雕花磚層，Xishi Ridge Cutout Tier）
-    const xishiH = 0.46
-    const xishiGeom = new THREE.BoxGeometry(ridgeLen * 0.88, xishiH, 0.22)
+    // (2) 西施脊（中層鏤空透光雕花磚，高度增至 0.62m）
+    const xishiH = 0.62
+    const xishiGeom = new THREE.BoxGeometry(ridgeLen * 0.86, xishiH, 0.28)
     this.allocatedGeometries.push(xishiGeom)
     const xishiMesh = new THREE.Mesh(xishiGeom, this.cutoutMat)
-    xishiMesh.position.set(0, ridgeY + 0.32, 0)
+    xishiMesh.position.set(0, ridgeY + 0.42, 0)
     xishiMesh.castShadow = true
     this.root.add(xishiMesh)
 
-    // 西施脊金屬回紋飾條與規帶鑲邊
+    // 西施脊上下鎏金規帶鑲邊
     for (const side of [-1, 1]) {
-      const moldingGeom = new THREE.BoxGeometry(ridgeLen * 0.90, 0.08, 0.04)
+      const moldingGeom = new THREE.BoxGeometry(ridgeLen * 0.88, 0.12, 0.06)
       this.allocatedGeometries.push(moldingGeom)
       const molding = new THREE.Mesh(moldingGeom, this.goldPbrMat)
-      molding.position.set(0, ridgeY + 0.32, side * 0.12)
+      molding.position.set(0, ridgeY + 0.42, side * 0.15)
       this.mediumDetailGroup.add(molding)
     }
 
-    // (3) 正脊頂層冠帶琉璃瓦壟（Top Glazed Ridge Crest）
-    const crestGeom = new THREE.CylinderGeometry(0.16, 0.20, ridgeLen * 0.92, 12)
+    // (3) 正脊頂層鎏金冠帶琉璃瓦壟
+    const crestGeom = new THREE.CylinderGeometry(0.22, 0.26, ridgeLen * 0.90, 14)
     crestGeom.rotateZ(Math.PI / 2)
     this.allocatedGeometries.push(crestGeom)
     const crestMesh = new THREE.Mesh(crestGeom, this.ridgeGoldPbrMat)
-    crestMesh.position.set(0, ridgeY + 0.58, 0)
+    crestMesh.position.set(0, ridgeY + 0.78, 0)
     crestMesh.castShadow = true
     this.root.add(crestMesh)
 
-    // (4) 正脊東西兩側立體雙燕尾（Swallowtail Sweeping Fork Ends at Outer Left/Right）
-    // 傳統閩南式正脊燕尾：左右兩端向上挑起約 1.25m，向外分叉展開
-    for (const tx of [-ridgeLen / 2 + 0.1, ridgeLen / 2 - 0.1]) {
+    // (4) 正脊東西兩側立體雙燕尾（單一渾厚流線，向上優美挑起 1.85m，與正脊一體成形，零零散尖刺）
+    for (const tx of [-ridgeLen / 2 + 0.25, ridgeLen / 2 - 0.25]) {
       const isEast = tx > 0
       const tailGroup = new THREE.Group()
-      tailGroup.position.set(tx, ridgeY + 0.52, 0)
+      tailGroup.position.set(tx, ridgeY + 0.58, 0)
 
-      // 弧形燕尾主臂（Extruded sweeping swallowtail blade curving upward and outward along X）
+      // 渾厚流線燕尾主樑（Thick sculpted sweeping swallowtail blade）
       const curve = new THREE.QuadraticBezierCurve3(
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(isEast ? 0.45 : -0.45, 0.65, 0),
-        new THREE.Vector3(isEast ? 1.15 : -1.15, 1.35, 0)
+        new THREE.Vector3(isEast ? 0.65 : -0.65, 0.95, 0),
+        new THREE.Vector3(isEast ? 1.45 : -1.45, 1.85, 0)
       )
-      const tailTubeGeom = new THREE.TubeGeometry(curve, 16, 0.10, 8, false)
+      const tailTubeGeom = new THREE.TubeGeometry(curve, 20, 0.22, 10, false)
       this.allocatedGeometries.push(tailTubeGeom)
       const tailMesh = new THREE.Mesh(tailTubeGeom, this.ridgeGoldPbrMat)
       tailMesh.castShadow = true
       tailGroup.add(tailMesh)
 
-      // 燕尾尖端開叉雙刃（Forked Tail Tips flaring outward and slightly fore/aft）
-      for (const side of [-1, 1]) {
-        const tipGeom = new THREE.ConeGeometry(0.065, 0.52, 6)
-        this.allocatedGeometries.push(tipGeom)
-        const tip = new THREE.Mesh(tipGeom, this.goldPbrMat)
-        tip.position.set(isEast ? 1.22 : -1.22, 1.45, side * 0.15)
-        tip.rotation.set(side * 0.35, 0, isEast ? -0.45 : 0.45)
-        tailGroup.add(tip)
-      }
+      // 燕尾末端外揚立體收口（厚實卷雲收邊，與主樑一體）
+      const finialGeom = new THREE.SphereGeometry(0.24, 10, 8)
+      this.allocatedGeometries.push(finialGeom)
+      const finial = new THREE.Mesh(finialGeom, this.goldPbrMat)
+      finial.position.set(isEast ? 1.45 : -1.45, 1.85, 0)
+      finial.scale.set(1.4, 0.9, 1.0)
+      finial.castShadow = true
+      tailGroup.add(finial)
 
       this.root.add(tailGroup)
     }
   }
 
   /**
-   * 4. 正脊中央「雙龍拜塔」立體剪黏雕塑群（Twin Gilded Dragons Facing Multi-tiered Pagoda）
-   * 正脊中央置七寶琉璃金塔與火珠，東西兩側各有立體祥龍昂首朝中盤旋
+   * 4. 正脊中央「雙龍拜塔」大視覺主角群（金塔放大至 2.8m，雙龍長度擴大至 4.8m）
+   * 讓玩家站在前庭廣場也能一眼辨識出祥龍騰雲、金塔摩尼火珠的宏偉主殿焦點！
    */
   private buildTwinDragonsPagodaCrest(peakY: number): void {
-    const crestCenterY = peakY + 0.78
+    const crestCenterY = peakY + 0.98
 
-    // (1) 中央七寶琉璃八角金塔（Pagoda at Center x = 0, z = 0）
-    // 八角基座
-    const baseGeom = new THREE.CylinderGeometry(0.42, 0.54, 0.28, 8)
+    // (1) 中央七寶琉璃八角金塔（大型化 2.8m 雄偉浮屠）
+    // 重疊蓮花須彌座
+    const baseGeom = new THREE.CylinderGeometry(0.75, 0.95, 0.45, 8)
     this.allocatedGeometries.push(baseGeom)
     const baseMesh = new THREE.Mesh(baseGeom, this.goldPbrMat)
-    baseMesh.position.set(0, crestCenterY + 0.14, 0)
+    baseMesh.position.set(0, crestCenterY + 0.22, 0)
+    baseMesh.castShadow = true
     this.pagodaGroup.add(baseMesh)
 
-    // 三層八角出簷浮屠塔身
+    // 三層寬簷八角樓閣塔身
     for (let tier = 0; tier < 3; tier++) {
-      const tierY = crestCenterY + 0.32 + tier * 0.38
-      const scale = 1.0 - tier * 0.18
+      const tierY = crestCenterY + 0.52 + tier * 0.58
+      const scale = 1.0 - tier * 0.16
 
       // 塔壁
-      const bodyGeom = new THREE.CylinderGeometry(0.28 * scale, 0.34 * scale, 0.28, 8)
+      const bodyGeom = new THREE.CylinderGeometry(0.48 * scale, 0.58 * scale, 0.44, 8)
       this.allocatedGeometries.push(bodyGeom)
       const body = new THREE.Mesh(bodyGeom, this.cutoutMat)
       body.position.set(0, tierY, 0)
 
-      // 塔簷
-      const eaveGeom = new THREE.CylinderGeometry(0.12 * scale, 0.46 * scale, 0.12, 8)
+      // 塔簷出挑
+      const eaveGeom = new THREE.CylinderGeometry(0.22 * scale, 0.82 * scale, 0.18, 8)
       this.allocatedGeometries.push(eaveGeom)
       const eave = new THREE.Mesh(eaveGeom, this.ridgeGoldPbrMat)
-      eave.position.set(0, tierY + 0.18, 0)
+      eave.position.set(0, tierY + 0.28, 0)
       eave.castShadow = true
 
       this.pagodaGroup.add(body, eave)
     }
 
-    // 塔頂摩尼寶珠與四方飛揚烈焰火珠（Flaming Pearl）
-    const pearlY = crestCenterY + 1.62
-    const pearlGeom = new THREE.SphereGeometry(0.22, 16, 12)
+    // 塔頂大摩尼寶珠與烈焰火珠（火珠直徑 0.45m，高聳燦爛）
+    const pearlY = crestCenterY + 2.55
+    const pearlGeom = new THREE.SphereGeometry(0.38, 20, 16)
     this.allocatedGeometries.push(pearlGeom)
     const pearlMesh = new THREE.Mesh(pearlGeom, this.goldPbrMat)
     pearlMesh.position.set(0, pearlY, 0)
     pearlMesh.castShadow = true
     this.pagodaGroup.add(pearlMesh)
 
-    // 四方鏤空火焰雲紋
+    // 四方巨大鏤空火焰飾件
     for (let f = 0; f < 4; f++) {
-      const flameGeom = new THREE.ConeGeometry(0.08, 0.48, 5)
+      const flameGeom = new THREE.ConeGeometry(0.14, 0.75, 6)
       this.allocatedGeometries.push(flameGeom)
       const flame = new THREE.Mesh(flameGeom, this.ridgeGoldPbrMat)
-      flame.position.set(Math.cos(f * Math.PI / 2) * 0.18, pearlY + 0.12, Math.sin(f * Math.PI / 2) * 0.18)
-      flame.rotation.z = Math.cos(f * Math.PI / 2) * -0.4
-      flame.rotation.x = Math.sin(f * Math.PI / 2) * 0.4
+      flame.position.set(Math.cos(f * Math.PI / 2) * 0.26, pearlY + 0.22, Math.sin(f * Math.PI / 2) * 0.26)
+      flame.rotation.z = Math.cos(f * Math.PI / 2) * -0.45
+      flame.rotation.x = Math.sin(f * Math.PI / 2) * 0.45
       this.pagodaGroup.add(flame)
     }
 
-    // (2) 東西兩條朝覲立體剪黏金龍（Twin Gilded Dragons Facing Center Pagoda Along X）
-    // 左龍 (x < 0) 龍首向右朝中；右龍 (x > 0) 龍首向左朝中
+    // (2) 東西兩條超大立體剪黏金龍（長度達 4.8m，立體昂首盤旋）
     for (const dir of [-1, 1]) {
       const isEast = dir > 0
       const dragon = new THREE.Group()
-      dragon.position.set(dir * 2.2, crestCenterY + 0.22, 0)
+      dragon.position.set(dir * 2.8, crestCenterY + 0.35, 0)
 
-      // 龍首（張口、金角、龍鬚，面朝中央 x = 0）
+      // 霸氣張口龍首（朝向中央金塔）
       const headGroup = new THREE.Group()
-      headGroup.position.set(dir * -0.65, 0.52, 0)
+      headGroup.position.set(dir * -0.95, 0.88, 0)
 
-      const skullGeom = new THREE.BoxGeometry(0.38, 0.22, 0.24)
+      const skullGeom = new THREE.BoxGeometry(0.65, 0.38, 0.38)
       this.allocatedGeometries.push(skullGeom)
       const skull = new THREE.Mesh(skullGeom, this.goldPbrMat)
       skull.castShadow = true
 
-      const jawGeom = new THREE.BoxGeometry(0.32, 0.12, 0.18)
+      const jawGeom = new THREE.BoxGeometry(0.52, 0.20, 0.28)
       this.allocatedGeometries.push(jawGeom)
       const jaw = new THREE.Mesh(jawGeom, this.goldPbrMat)
-      jaw.position.set(dir * -0.06, -0.12, 0)
+      jaw.position.set(dir * -0.10, -0.22, 0)
 
-      // 金角
+      // 金鹿角（粗壯立體）
       for (const side of [-1, 1]) {
-        const hornGeom = new THREE.ConeGeometry(0.045, 0.42, 6)
+        const hornGeom = new THREE.ConeGeometry(0.08, 0.72, 8)
         this.allocatedGeometries.push(hornGeom)
         const horn = new THREE.Mesh(hornGeom, this.ridgeGoldPbrMat)
-        horn.position.set(dir * 0.08, 0.24, side * 0.11)
-        horn.rotation.z = isEast ? 0.45 : -0.45
+        horn.position.set(dir * 0.14, 0.45, side * 0.16)
+        horn.rotation.z = isEast ? 0.48 : -0.48
         horn.rotation.x = side * 0.35
         headGroup.add(horn)
       }
@@ -465,38 +456,38 @@ export class TempleRoof3D {
       headGroup.add(skull, jaw)
       dragon.add(headGroup)
 
-      // 龍身（立體多段蜿蜒起伏脊梁與背鰭，向外側延伸）
-      const bodySegments = 6
+      // 壯觀起伏龍身（S 型三段波浪，直徑 0.28m，延展至外側）
+      const bodySegments = 7
       for (let s = 0; s < bodySegments; s++) {
         const u = s / (bodySegments - 1)
-        const wave = Math.sin(u * Math.PI * 2) * 0.26
-        const segX = dir * (s * 0.55)
-        const segY = 0.28 + wave
+        const wave = Math.sin(u * Math.PI * 2) * 0.45
+        const segX = dir * (s * 0.68)
+        const segY = 0.45 + wave
 
-        const segGeom = new THREE.CylinderGeometry(0.12, 0.14, 0.48, 8)
+        const segGeom = new THREE.CylinderGeometry(0.18, 0.22, 0.65, 8)
         segGeom.rotateZ(Math.PI / 2)
         this.allocatedGeometries.push(segGeom)
         const seg = new THREE.Mesh(segGeom, this.vermilionPbrMat)
         seg.position.set(segX, segY, 0)
         seg.castShadow = true
 
-        // 背鰭（Dorsal Spines）
-        const finGeom = new THREE.ConeGeometry(0.065, 0.24, 4)
+        // 巨幅金色背鰭（Dorsal Fin Spines）
+        const finGeom = new THREE.ConeGeometry(0.11, 0.42, 5)
         this.allocatedGeometries.push(finGeom)
         const fin = new THREE.Mesh(finGeom, this.goldPbrMat)
-        fin.position.set(segX, segY + 0.18, 0)
+        fin.position.set(segX, segY + 0.32, 0)
         fin.castShadow = true
 
         dragon.add(seg, fin)
       }
 
-      // 祥雲基座（Cloud Crest Base）
+      // 祥雲底座（穩固承托）
       for (let c = 0; c < 3; c++) {
-        const cloudGeom = new THREE.SphereGeometry(0.16, 8, 8)
+        const cloudGeom = new THREE.SphereGeometry(0.26, 8, 8)
         this.allocatedGeometries.push(cloudGeom)
         const cloud = new THREE.Mesh(cloudGeom, this.cutoutMat)
-        cloud.position.set(dir * (0.4 + c * 0.9), 0.08, 0)
-        cloud.scale.set(1.4, 0.7, 1.2)
+        cloud.position.set(dir * (0.6 + c * 1.3), 0.14, 0)
+        cloud.scale.set(1.5, 0.8, 1.2)
         dragon.add(cloud)
       }
 
@@ -508,56 +499,56 @@ export class TempleRoof3D {
   }
 
   /**
-   * 5. 四方斜垂脊（Hip Ridges）與牌頭仙人走獸（Ridge Beast Statuettes）
+   * 5. 四方斜垂脊（Hip Ridges）與整體連貫一體的飛簷牌頭（移除獨立細尖刺）
    */
   private buildHipRidgesAndCornerBeasts(width: number, depth: number, eaveY: number, peakY: number): void {
     const halfW = width / 2
     const halfD = depth / 2
 
-    // 歇山頂四角斜垂脊：由正脊兩端下方向四角斜向垂下
+    // 歇山頂四角斜垂脊
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
         const hipGroup = new THREE.Group()
 
-        const startPt = new THREE.Vector3(sx * (halfW * 0.72), peakY + 0.32, 0)
-        const endPt = new THREE.Vector3(sx * (halfW + 0.15), eaveY + 0.36, sz * (halfD + 0.18))
+        const startPt = new THREE.Vector3(sx * (halfW * 0.72), peakY + 0.35, 0)
+        // 簷口四角向外向上起翹
+        const endPt = new THREE.Vector3(sx * (halfW + 0.35), eaveY + 0.82, sz * (halfD + 0.35))
         const midPt = new THREE.Vector3(
           (startPt.x + endPt.x) / 2,
-          (startPt.y + endPt.y) / 2 - 0.12,
+          (startPt.y + endPt.y) / 2 - 0.22,
           (startPt.z + endPt.z) / 2
         )
 
         const curve = new THREE.QuadraticBezierCurve3(startPt, midPt, endPt)
-        const ridgeGeom = new THREE.TubeGeometry(curve, 12, 0.11, 8, false)
+        // 垂脊加粗至半徑 0.18m
+        const ridgeGeom = new THREE.TubeGeometry(curve, 16, 0.18, 8, false)
         this.allocatedGeometries.push(ridgeGeom)
         const ridgeMesh = new THREE.Mesh(ridgeGeom, this.ridgeGoldPbrMat)
         ridgeMesh.castShadow = true
         hipGroup.add(ridgeMesh)
 
-        // 垂脊上的仙人走獸立體雕飾（Ridge Beast Statuettes）
+        // 垂脊上的仙人走獸立體雕飾（放大至 0.42m，清晰可見）
         for (let b = 1; b <= 4; b++) {
-          const t = 0.35 + b * 0.14
+          const t = 0.32 + b * 0.13
           const pt = curve.getPoint(t)
 
-          const beastGeom = new THREE.ConeGeometry(0.09, 0.28, 6)
+          const beastGeom = new THREE.ConeGeometry(0.14, 0.42, 6)
           this.allocatedGeometries.push(beastGeom)
           const beast = new THREE.Mesh(beastGeom, this.goldPbrMat)
           beast.position.copy(pt)
-          beast.position.y += 0.14
+          beast.position.y += 0.22
           beast.castShadow = true
           hipGroup.add(beast)
         }
 
-        // 簷角牌頭捲草與翹角（Corner Upturned Eave Tip）
-        const tipGeom = new THREE.ConeGeometry(0.18, 0.75, 8)
-        this.allocatedGeometries.push(tipGeom)
-        const tip = new THREE.Mesh(tipGeom, this.ridgeGoldPbrMat)
-        tip.position.copy(endPt)
-        tip.position.y += 0.22
-        tip.rotation.z = sx > 0 ? -0.72 : 0.72
-        tip.rotation.x = sz > 0 ? 0.32 : -0.32
-        tip.castShadow = true
-        hipGroup.add(tip)
+        // 簷角牌頭祥雲印斗（穩實座落於簷角屋面，渾然一體，絕無任何向外懸空的異物尖刺）
+        const finialGeom = new THREE.SphereGeometry(0.28, 12, 10)
+        this.allocatedGeometries.push(finialGeom)
+        const finial = new THREE.Mesh(finialGeom, this.ridgeGoldPbrMat)
+        finial.position.copy(endPt)
+        finial.scale.set(1.2, 0.85, 1.2)
+        finial.castShadow = true
+        hipGroup.add(finial)
 
         this.root.add(hipGroup)
       }
@@ -565,29 +556,29 @@ export class TempleRoof3D {
   }
 
   /**
-   * 6. 屋簷下方大木作排樓斗拱系統（Dougong Brackets: 坐斗、橫栱、象鼻昂、散斗、耍頭）
-   * 沿主殿正面面寬均勻分佈 7 組精雕細琢的五踩排樓斗拱，使用 InstancedMesh 最佳化！
+   * 6. 屋簷下方大木作排樓斗拱系統（加深出挑、加大昂嘴、強化陰影層次）
    */
   private buildFrontEaveDougongBrackets(width: number, depth: number, eaveY: number): void {
     const halfD = depth / 2
-    const bracketY = eaveY - 0.42
+    const bracketY = eaveY - 0.45
     const bracketZ = halfD - 0.48
 
     const clusterCount = 7
-    const spanW = width * 0.76
+    const spanW = width * 0.78
     const stepX = spanW / (clusterCount - 1)
 
-    // 幾何體單元
-    const blockGeom = new THREE.BoxGeometry(0.38, 0.18, 0.38)
+    // 大號坐斗（0.52m × 0.24m × 0.52m）
+    const blockGeom = new THREE.BoxGeometry(0.52, 0.24, 0.52)
     this.allocatedGeometries.push(blockGeom)
 
-    const armGeom = new THREE.BoxGeometry(0.85, 0.14, 0.24)
+    // 寬闊橫栱（兩端雕雲紋，面寬 1.15m）
+    const armGeom = new THREE.BoxGeometry(1.15, 0.18, 0.28)
     this.allocatedGeometries.push(armGeom)
 
-    const beakGeom = new THREE.BoxGeometry(0.22, 0.16, 0.72)
+    // 鋒芒象鼻昂（前挑 0.95m，下傾 24 度，投射深邃陰影）
+    const beakGeom = new THREE.BoxGeometry(0.26, 0.22, 0.95)
     this.allocatedGeometries.push(beakGeom)
 
-    // 每個 cluster 有 3 個斗、2 層橫栱、1 個象鼻昂
     const totalBlocks = clusterCount * 3
     const totalArms = clusterCount * 2
     const totalBeaks = clusterCount
@@ -612,40 +603,40 @@ export class TempleRoof3D {
     for (let i = 0; i < clusterCount; i++) {
       const cx = -spanW / 2 + i * stepX
 
-      // Tier 1: 坐斗（大斗 / Base Bucket Block）
+      // Tier 1: 坐斗
       dummy.position.set(cx, bracketY, bracketZ)
       dummy.rotation.set(0, 0, 0)
       dummy.scale.set(1, 1, 1)
       dummy.updateMatrix()
       this.dougongBlockInstanced.setMatrixAt(bIdx++, dummy.matrix)
 
-      // Tier 1: 第一層橫栱（Primary Bow Bracket Arm）
-      dummy.position.set(cx, bracketY + 0.14, bracketZ)
+      // Tier 1: 第一層橫栱
+      dummy.position.set(cx, bracketY + 0.16, bracketZ)
       dummy.rotation.set(0, 0, 0)
       dummy.scale.set(1, 1, 1)
       dummy.updateMatrix()
       this.dougongArmInstanced.setMatrixAt(aIdx++, dummy.matrix)
 
-      // Tier 2: 象鼻昂（Cantilever Beak poking outwards）
-      dummy.position.set(cx, bracketY + 0.24, bracketZ + 0.22)
-      dummy.rotation.set(0.24, 0, 0) // Tilting downward outward
+      // Tier 2: 象鼻昂（強烈出挑 0.95m）
+      dummy.position.set(cx, bracketY + 0.28, bracketZ + 0.35)
+      dummy.rotation.set(0.24, 0, 0)
       dummy.scale.set(1, 1, 1)
       dummy.updateMatrix()
       this.dougongBeakInstanced.setMatrixAt(kIdx++, dummy.matrix)
 
-      // Tier 2: 左右散斗（Small Buckets on outer ends of arm）
+      // Tier 2: 散斗
       for (const side of [-1, 1]) {
-        dummy.position.set(cx + side * 0.34, bracketY + 0.26, bracketZ)
+        dummy.position.set(cx + side * 0.45, bracketY + 0.30, bracketZ)
         dummy.rotation.set(0, 0, 0)
-        dummy.scale.set(0.65, 0.8, 0.65)
+        dummy.scale.set(0.7, 0.85, 0.7)
         dummy.updateMatrix()
         this.dougongBlockInstanced.setMatrixAt(bIdx++, dummy.matrix)
       }
 
-      // Tier 3: 第二層橫栱（Secondary Upper Bow Bracket Arm）
-      dummy.position.set(cx, bracketY + 0.36, bracketZ + 0.12)
+      // Tier 3: 第二層橫栱
+      dummy.position.set(cx, bracketY + 0.42, bracketZ + 0.16)
       dummy.rotation.set(0, 0, 0)
-      dummy.scale.set(1.18, 1, 1)
+      dummy.scale.set(1.25, 1, 1)
       dummy.updateMatrix()
       this.dougongArmInstanced.setMatrixAt(aIdx++, dummy.matrix)
     }
@@ -660,15 +651,15 @@ export class TempleRoof3D {
   }
 
   /**
-   * 7. 鰲魚雀替雕花托木、懸空垂花蓮花吊筒與多層次彩繪壽樑
+   * 7. 鰲魚雀替雕花托木、懸空垂花蓮花吊筒與厚重大額枋主壽樑
    */
   private buildCarvedTimberworkAndSuspendedLotus(width: number, depth: number, eaveY: number): void {
     const halfD = depth / 2
-    const beamY = eaveY - 0.52
+    const beamY = eaveY - 0.58
     const beamZ = halfD - 0.48
 
-    // (1) 正面主壽樑（大額枋 / Main Architrave Beam）
-    const architraveGeom = new THREE.BoxGeometry(width * 0.88, 0.52, 0.48)
+    // (1) 正面厚實主壽樑（高 0.68m，深 0.55m，大木作穩實托承）
+    const architraveGeom = new THREE.BoxGeometry(width * 0.90, 0.68, 0.55)
     this.allocatedGeometries.push(architraveGeom)
     const architrave = new THREE.Mesh(architraveGeom, this.timberPbrMat)
     architrave.position.set(0, beamY, beamZ)
@@ -676,31 +667,28 @@ export class TempleRoof3D {
     architrave.receiveShadow = true
     this.root.add(architrave)
 
-    // 壽樑燙金祥雲飾帶（Gold Leaf Cloud Inlay Band）
-    const inlayGeom = new THREE.BoxGeometry(width * 0.86, 0.12, 0.51)
+    // 壽樑燙金回紋飾帶
+    const inlayGeom = new THREE.BoxGeometry(width * 0.88, 0.16, 0.58)
     this.allocatedGeometries.push(inlayGeom)
     const inlay = new THREE.Mesh(inlayGeom, this.goldPbrMat)
     inlay.position.set(0, beamY, beamZ)
     this.mediumDetailGroup.add(inlay)
 
-    // (2) 鰲魚雀替（Dragon-Carp Corbels / 插角托木）
-    // 位於梁柱交角處，展現繁複大木作工藝
+    // (2) 鰲魚雀替（雕花托木）
     for (const cx of [-5.4, 5.4]) {
       for (const dir of [-1, 1]) {
         const corbelGroup = new THREE.Group()
-        corbelGroup.position.set(cx + dir * 0.55, beamY - 0.32, beamZ)
+        corbelGroup.position.set(cx + dir * 0.65, beamY - 0.38, beamZ)
 
-        // 雕花魚身托木
-        const corbelGeom = new THREE.BoxGeometry(0.72, 0.38, 0.22)
+        const corbelGeom = new THREE.BoxGeometry(0.88, 0.45, 0.26)
         this.allocatedGeometries.push(corbelGeom)
         const corbelMesh = new THREE.Mesh(corbelGeom, this.vermilionPbrMat)
         corbelMesh.castShadow = true
 
-        // 鎏金卷雲魚尾
-        const tailGeom = new THREE.ConeGeometry(0.14, 0.42, 6)
+        const tailGeom = new THREE.ConeGeometry(0.18, 0.52, 6)
         this.allocatedGeometries.push(tailGeom)
         const tailMesh = new THREE.Mesh(tailGeom, this.goldPbrMat)
-        tailMesh.position.set(dir * 0.32, -0.08, 0)
+        tailMesh.position.set(dir * 0.38, -0.10, 0)
         tailMesh.rotation.z = dir > 0 ? -1.15 : 1.15
 
         corbelGroup.add(corbelMesh, tailMesh)
@@ -708,23 +696,20 @@ export class TempleRoof3D {
       }
     }
 
-    // (3) 垂花吊筒（Suspended Lotus Cylinders / 雕花花籃吊筒）
-    // 懸垂在斗拱出挑前端，垂掛優雅蓮花苞
+    // (3) 垂花蓮花吊筒（加粗加長，垂懸在挑簷前方）
     for (const lx of [-6.2, -2.8, 2.8, 6.2]) {
       const dropGroup = new THREE.Group()
-      dropGroup.position.set(lx, beamY - 0.22, beamZ + 0.32)
+      dropGroup.position.set(lx, beamY - 0.28, beamZ + 0.38)
 
-      // 吊筒身
-      const dropBodyGeom = new THREE.CylinderGeometry(0.12, 0.14, 0.45, 8)
+      const dropBodyGeom = new THREE.CylinderGeometry(0.16, 0.18, 0.58, 8)
       this.allocatedGeometries.push(dropBodyGeom)
       const dropBody = new THREE.Mesh(dropBodyGeom, this.vermilionPbrMat)
       dropBody.castShadow = true
 
-      // 蓮花苞瓣頭
-      const lotusHeadGeom = new THREE.SphereGeometry(0.16, 10, 8)
+      const lotusHeadGeom = new THREE.SphereGeometry(0.22, 12, 10)
       this.allocatedGeometries.push(lotusHeadGeom)
       const lotusHead = new THREE.Mesh(lotusHeadGeom, this.ridgeGoldPbrMat)
-      lotusHead.position.y = -0.26
+      lotusHead.position.y = -0.34
       lotusHead.scale.set(1, 1.35, 1)
       lotusHead.castShadow = true
 
