@@ -3,40 +3,61 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>玉皇宮 Phase 3 — Stage 1.5 GLB 資產管線與共享資源釋放驗證</title>
+  <title>玉皇宮 Phase 3 Stage 2 — 半寫實 3D 祥龍龍首樣板隔離預覽</title>
   <style>
-    body { margin: 0; padding: 0; overflow: hidden; background: #1a1614; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #e8d0a0; }
+    body { margin: 0; padding: 0; overflow: hidden; background: #161210; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #e8d0a0; }
     #canvas-container { width: 100vw; height: 100vh; display: block; }
     #info-panel {
-      position: absolute; top: 16px; left: 16px; z-index: 100;
-      background: rgba(26, 20, 16, 0.92); border: 1px solid #997a3d;
-      border-radius: 8px; padding: 14px 20px; max-width: 520px; font-size: 13px; line-height: 1.6;
+      position: absolute; top: 14px; left: 14px; z-index: 100;
+      background: rgba(22, 17, 14, 0.90); border: 1px solid #997a3d;
+      border-radius: 8px; padding: 12px 16px; max-width: 470px; font-size: 12.5px; line-height: 1.5;
       backdrop-filter: blur(6px); box-shadow: 0 8px 24px rgba(0,0,0,0.65);
     }
-    h2 { margin: 0 0 10px 0; font-size: 16px; color: #ffd700; border-bottom: 1px solid #785a28; padding-bottom: 6px; letter-spacing: 0.5px; }
+    h2 { margin: 0 0 8px 0; font-size: 15px; color: #ffd700; border-bottom: 1px solid #785a28; padding-bottom: 5px; letter-spacing: 0.5px; }
     .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-right: 4px; }
     .badge-ok { background: #1b5e20; color: #a5d6a7; border: 1px solid #2e7d32; }
-    .btn-group { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .section-label { font-size: 11px; color: #bcaaa4; margin-top: 8px; margin-bottom: 3px; font-weight: 600; }
+    .btn-group { display: flex; gap: 5px; flex-wrap: wrap; }
     button {
       background: #3e2723; color: #ffe082; border: 1px solid #a1887f; border-radius: 4px;
-      padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.2s ease;
+      padding: 4px 9px; cursor: pointer; font-size: 11.5px; font-weight: 500; transition: all 0.15s ease;
     }
     button:hover { background: #5d4037; border-color: #ffd54f; }
     button.active { background: #d84315; color: #fff; border-color: #ffab91; }
-    #metrics-list { margin: 8px 0; font-family: Consolas, monospace; font-size: 11.5px; color: #d7ccc8; max-height: 170px; overflow-y: auto; }
+    #metrics-list { margin: 6px 0; font-family: Consolas, monospace; font-size: 11px; color: #d7ccc8; max-height: 165px; overflow-y: auto; }
   </style>
 </head>
 <body>
   <div id="info-panel">
-    <h2>玉皇宮 3D GLB 管線與共享資源驗證 (Stage 1.5)</h2>
+    <h2>玉皇宮 3D 祥龍龍首樣板預覽 (Stage 2)</h2>
     <div id="status-badge"><span class="badge badge-ok">載入中...</span></div>
     <div id="metrics-list"></div>
+
+    <div class="section-label">視角切換 (360° Orbit / 預設鏡頭 / 近距離特寫)</div>
     <div class="btn-group">
-      <button id="btn-front" onclick="window.setView('front')">正面 (Front)</button>
-      <button id="btn-side" onclick="window.setView('side')">側面 (Side)</button>
-      <button id="btn-angle45" onclick="window.setView('angle45')">45° 透視 (Angle 45°)</button>
-      <button id="btn-dispose-one" onclick="window.runPartialDisposeTest()">卸載實例1 (Keep Inst 2)</button>
-      <button id="btn-dispose-all" onclick="window.runFullDisposeTest()">全部卸載 (Dispose All)</button>
+      <button id="btn-front" onclick="window.setView('front')">正面</button>
+      <button id="btn-side_left" onclick="window.setView('side_left')">左側</button>
+      <button id="btn-side_right" onclick="window.setView('side_right')">右側</button>
+      <button id="btn-angle45" onclick="window.setView('angle45')">45°透視</button>
+      <button id="btn-top" onclick="window.setView('top')">頂部鹿角</button>
+      <button id="btn-bottom_jaw" onclick="window.setView('bottom_jaw')">下顎口腔</button>
+      <button id="btn-pair" onclick="window.setView('pair')">雙龍對稱</button>
+    </div>
+
+    <div class="section-label">光照方向與線框拓樸 (Lighting & Wireframe)</div>
+    <div class="btn-group">
+      <button id="btn-light-temple" class="active" onclick="window.setLightPreset('temple')">宮廟正陽</button>
+      <button id="btn-light-side" onclick="window.setLightPreset('side')">側逆戲劇光</button>
+      <button id="btn-light-zenith" onclick="window.setLightPreset('zenith')">頂光輪廓</button>
+      <button id="btn-wireframe" onclick="window.toggleWireframe()">線框 (Wireframe)</button>
+      <button id="btn-turntable" onclick="window.toggleTurntable()">360°旋轉</button>
+    </div>
+
+    <div class="section-label">共享資源複製與釋放驗證 (Shared Resource Lifecycle)</div>
+    <div class="btn-group">
+      <button id="btn-spawn-pair" onclick="window.spawnMirroredPair()">建立雙實例</button>
+      <button id="btn-dispose-one" onclick="window.runPartialDisposeTest()">卸載實例1</button>
+      <button id="btn-dispose-all" onclick="window.runFullDisposeTest()">全部卸載</button>
     </div>
   </div>
   <div id="canvas-container"></div>
