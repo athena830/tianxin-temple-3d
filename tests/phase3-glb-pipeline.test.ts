@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { readFileSync, existsSync } from 'node:fs'
 import { Assets } from '../src/engine/assets'
 
-describe('Phase 3 Stage 1.5 GLB Asset Pipeline Verification', () => {
+describe('Phase 3 Stage 1.5 GLB Asset Pipeline & Shared Resource Disposal Verification', () => {
   it('verifies test.glb exists and has valid glTF 2.0 binary header', () => {
     const glbPath = 'public/assets/models/test.glb'
     expect(existsSync(glbPath)).toBe(true)
@@ -24,28 +24,24 @@ describe('Phase 3 Stage 1.5 GLB Asset Pipeline Verification', () => {
   it('verifies Assets class gltf() memoization cache and error clearing', async () => {
     const assets = new Assets()
 
-    // Mock gltfLoader.loadAsync
     let loadCallCount = 0
-    const mockGltf = { scene: new THREE.Group() } as any
-    ;(assets as any).gltfLoader.loadAsync = async (url: string) => {
+    const mockGltf = { scene: new THREE.Group() } as unknown
+    ;(assets as unknown as { gltfLoader: { loadAsync: (u: string) => Promise<unknown> } }).gltfLoader.loadAsync = async (url: string) => {
       loadCallCount++
       if (url.includes('fail')) throw new Error('File not found')
       return mockGltf
     }
 
-    // Call 1
     const p1 = assets.gltf('/assets/models/test.glb')
-    // Call 2 (identical URL)
     const p2 = assets.gltf('/assets/models/test.glb')
 
-    expect(p1).toBe(p2) // Same promise instance
+    expect(p1).toBe(p2)
     const res1 = await p1
     const res2 = await p2
     expect(res1).toBe(mockGltf)
     expect(res2).toBe(mockGltf)
-    expect(loadCallCount).toBe(1) // LoadAsync called only once
+    expect(loadCallCount).toBe(1)
 
-    // Failure case: error should clear cache to allow retry
     let failed = false
     try {
       await assets.gltf('fail.glb')
@@ -53,45 +49,73 @@ describe('Phase 3 Stage 1.5 GLB Asset Pipeline Verification', () => {
       failed = true
     }
     expect(failed).toBe(true)
-    expect((assets as any).cache.has('fail.glb')).toBe(false)
+    expect((assets as unknown as { cache: Map<string, unknown> }).cache.has('fail.glb')).toBe(false)
   })
 
-  it('verifies model cloning, symmetrical mirroring (scale.x = -1), and deep resource disposal', () => {
-    // Construct sample hierarchy simulating GLTF scene
-    const root = new THREE.Group()
-    const geo1 = new THREE.BoxGeometry(1, 1, 1)
-    const mat1 = new THREE.MeshStandardMaterial({ color: 0xc83828, metalness: 0.35, roughness: 0.25 })
-    const mesh1 = new THREE.Mesh(geo1, mat1)
-    root.add(mesh1)
+  it('verifies multi-instance shared resources: unloading instance 1 keeps instance 2 alive, unloading all disposes shared resources', async () => {
+    const assets = new Assets()
 
-    // Test cloning
-    const clone = root.clone(true)
-    expect(clone.children.length).toBe(1)
+    // Build mock GLTF scene with 2 meshes sharing 1 material and 2 geometries
+    const templateScene = new THREE.Group()
+    const sharedGeo1 = new THREE.BoxGeometry(1, 1, 1)
+    const sharedGeo2 = new THREE.SphereGeometry(0.5, 12, 12)
+    const sharedMat = new THREE.MeshStandardMaterial({ color: 0xc83828, metalness: 0.35, roughness: 0.25 })
 
-    // Test mirroring for dragon symmetry
-    clone.scale.set(-1, 1, 1)
-    expect(clone.scale.x).toBe(-1)
-    expect(clone.scale.y).toBe(1)
-    expect(clone.scale.z).toBe(1)
+    const meshA = new THREE.Mesh(sharedGeo1, sharedMat)
+    meshA.name = 'Head'
+    const meshB = new THREE.Mesh(sharedGeo2, sharedMat)
+    meshB.name = 'Snout'
+    templateScene.add(meshA, meshB)
 
-    // Test clean disposal
     let disposedGeos = 0
     let disposedMats = 0
-    geo1.addEventListener('dispose', () => { disposedGeos++ })
-    mat1.addEventListener('dispose', () => { disposedMats++ })
+    sharedGeo1.addEventListener('dispose', () => { disposedGeos++ })
+    sharedGeo2.addEventListener('dispose', () => { disposedGeos++ })
+    sharedMat.addEventListener('dispose', () => { disposedMats++ })
 
-    clone.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const m = child as THREE.Mesh
-        if (m.geometry) m.geometry.dispose()
-        if (m.material) {
-          if (Array.isArray(m.material)) m.material.forEach(mat => mat.dispose())
-          else m.material.dispose()
-        }
-      }
+    ;(assets as unknown as { gltfLoader: { loadAsync: () => Promise<unknown> } }).gltfLoader.loadAsync = async () => ({
+      scene: templateScene,
     })
 
-    expect(disposedGeos).toBe(1)
+    const url = '/assets/models/shared_dragon_test.glb'
+    const scene = new THREE.Scene()
+
+    // 1. Acquire two instances sharing underlying BufferGeometries and Material
+    const instance1 = await assets.acquireGltfInstance(url)
+    const instance2 = await assets.acquireGltfInstance(url)
+    instance2.scale.set(-1, 1, 1) // Mirrored instance
+    scene.add(instance1, instance2)
+
+    const inst1MeshA = instance1.children[0] as THREE.Mesh
+    const inst2MeshA = instance2.children[0] as THREE.Mesh
+    expect(inst1MeshA.geometry).toBe(inst2MeshA.geometry)
+    expect(inst1MeshA.material).toBe(inst2MeshA.material)
+
+    const initialStats = assets.getSharedStats(url)
+    expect(initialStats.activeInstances).toBe(2)
+    expect(initialStats.sharedGeometries).toBe(2)
+    expect(initialStats.sharedMaterials).toBe(1)
+
+    // 2. Unload Instance 1 — Instance 2 must remain in scene and shared resources MUST NOT be disposed
+    const afterFirstRelease = assets.releaseGltfInstance(url, instance1)
+    expect(afterFirstRelease.activeInstances).toBe(1)
+    expect(afterFirstRelease.disposedGeometries).toBe(0)
+    expect(afterFirstRelease.disposedMaterials).toBe(0)
+    expect(disposedGeos).toBe(0)
+    expect(disposedMats).toBe(0)
+
+    // Verify Instance 1 removed from scene, Instance 2 still in scene with valid geometry attributes
+    expect(scene.children.includes(instance1)).toBe(false)
+    expect(scene.children.includes(instance2)).toBe(true)
+    expect(inst2MeshA.geometry.attributes.position.count).toBeGreaterThan(0)
+
+    // 3. Unload Instance 2 — All instances now unloaded, shared geometries & materials MUST be disposed
+    const afterSecondRelease = assets.releaseGltfInstance(url, instance2)
+    expect(afterSecondRelease.activeInstances).toBe(0)
+    expect(afterSecondRelease.disposedGeometries).toBe(2)
+    expect(afterSecondRelease.disposedMaterials).toBe(1)
+    expect(disposedGeos).toBe(2)
     expect(disposedMats).toBe(1)
+    expect(scene.children.includes(instance2)).toBe(false)
   })
 })
