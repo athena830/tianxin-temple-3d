@@ -35,7 +35,7 @@ export function defaultSave(): SaveData {
     muted: false,
     sensitivity: 1,
     invertY: false,
-    quality: 'high',
+    quality: 'medium',
     reducedMotion: false,
     tutorialDone: false,
     playerName: 'PLAYER',

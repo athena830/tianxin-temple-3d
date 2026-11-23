@@ -752,7 +752,19 @@ export class TempleRoof3D {
   private setShadows(cast: boolean, receive: boolean): void {
     this.root.traverse((obj) => {
       if ((obj as THREE.Mesh).isMesh) {
-        obj.castShadow = cast
+        const isMicroDetail =
+          obj === this.tileTubeInstanced ||
+          obj === this.tileWadangInstanced ||
+          obj === this.tileDripInstanced ||
+          obj === this.dougongBlockInstanced ||
+          obj === this.dougongArmInstanced ||
+          obj === this.dougongBeakInstanced ||
+          this.highDetailGroup.children.includes(obj) ||
+          this.highDetailGroup.children.includes((obj as any).parent) ||
+          this.twinDragonsGroup.children.includes(obj) ||
+          this.twinDragonsGroup.children.includes((obj as any).parent)
+
+        obj.castShadow = cast && !isMicroDetail
         obj.receiveShadow = receive
       }
     })

@@ -14,10 +14,7 @@ export const QUALITY_PRESETS: Record<Quality, Preset> = {
 
 /** Pick a starting quality from device hints; the player can override it in Settings. */
 export function suggestQuality(): Quality {
-  const coarse = matchMedia('(pointer: coarse)').matches
-  const cores = navigator.hardwareConcurrency ?? 4
-  if (coarse || cores <= 4) return 'medium'
-  return 'high'
+  return 'medium'
 }
 
 /**
@@ -29,10 +26,12 @@ export class Renderer {
   private composer?: EffectComposer
   private bloom?: UnrealBloomPass
   private preset: Preset
+  private currentQuality: Quality
   private scene?: THREE.Scene
   private camera?: THREE.Camera
 
   constructor(readonly canvas: HTMLCanvasElement, quality: Quality) {
+    this.currentQuality = quality
     this.preset = QUALITY_PRESETS[quality]
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: this.preset.antialias, powerPreference: 'high-performance' })
     this.gl.outputColorSpace = THREE.SRGBColorSpace
@@ -43,11 +42,16 @@ export class Renderer {
     window.addEventListener('resize', () => this.resize())
   }
 
+  get quality(): Quality {
+    return this.currentQuality
+  }
+
   get shadowMapSize(): number {
     return this.preset.shadowMap
   }
 
   applyQuality(quality: Quality): void {
+    this.currentQuality = quality
     this.preset = QUALITY_PRESETS[quality]
     this.gl.shadowMap.enabled = this.preset.shadows
     this.gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio))

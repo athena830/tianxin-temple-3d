@@ -107,7 +107,7 @@ export class TempleGame {
   reducedMotion = false
   readonly physics = new Physics(-24)
   readonly world: TempleWorld
-  readonly camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 0.05, 220)
+  readonly camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 0.05, 135)
   private readonly body: RAPIER.RigidBody
   private readonly collider: RAPIER.Collider
   private readonly controller: RAPIER.KinematicCharacterController
@@ -130,6 +130,10 @@ export class TempleGame {
   private ritualDone: (() => void) | null = null
   /** Decorations temporarily hidden because they sit between the lens and the visitor. */
   private readonly occluders: THREE.Object3D[] = []
+  private readonly lastOccludeCamPos = new THREE.Vector3()
+  private readonly lastOccludeTarget = new THREE.Vector3()
+  private occludeFrameCount = 0
+  private occludeWasMoving = false
   active: ShrinePoint | null = null
   /** Station the guide arrow currently points to. */
   guide: ShrinePoint | null = null
@@ -160,7 +164,7 @@ export class TempleGame {
     this.controller = this.physics.world.createCharacterController(0.02)
     this.controller.enableAutostep(0.65, 0.15, false)
     this.controller.enableSnapToGround(0.65)
-    this.renderer.gl.shadowMap.enabled = true
+    this.world.applyQuality(this.renderer.quality)
     this.physics.world.step()
   }
 
@@ -560,11 +564,42 @@ export class TempleGame {
    * lens-to-visitor segment for this frame. Walls never reach here because the physics ray already pulled the lens in.
    */
   private hideOccluders(): void {
-    for (const o of this.occluders) o.visible = true
-    this.occluders.length = 0
     const toTarget = this.camTarget.clone().sub(this.camera.position)
     const dist = toTarget.length()
-    if (dist < 0.2) return
+    if (dist < 0.2) {
+      for (const o of this.occluders) o.visible = true
+      this.occluders.length = 0
+      return
+    }
+
+    const camDistSq = this.camera.position.distanceToSquared(this.lastOccludeCamPos)
+    const targetDistSq = this.camTarget.distanceToSquared(this.lastOccludeTarget)
+    const isMoving = camDistSq > 0.0004 || targetDistSq > 0.0004 // moved > 2cm
+
+    this.occludeFrameCount++
+
+    if (!isMoving) {
+      if (this.occludeWasMoving) {
+        // Just transitioned from moving to stationary: run one final exact pass
+        this.occludeWasMoving = false
+      } else {
+        // Fully stationary: maintain existing hidden occluders, skip expensive raycast
+        return
+      }
+    } else {
+      this.occludeWasMoving = true
+      // While moving, throttle raycast to once every 3 frames (~50ms)
+      if (this.occludeFrameCount % 3 !== 0) {
+        return
+      }
+    }
+
+    this.lastOccludeCamPos.copy(this.camera.position)
+    this.lastOccludeTarget.copy(this.camTarget)
+
+    for (const o of this.occluders) o.visible = true
+    this.occluders.length = 0
+
     toTarget.divideScalar(dist)
     // Start a little behind the lens so meshes that enclose the camera are caught too.
     const origin = this.camera.position.clone().addScaledVector(toTarget, -0.6)

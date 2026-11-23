@@ -2972,7 +2972,8 @@ export class TempleWorld {
         petal.scale.set(0.95, 1.35, 0.52)
         petal.position.set(Math.cos(ang) * radius, y, Math.sin(ang) * radius)
         petal.rotation.set(0.28 * Math.cos(ang), -ang, -0.28 * Math.sin(ang))
-        petal.castShadow = true
+        petal.castShadow = false
+        petal.receiveShadow = true
         root.add(petal)
       }
     }
@@ -3353,7 +3354,7 @@ export class TempleWorld {
 
     root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
-        obj.castShadow = true
+        obj.castShadow = false
         obj.receiveShadow = true
       }
     })
@@ -3555,7 +3556,7 @@ export class TempleWorld {
 
     root.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
-        obj.castShadow = true
+        obj.castShadow = false
         obj.receiveShadow = true
       }
     })
@@ -3854,7 +3855,7 @@ export class TempleWorld {
 
       unit.traverse(obj => {
         if (obj instanceof THREE.Mesh) {
-          obj.castShadow = true
+          obj.castShadow = false
           obj.receiveShadow = true
         }
       })
@@ -4328,6 +4329,7 @@ export class TempleWorld {
   applyQuality(quality: Quality): void {
     this.pbr.applyQuality(quality)
     this.mainHallRoof3D?.applyQuality(quality)
+    this.sun.castShadow = quality !== 'low'
     const mapSize = quality === 'low' ? 512 : quality === 'medium' ? 1024 : 2048
     if (this.shadowMapResolution !== mapSize) {
       this.shadowMapResolution = mapSize
@@ -4622,7 +4624,9 @@ export class TempleWorld {
     const insideHall = playerPosition.z < frontThresholdZ && playerPosition.z > backWallZ && Math.abs(playerPosition.x) < sideWallX
     this.roof.visible = !insideHall
     const insideRear = playerPosition.z < -16.5 && playerPosition.z > -33.5 && Math.abs(playerPosition.x) < 12.0
-    this.rearRoof.visible = !insideRear
+    const nearRear = playerPosition.z < 12.0
+    if (this.rearHallGroup) this.rearHallGroup.visible = nearRear
+    this.rearRoof.visible = nearRear && !insideRear
 
     // 分區 PointLight 最佳化：遠離後殿（z > 10m）時暫停後殿內部點光，進入前庭中後段與主殿即自動開啟，完全保留原有照明
     const enableRearLights = playerPosition.z < 10.0

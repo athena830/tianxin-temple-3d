@@ -14,7 +14,7 @@ describe('save', () => {
     expect(s.musicVolume).toBe(1)
     expect(s.sfxVolume).toBe(0)
     expect(s.locale).toBe('')
-    expect(s.quality).toBe('high')
+    expect(s.quality).toBe('medium')
     expect(s.sensitivity).toBe(1)
     expect(s.playerName).toBe('a very long play')
   })

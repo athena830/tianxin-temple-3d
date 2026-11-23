@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Physics } from '../engine/physics'
 import type { TemplePbrLibrary } from './temple-pbr-materials'
 
@@ -90,17 +91,17 @@ export class FrontCourtyard {
     this.addSkyLanterns()
   }
 
-  private add(mesh: THREE.Object3D, shadow = true): THREE.Object3D {
+  private add(mesh: THREE.Object3D, shadow = false): THREE.Object3D {
     mesh.traverse(o => { if (o instanceof THREE.Mesh) { o.castShadow = shadow; o.receiveShadow = true } })
     this.c.scene.add(mesh)
     return mesh
   }
 
-  private box(w: number, h: number, d: number, color: string | THREE.Material, x: number, y: number, z: number, collide = false, angle = 0): THREE.Mesh {
+  private box(w: number, h: number, d: number, color: string | THREE.Material, x: number, y: number, z: number, collide = false, angle = 0, shadow = collide): THREE.Mesh {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof color === 'string' ? this.c.mat(color) : color)
     m.position.set(x, y, z)
     m.rotation.y = angle
-    this.add(m)
+    this.add(m, shadow)
     if (collide) this.c.physics.addStaticBox(new THREE.Vector3(x, y, z), new THREE.Vector3(w, h, d), angle ? rotY(angle) : undefined)
     return m
   }
@@ -222,26 +223,46 @@ export class FrontCourtyard {
       this.box(3.9, 0.5, 0.85, vermilion, side * 4.3, 5.35, z)
       this.box(4.05, 0.12, 0.94, gold, side * 4.3, 5.08, z)
     }
-    // 山門飛簷斗栱組（共用幾何體實例，強化傳統大木作立體輪廓）
+    // 山門飛簷斗栱組（共用幾何體實例，強化傳統大木作立體輪廓） - Batched with mergeGeometries
     const dgBaseGeo = new THREE.BoxGeometry(0.32, 0.14, 0.32)
     const dgArmGeo = new THREE.BoxGeometry(0.66, 0.12, 0.2)
     const dgBeakGeo = new THREE.BoxGeometry(0.18, 0.12, 0.64)
+    const gateGoldGeoms: THREE.BufferGeometry[] = []
+    const gateVermilionGeoms: THREE.BufferGeometry[] = []
+
     const addGateDougong = (dx: number, dy: number) => {
       for (const faceDir of [-1, 1]) {
-        const dg = new THREE.Group()
-        dg.position.set(dx, dy, z + faceDir * 0.52)
-        const b = new THREE.Mesh(dgBaseGeo, gold)
-        const arm = new THREE.Mesh(dgArmGeo, vermilion)
-        arm.position.y = 0.12
-        const beak = new THREE.Mesh(dgBeakGeo, gold)
-        beak.position.set(0, 0.2, faceDir * 0.12)
-        beak.rotation.x = faceDir * 0.18
-        dg.add(b, arm, beak)
-        this.add(dg)
+        const b = dgBaseGeo.clone()
+        b.translate(dx, dy, z + faceDir * 0.52)
+        gateGoldGeoms.push(b)
+
+        const arm = dgArmGeo.clone()
+        arm.translate(dx, dy + 0.12, z + faceDir * 0.52)
+        gateVermilionGeoms.push(arm)
+
+        const beak = dgBeakGeo.clone()
+        beak.rotateX(faceDir * 0.18)
+        beak.translate(dx, dy + 0.2, z + faceDir * 0.52 + faceDir * 0.12)
+        gateGoldGeoms.push(beak)
       }
     }
     for (const dx of [-1.8, -0.6, 0.6, 1.8]) addGateDougong(dx, 6.32)
     for (const dx of [-5.1, -3.5, 3.5, 5.1]) addGateDougong(dx, 5.5)
+
+    dgBaseGeo.dispose()
+    dgArmGeo.dispose()
+    dgBeakGeo.dispose()
+
+    if (gateGoldGeoms.length > 0) {
+      const mergedGold = BufferGeometryUtils.mergeGeometries(gateGoldGeoms, false)
+      for (const bg of gateGoldGeoms) bg.dispose()
+      this.add(new THREE.Mesh(mergedGold, gold), false)
+    }
+    if (gateVermilionGeoms.length > 0) {
+      const mergedVermilion = BufferGeometryUtils.mergeGeometries(gateVermilionGeoms, false)
+      for (const bg of gateVermilionGeoms) bg.dispose()
+      this.add(new THREE.Mesh(mergedVermilion, vermilion), false)
+    }
 
     const plaque = this.box(3.8, 1.05, 0.24, darkTimber, 0, 5.4, z + 0.5)
     plaque.castShadow = false
@@ -253,11 +274,11 @@ export class FrontCourtyard {
     }
     const mid = this.c.roof(7.4, 2.4, 6.55, 7.9)
     mid.position.set(0, 0, z)
-    this.add(mid)
+    this.add(mid, true)
     for (const side of [-1, 1]) {
       const r = this.c.roof(4.6, 2.0, 5.65, 6.55)
       r.position.set(side * 4.3, 0, z)
-      this.add(r)
+      this.add(r, true)
     }
     // Side-bay lanterns: bottom edge at about 4.4 m, never over the central road.
     for (const side of [-1, 1]) for (const dz of [0.7, -0.7]) this.lantern(side * 4.3, 4.85, z + dz, 0.36)
@@ -356,7 +377,7 @@ export class FrontCourtyard {
     roof.position.set(0, 0, 0)
     screenGroup.add(roof)
 
-    this.add(screenGroup)
+    this.add(screenGroup, true)
     this.c.physics.addStaticBox(new THREE.Vector3(0, 2.1, z), new THREE.Vector3(wallW + 0.8, 4.6, 1.5))
   }
 
@@ -383,58 +404,75 @@ export class FrontCourtyard {
     coreMat.emissiveIntensity = 1.2
     this.lanternMats.push(coreMat)
 
-    // 1. 頂部懸掛金索與吊環
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, size * 1.5, 6), gold)
-    cord.position.y = size * 2.0
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(size * 0.14, size * 0.03, 6, 12), gold)
-    ring.position.y = size * 1.35
-    ring.rotation.x = Math.PI / 2
-    g.add(cord, ring)
+    // Merge all gold parts into one geometry: cord, ring, roofEave, 6 filigree posts, baseTray
+    const goldGeoms: THREE.BufferGeometry[] = []
+    const cordGeo = new THREE.CylinderGeometry(0.015, 0.015, size * 1.5, 6)
+    cordGeo.translate(0, size * 2.0, 0)
+    goldGeoms.push(cordGeo)
 
-    // 2. 原神璃月雙層六角飛簷寶頂（Pagoda Roof Cap with Upturned Eaves）
+    const ringGeo = new THREE.TorusGeometry(size * 0.14, size * 0.03, 6, 12)
+    ringGeo.rotateX(Math.PI / 2)
+    ringGeo.translate(0, size * 1.35, 0)
+    goldGeoms.push(ringGeo)
+
+    const eaveGeo = new THREE.CylinderGeometry(size * 0.78, size * 0.62, size * 0.08, 6)
+    eaveGeo.translate(0, size * 0.98, 0)
+    goldGeoms.push(eaveGeo)
+
+    const postR = size * 0.56
+    const basePostGeo = new THREE.CylinderGeometry(size * 0.032, size * 0.032, size * 1.32, 4)
+    for (let i = 0; i < 6; i++) {
+      const ang = (i * Math.PI) / 3
+      const postG = basePostGeo.clone()
+      postG.translate(Math.cos(ang) * postR, size * 0.32, Math.sin(ang) * postR)
+      goldGeoms.push(postG)
+    }
+    basePostGeo.dispose()
+
+    const trayGeo = new THREE.CylinderGeometry(size * 0.65, size * 0.35, size * 0.2, 6)
+    trayGeo.translate(0, -size * 0.42, 0)
+    goldGeoms.push(trayGeo)
+
+    const mergedGold = BufferGeometryUtils.mergeGeometries(goldGeoms, false)
+    for (const bg of goldGeoms) bg.dispose()
+    g.add(new THREE.Mesh(mergedGold, gold))
+
+    // Roof top
     const roofTop = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.18, size * 0.76, size * 0.28, 6), darkWood)
     roofTop.position.y = size * 1.14
-    const roofEave = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.78, size * 0.62, size * 0.08, 6), gold)
-    roofEave.position.y = size * 0.98
-    g.add(roofTop, roofEave)
+    g.add(roofTop)
 
-    // 3. 六角透光絹紗燈膽與明耀靈心（Silk Chamber & Luminous Core）
+    // Body & Inner Core
     const body = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.58, size * 0.52, size * 1.28, 6), silkMat)
     body.position.y = size * 0.32
     const innerCore = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.26, size * 0.26, size * 0.85, 6), coreMat)
     innerCore.position.y = size * 0.32
     g.add(body, innerCore)
 
-    // 4. 六方金雕護框立柱（Corner Filigree Posts）
-    const postR = size * 0.56
-    for (let i = 0; i < 6; i++) {
-      const ang = (i * Math.PI) / 3
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.032, size * 0.032, size * 1.32, 4), gold)
-      post.position.set(Math.cos(ang) * postR, size * 0.32, Math.sin(ang) * postR)
-      g.add(post)
-    }
-
-    // 5. 下方蓮華雕花托底（Hexagonal Lotus Bracket Base）
-    const baseTray = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.65, size * 0.35, size * 0.2, 6), gold)
-    baseTray.position.y = -size * 0.42
+    // Bead
     const jadeBeadMat = this.c.mat('#3fa878', 0.3, 0.4)
     const bead = new THREE.Mesh(new THREE.DodecahedronGeometry(size * 0.14), jadeBeadMat)
     bead.position.y = -size * 0.58
-    g.add(baseTray, bead)
+    g.add(bead)
 
-    // 6. 三束飄逸垂墜紅金流蘇（Flowing Silk Tassels）
+    // Merge 3 tassels into one geometry
     const tasselMat = this.c.mat('#d03628', 0.7)
-    const centerTassel = new THREE.Mesh(new THREE.ConeGeometry(size * 0.16, size * 0.95, 6), tasselMat)
-    centerTassel.position.y = -size * 1.1
-    centerTassel.rotation.x = Math.PI
-    g.add(centerTassel)
+    const tasselGeoms: THREE.BufferGeometry[] = []
+    const centerTasselGeo = new THREE.ConeGeometry(size * 0.16, size * 0.95, 6)
+    centerTasselGeo.rotateX(Math.PI)
+    centerTasselGeo.translate(0, -size * 1.1, 0)
+    tasselGeoms.push(centerTasselGeo)
+
     for (const sideAng of [-0.4, 0.4]) {
-      const sideTassel = new THREE.Mesh(new THREE.ConeGeometry(size * 0.1, size * 0.65, 5), tasselMat)
-      sideTassel.position.set(Math.sin(sideAng) * size * 0.22, -size * 0.92, Math.cos(sideAng) * size * 0.22)
-      sideTassel.rotation.x = Math.PI
-      sideTassel.rotation.z = sideAng * 0.35
-      g.add(sideTassel)
+      const sideGeo = new THREE.ConeGeometry(size * 0.1, size * 0.65, 5)
+      sideGeo.rotateX(Math.PI)
+      sideGeo.rotateZ(sideAng * 0.35)
+      sideGeo.translate(Math.sin(sideAng) * size * 0.22, -size * 0.92, Math.cos(sideAng) * size * 0.22)
+      tasselGeoms.push(sideGeo)
     }
+    const mergedTassels = BufferGeometryUtils.mergeGeometries(tasselGeoms, false)
+    for (const tg of tasselGeoms) tg.dispose()
+    g.add(new THREE.Mesh(mergedTassels, tasselMat))
 
     // 7. 廣角暖金環境光輝
     if (size >= 0.22) {
@@ -482,7 +520,7 @@ export class FrontCourtyard {
     const podium = new THREE.Mesh(podiumGeo, stone)
     podium.position.set(cx, podH / 2, cz)
     podium.receiveShadow = true
-    this.add(podium)
+    this.add(podium, true)
     this.c.physics.addStaticBox(new THREE.Vector3(cx, podH / 2, cz), new THREE.Vector3(podW, podH, podW))
 
     // 2. 前側兩階踏步 (Front Stone Steps facing +X towards road)
@@ -765,7 +803,7 @@ export class FrontCourtyard {
       screenGroup.add(rearBadgeLower)
     }
 
-    this.add(screenGroup)
+    this.add(screenGroup, true)
     this.c.physics.addStaticBox(new THREE.Vector3(cx - 1.25, podH + 1.15, cz), new THREE.Vector3(0.3, 2.3, 2.4))
 
     // 正面神龕溫潤洗牆光 (Front Niche Warm Wash Light)
@@ -798,7 +836,7 @@ export class FrontCourtyard {
     throneLotus.scale.set(0.65, 1, 1.05)
 
     throneGroup.add(thronePlinth, throneWaist, throneLotus)
-    this.add(throneGroup)
+    this.add(throneGroup, true)
 
     // 低矮朱紅雕花供桌 (Low Offering Table)
     const tableX = cx + 0.18
@@ -1118,24 +1156,42 @@ export class FrontCourtyard {
     const f = new THREE.Group()
     f.position.set(x, y, z)
     const petalMat = this.c.mat(color, 0.6)
+    const geoms: THREE.BufferGeometry[] = []
+
     // Outer petals (6 petals, spreading)
+    const baseOuter = new THREE.SphereGeometry(s, 8, 6)
     for (let i = 0; i < 6; i += 1) {
-      const p = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 6), petalMat)
+      const g = baseOuter.clone()
       const a = (i / 6) * Math.PI * 2
-      p.scale.set(0.48, 0.92, 0.28)
-      p.position.set(Math.cos(a) * s * 0.6, s * 0.55, Math.sin(a) * s * 0.6)
-      p.rotation.set(Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55)
-      f.add(p)
+      const m = new THREE.Matrix4()
+      const rot = new THREE.Euler(Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55)
+      const pos = new THREE.Vector3(Math.cos(a) * s * 0.6, s * 0.55, Math.sin(a) * s * 0.6)
+      const scale = new THREE.Vector3(0.48, 0.92, 0.28)
+      m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scale)
+      g.applyMatrix4(m)
+      geoms.push(g)
     }
+    baseOuter.dispose()
+
     // Inner petals (5 petals, upright cup)
+    const baseInner = new THREE.SphereGeometry(s * 0.85, 8, 6)
     for (let i = 0; i < 5; i += 1) {
-      const p = new THREE.Mesh(new THREE.SphereGeometry(s * 0.85, 8, 6), petalMat)
+      const g = baseInner.clone()
       const a = (i / 5) * Math.PI * 2 + 0.35
-      p.scale.set(0.42, 0.88, 0.26)
-      p.position.set(Math.cos(a) * s * 0.38, s * 0.65, Math.sin(a) * s * 0.38)
-      p.rotation.set(Math.sin(a) * 0.32, 0, -Math.cos(a) * 0.32)
-      f.add(p)
+      const m = new THREE.Matrix4()
+      const rot = new THREE.Euler(Math.sin(a) * 0.32, 0, -Math.cos(a) * 0.32)
+      const pos = new THREE.Vector3(Math.cos(a) * s * 0.38, s * 0.65, Math.sin(a) * s * 0.38)
+      const scale = new THREE.Vector3(0.42, 0.88, 0.26)
+      m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scale)
+      g.applyMatrix4(m)
+      geoms.push(g)
     }
+    baseInner.dispose()
+
+    const mergedPetals = BufferGeometryUtils.mergeGeometries(geoms, false)
+    for (const bg of geoms) bg.dispose()
+    f.add(new THREE.Mesh(mergedPetals, petalMat))
+
     const heart = new THREE.Mesh(new THREE.SphereGeometry(s * 0.35, 8, 6), this.c.mat('#e8c35c', 0.5))
     heart.position.y = s * 0.55
     f.add(heart)
@@ -1211,30 +1267,48 @@ export class FrontCourtyard {
     rim.position.y = 0.46
     g.add(rim)
 
-    // 2. 16 Carved Stone Baluster Posts (漢白玉望柱與雕花柱頭)
+    // 2. 16 Carved Stone Baluster Posts (漢白玉望柱與雕花柱頭) - Batched with mergeGeometries
     const postCount = 16
+    const baseGeoms: THREE.BufferGeometry[] = []
+    const marbleGeoms: THREE.BufferGeometry[] = []
+    const goldGeoms: THREE.BufferGeometry[] = []
+    const panelGeoms: THREE.BufferGeometry[] = []
+
+    const boxBaseGeo = new THREE.BoxGeometry(0.24, 0.24, 0.24)
+    const boxColGeo = new THREE.BoxGeometry(0.18, 0.38, 0.18)
+    const finialBaseGeo = new THREE.CylinderGeometry(0.12, 0.08, 0.08, 8)
+    const sphereFinialGeo = new THREE.SphereGeometry(0.1, 8, 6)
+
     for (let i = 0; i < postCount; i += 1) {
       const a = (i / postCount) * Math.PI * 2
       const px = Math.cos(a) * (rx + 0.12)
       const pz = Math.sin(a) * (rz + 0.12)
-      const post = new THREE.Group()
-      post.position.set(px, 0, pz)
 
       // Post pedestal
-      const pBase = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), stoneWall)
-      pBase.position.y = 0.32
+      const bG = boxBaseGeo.clone()
+      bG.translate(px, 0.32, pz)
+      baseGeoms.push(bG)
+
       // Post column
-      const pCol = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.38, 0.18), whiteMarble)
-      pCol.position.y = 0.58
-      // Lotus finial (蓮花苞柱頭)
-      const finialBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 0.08, 8), this.c.mat(PAL.gold, 0.5, 0.3))
-      finialBase.position.y = 0.81
-      const finial = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), whiteMarble)
-      finial.scale.set(0.9, 1.3, 0.9)
-      finial.position.y = 0.92
-      post.add(pBase, pCol, finialBase, finial)
-      g.add(post)
+      const colG = boxColGeo.clone()
+      colG.translate(px, 0.58, pz)
+      marbleGeoms.push(colG)
+
+      // Lotus finial base
+      const fbG = finialBaseGeo.clone()
+      fbG.translate(px, 0.81, pz)
+      goldGeoms.push(fbG)
+
+      // Lotus finial sphere
+      const fG = sphereFinialGeo.clone()
+      fG.scale(0.9, 1.3, 0.9)
+      fG.translate(px, 0.92, pz)
+      marbleGeoms.push(fG)
     }
+    boxBaseGeo.dispose()
+    boxColGeo.dispose()
+    finialBaseGeo.dispose()
+    sphereFinialGeo.dispose()
 
     // Balustrade panels (中間雕石欄板)
     for (let i = 0; i < postCount; i += 1) {
@@ -1248,11 +1322,27 @@ export class FrontCourtyard {
       const mz = (p1z + p2z) / 2
       const segLen = Math.hypot(p2x - p1x, p2z - p1z)
       const segAngle = Math.atan2(p2z - p1z, p2x - p1x)
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.28, 0.1), this.c.mat('#cfc6b5', 0.8))
-      panel.position.set(mx, 0.44, mz)
-      panel.rotation.y = -segAngle
-      g.add(panel)
+      const pG = new THREE.BoxGeometry(segLen, 0.28, 0.1)
+      pG.rotateY(-segAngle)
+      pG.translate(mx, 0.44, mz)
+      panelGeoms.push(pG)
     }
+
+    const mergedBase = BufferGeometryUtils.mergeGeometries(baseGeoms, false)
+    for (const bg of baseGeoms) bg.dispose()
+    g.add(new THREE.Mesh(mergedBase, stoneWall))
+
+    const mergedMarble = BufferGeometryUtils.mergeGeometries(marbleGeoms, false)
+    for (const mg of marbleGeoms) mg.dispose()
+    g.add(new THREE.Mesh(mergedMarble, whiteMarble))
+
+    const mergedGold = BufferGeometryUtils.mergeGeometries(goldGeoms, false)
+    for (const gg of goldGeoms) gg.dispose()
+    g.add(new THREE.Mesh(mergedGold, this.c.mat(PAL.gold, 0.5, 0.3)))
+
+    const mergedPanels = BufferGeometryUtils.mergeGeometries(panelGeoms, false)
+    for (const pg of panelGeoms) pg.dispose()
+    g.add(new THREE.Mesh(mergedPanels, this.c.mat('#cfc6b5', 0.8)))
 
     // 3. Taihu Scholar Stones (太湖石假山景觀) & Waterside Lantern
     const rockMat = this.c.mat('#6e655a', 0.92)
@@ -1344,6 +1434,10 @@ export class FrontCourtyard {
     // Seeded pseudo-random using golden ratio distribution
     const padPositions: { x: number; z: number; y: number; r: number; elevated: boolean }[] = []
 
+    const padGeomsByColor = new Map<string, THREE.BufferGeometry[]>()
+    for (const c of padColors) padGeomsByColor.set(c, [])
+    const stemGeoms: THREE.BufferGeometry[] = []
+
     for (let i = 0; i < padCount; i += 1) {
       const phi = i * 2.39996 + 0.5
       const radFrac = Math.sqrt((i + 0.8) / padCount) * 0.92
@@ -1363,26 +1457,32 @@ export class FrontCourtyard {
 
       padPositions.push({ x: px, z: pz, y: py, r: padR, elevated: isElevated })
 
-      // Pad mesh
+      // Pad geom
       const padGeom = new THREE.CircleGeometry(padR, 14, 0.25, Math.PI * 2 - 0.25)
-      const padMesh = new THREE.Mesh(padGeom, this.c.mat(color, 0.7))
-      padMesh.rotation.x = -Math.PI / 2
-      padMesh.rotation.z = phi
+      padGeom.rotateX(-Math.PI / 2)
+      padGeom.rotateY(phi)
       if (isElevated) {
-        padMesh.rotation.x += ((i % 5) - 2) * 0.06
-        padMesh.rotation.y += ((i % 3) - 1) * 0.05
+        padGeom.rotateX(((i % 5) - 2) * 0.06)
+        padGeom.rotateY(((i % 3) - 1) * 0.05)
       }
-      padMesh.position.set(px, py, pz)
-      this.c.scene.add(padMesh)
+      padGeom.translate(px, py, pz)
+      padGeomsByColor.get(color)!.push(padGeom)
 
       // Slender stem down to water if elevated
       if (isElevated) {
-        const stem = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.016, 0.018, stemH + 0.08, 6),
-          this.c.mat('#3b5e32', 0.8)
-        )
-        stem.position.set(px, 0.25 + stemH / 2, pz)
-        this.c.scene.add(stem)
+        const stemG = new THREE.CylinderGeometry(0.016, 0.018, stemH + 0.08, 6)
+        stemG.translate(px, 0.25 + stemH / 2, pz)
+        stemGeoms.push(stemG)
+      }
+    }
+
+    // Merge and add pads by color
+    for (const [color, geoms] of padGeomsByColor.entries()) {
+      if (geoms.length > 0) {
+        const merged = BufferGeometryUtils.mergeGeometries(geoms, false)
+        for (const g of geoms) g.dispose()
+        const m = new THREE.Mesh(merged, this.c.mat(color, 0.7))
+        this.c.scene.add(m)
       }
     }
 
@@ -1437,12 +1537,9 @@ export class FrontCourtyard {
       const fy = 0.29 + stemH
 
       // Slender stem
-      const stem = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.015, 0.018, stemH + 0.08, 6),
-        this.c.mat('#446b38', 0.8)
-      )
-      stem.position.set(fx, 0.26 + stemH / 2, fz)
-      this.c.scene.add(stem)
+      const stemG = new THREE.CylinderGeometry(0.015, 0.018, stemH + 0.08, 6)
+      stemG.translate(fx, 0.26 + stemH / 2, fz)
+      stemGeoms.push(stemG)
 
       if (ft.type === 'bud') {
         this.c.scene.add(this.lotusBud(fx, fy, fz, ft.size, ft.color))
@@ -1451,6 +1548,13 @@ export class FrontCourtyard {
       } else {
         this.c.scene.add(this.lotusFlower(fx, fy, fz, ft.size, ft.color))
       }
+    }
+
+    if (stemGeoms.length > 0) {
+      const mergedStems = BufferGeometryUtils.mergeGeometries(stemGeoms, false)
+      for (const sg of stemGeoms) sg.dispose()
+      const stemMesh = new THREE.Mesh(mergedStems, this.c.mat('#446b38', 0.8))
+      this.c.scene.add(stemMesh)
     }
   }
 
@@ -1521,7 +1625,7 @@ export class FrontCourtyard {
     fireLight.position.set(0, 1.4, 1.2)
     g.add(fireLight)
 
-    this.add(g)
+    this.add(g, true)
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 1.8, 3.0)
   }
 
@@ -1588,17 +1692,23 @@ export class FrontCourtyard {
     puffTop.position.set(0.02, 1.02, 0.02)
     g.add(puff1, puff2, puffTop)
 
-    // 4. 原神仙草靈花（微光落櫻／琉璃仙花花蕊）
+    // 4. 原神仙草靈花（微光落櫻／琉璃仙花花蕊）- Merged into 1 geometry
     const flowerMat = this.c.mat('#ffb8cf', 0.4)
     flowerMat.emissive.set('#ff6994')
     flowerMat.emissiveIntensity = 0.5
+    const flowerGeoms: THREE.BufferGeometry[] = []
+    const baseFlowerGeo = new THREE.DodecahedronGeometry(0.06)
     for (const [fx, fy, fz] of [[-0.22, 0.82, 0.18], [0.22, 0.88, 0.14], [0.05, 1.12, -0.1]]) {
-      const flower = new THREE.Mesh(new THREE.DodecahedronGeometry(0.06), flowerMat)
-      flower.position.set(fx, fy, fz)
-      g.add(flower)
+      const fg = baseFlowerGeo.clone()
+      fg.translate(fx, fy, fz)
+      flowerGeoms.push(fg)
     }
+    baseFlowerGeo.dispose()
+    const mergedFlowers = BufferGeometryUtils.mergeGeometries(flowerGeoms, false)
+    for (const fg of flowerGeoms) fg.dispose()
+    g.add(new THREE.Mesh(mergedFlowers, flowerMat))
 
-    this.add(g)
+    this.add(g, false)
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.5, z), 0.45, 1.0)
   }
 
@@ -1617,46 +1727,43 @@ export class FrontCourtyard {
     const g = new THREE.Group()
     g.position.set(x, 0, z)
 
-    // 1. 基座（六角多階台基）
-    const base1 = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.54, 0.16, 6), darkStone)
-    base1.position.y = 0.08
-    const base2 = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.45, 0.22, 6), stone)
-    base2.position.y = 0.25
-    g.add(base1, base2)
+    // Merge stone parts: base2, shaft1, shaft2, midTray, roof
+    const stoneGeoms: THREE.BufferGeometry[] = []
+    const b2 = new THREE.CylinderGeometry(0.38, 0.45, 0.22, 6); b2.translate(0, 0.25, 0); stoneGeoms.push(b2)
+    const s1 = new THREE.CylinderGeometry(0.16, 0.22, 0.5, 6); s1.translate(0, 0.6, 0); stoneGeoms.push(s1)
+    const s2 = new THREE.CylinderGeometry(0.18, 0.22, 0.35, 6); s2.translate(0, 1.12, 0); stoneGeoms.push(s2)
+    const tray = new THREE.CylinderGeometry(0.48, 0.32, 0.14, 6); tray.translate(0, 1.34, 0); stoneGeoms.push(tray)
+    const roof = new THREE.CylinderGeometry(0.16, 0.62, 0.26, 6); roof.translate(0, 1.92, 0); stoneGeoms.push(roof)
+    const mergedStone = BufferGeometryUtils.mergeGeometries(stoneGeoms, false)
+    for (const bg of stoneGeoms) bg.dispose()
+    g.add(new THREE.Mesh(mergedStone, stone))
 
-    // 2. 束腰蓮華石中柱
-    const shaft1 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 0.5, 6), stone)
-    shaft1.position.y = 0.6
-    const shaftRing = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.14, 6), darkStone)
-    shaftRing.position.y = 0.9
-    const shaft2 = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.35, 6), stone)
-    shaft2.position.y = 1.12
-    g.add(shaft1, shaftRing, shaft2)
+    // Merge darkStone parts: base1, shaftRing, 6 window posts
+    const darkGeoms: THREE.BufferGeometry[] = []
+    const b1 = new THREE.CylinderGeometry(0.48, 0.54, 0.16, 6); b1.translate(0, 0.08, 0); darkGeoms.push(b1)
+    const sRing = new THREE.CylinderGeometry(0.24, 0.18, 0.14, 6); sRing.translate(0, 0.9, 0); darkGeoms.push(sRing)
+    const basePost = new THREE.CylinderGeometry(0.038, 0.038, 0.4, 4)
+    for (let i = 0; i < 6; i++) {
+      const ang = (i * Math.PI) / 3
+      const postG = basePost.clone()
+      postG.translate(Math.cos(ang) * 0.35, 1.6, Math.sin(ang) * 0.35)
+      darkGeoms.push(postG)
+    }
+    basePost.dispose()
+    const mergedDark = BufferGeometryUtils.mergeGeometries(darkGeoms, false)
+    for (const dg of darkGeoms) dg.dispose()
+    g.add(new THREE.Mesh(mergedDark, darkStone))
 
-    // 3. 中台（火袋承托六角盤）
-    const midTray = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.32, 0.14, 6), stone)
-    midTray.position.y = 1.34
-    g.add(midTray)
-
-    // 4. 火袋（六角透光鏤空燈室）
+    // Window core
     const lightMat = this.c.mat('#ffea9f', 0.35)
     lightMat.emissive.set('#ffa338')
     lightMat.emissiveIntensity = 0.85
     this.lanternMats.push(lightMat)
-
     const windowCore = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.38, 6), lightMat)
     windowCore.position.y = 1.6
     g.add(windowCore)
 
-    // 六方石質立柱格窗
-    for (let i = 0; i < 6; i++) {
-      const ang = (i * Math.PI) / 3
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.4, 4), darkStone)
-      post.position.set(Math.cos(ang) * 0.35, 1.6, Math.sin(ang) * 0.35)
-      g.add(post)
-    }
-
-    // 內置金焰靈心
+    // Flame
     const flameMat = this.c.mat('#ffffff', 0.1)
     flameMat.emissive.set('#ff8a00')
     flameMat.emissiveIntensity = 1.6
@@ -1664,19 +1771,17 @@ export class FrontCourtyard {
     flame.position.y = 1.6
     g.add(flame)
 
-    // 5. 飛簷石頂（笠石）與頂石寶珠
-    const roof = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.62, 0.26, 6), stone)
-    roof.position.y = 1.92
+    // Finial
     const finial = new THREE.Mesh(new THREE.DodecahedronGeometry(0.11), goldAcc)
     finial.position.y = 2.13
-    g.add(roof, finial)
+    g.add(finial)
 
-    // 6. 步道照明光暈
+    // PointLight
     const groundLight = new THREE.PointLight('#ffc060', 1.45, 10.5, 1.8)
     groundLight.position.y = 1.6
     g.add(groundLight)
 
-    this.add(g)
+    this.add(g, false)
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.9, z), 0.48, 1.8)
   }
 
@@ -1711,58 +1816,51 @@ export class FrontCourtyard {
     stone1.scale.set(1.2, 0.6, 0.9)
     tree.add(stone1)
 
-    // 2. 遒勁自然多段曲折樹幹（Graceful Curved Anime Trunk）
+    // 2. 遒勁自然多段曲折樹幹（Graceful Curved Anime Trunk）- Merged into 1 geometry
     const barkMat = this.c.mat('#553723', 0.85)
-    // 樹幹段 1（根部上揚微傾）
-    const trunk1 = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.38, 1.3, 8), barkMat)
-    trunk1.position.set(0, 0.68, 0)
-    trunk1.rotation.z = 0.08
-    trunk1.castShadow = true
-    tree.add(trunk1)
+    const trunkGeoms: THREE.BufferGeometry[] = []
 
-    // 樹幹段 2（中段曲度延伸）
-    const trunk2 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 1.2, 8), barkMat)
-    trunk2.position.set(0.08, 1.75, 0.04)
-    trunk2.rotation.z = -0.14
-    trunk2.rotation.x = 0.06
-    trunk2.castShadow = true
-    tree.add(trunk2)
+    const t1 = new THREE.CylinderGeometry(0.26, 0.38, 1.3, 8)
+    t1.rotateZ(0.08)
+    t1.translate(0, 0.68, 0)
+    trunkGeoms.push(t1)
 
-    // 主分枝 A（左側伸展枝）
-    const branchA = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.1, 7), barkMat)
-    branchA.position.set(-0.35, 2.45, 0.12)
-    branchA.rotation.z = 0.65
-    branchA.rotation.x = -0.15
-    branchA.castShadow = true
-    tree.add(branchA)
+    const t2 = new THREE.CylinderGeometry(0.2, 0.26, 1.2, 8)
+    t2.rotateZ(-0.14)
+    t2.rotateX(0.06)
+    t2.translate(0.08, 1.75, 0.04)
+    trunkGeoms.push(t2)
 
-    // 主分枝 B（右側高聳主枝）
-    const branchB = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.17, 1.2, 7), barkMat)
-    branchB.position.set(0.32, 2.55, -0.1)
-    branchB.rotation.z = -0.5
-    branchB.rotation.x = 0.18
-    branchB.castShadow = true
-    tree.add(branchB)
+    const bA = new THREE.CylinderGeometry(0.12, 0.18, 1.1, 7)
+    bA.rotateZ(0.65)
+    bA.rotateX(-0.15)
+    bA.translate(-0.35, 2.45, 0.12)
+    trunkGeoms.push(bA)
+
+    const bB = new THREE.CylinderGeometry(0.11, 0.17, 1.2, 7)
+    bB.rotateZ(-0.5)
+    bB.rotateX(0.18)
+    bB.translate(0.32, 2.55, -0.1)
+    trunkGeoms.push(bB)
+
+    const mergedTrunk = BufferGeometryUtils.mergeGeometries(trunkGeoms, false)
+    for (const tg of trunkGeoms) tg.dispose()
+    const trunkMesh = new THREE.Mesh(mergedTrunk, barkMat)
+    trunkMesh.castShadow = true
+    tree.add(trunkMesh)
 
     // 3. 原神風格雲團簇狀蓬鬆樹冠（Anime Cel-shaded Cloud Foliage Clumps）
-    // 配色方案：
-    // - seed % 3 === 0: 璃月金秋銀杏／秋月神木（Genshin Liyue Golden Ginkgo）
-    // - seed % 3 === 1: 稻妻緋櫻仙木／桃花神木（Genshin Inazuma Sacred Sakura）
-    // - seed % 3 === 2: 璃月翡翠青松／常青仙木（Genshin Liyue Jade Pine）
     const type = seed % 3
     let colDeep: string, colMid: string, colHigh: string, colBright: string
     let emDeep: string, emMid: string, emHigh: string, emBright: string
 
     if (type === 0) {
-      // 璃月金秋銀杏
       colDeep = '#b06500'; colMid = '#e59500'; colHigh = '#f7c844'; colBright = '#ffe680'
       emDeep = '#452200'; emMid = '#552f00'; emHigh = '#663c00'; emBright = '#805500'
     } else if (type === 1) {
-      // 稻妻緋櫻仙木
       colDeep = '#75243e'; colMid = '#ba3d62'; colHigh = '#f27c9e'; colBright = '#fed2df'
       emDeep = '#3d0d1b'; emMid = '#5c192d'; emHigh = '#78263d'; emBright = '#943851'
     } else {
-      // 璃月翡翠仙松
       colDeep = '#18452c'; colMid = '#337b4f'; colHigh = '#5db777'; colBright = '#96e0a9'
       emDeep = '#0a2113'; emMid = '#12331f'; emHigh = '#1a482b'; emBright = '#225d37'
     }
@@ -1783,43 +1881,43 @@ export class FrontCourtyard {
     matBright.emissive.set(emBright)
     matBright.emissiveIntensity = 0.28
 
-    // 定義 7 個雲團蓬鬆簇（立體橢圓球狀、層次錯落）
     const clusters: { pos: [number, number, number]; scale: [number, number, number]; mat: THREE.Material }[] = [
-      // 底部托球（深色打底）
       { pos: [-0.6, 2.5, 0.2], scale: [0.95, 0.65, 0.95], mat: matDeep },
       { pos: [0.55, 2.6, -0.2], scale: [1.0, 0.68, 1.0], mat: matDeep },
-      // 中層大雲團（主要體積）
       { pos: [-0.75, 3.1, 0.15], scale: [1.3, 0.82, 1.25], mat: matMid },
       { pos: [0.7, 3.25, -0.1], scale: [1.35, 0.85, 1.3], mat: matMid },
       { pos: [0.0, 3.2, 0.5], scale: [1.1, 0.75, 1.15], mat: matMid },
-      // 高層主樹冠（明亮光影）
       { pos: [0.08, 3.8, 0.0], scale: [1.45, 0.95, 1.45], mat: matHigh },
-      // 頂峰高光小雲頂（朝天迎光）
       { pos: [0.12, 4.35, -0.05], scale: [1.0, 0.72, 1.0], mat: matBright },
     ]
 
     for (const c of clusters) {
-      // 原神風格多面體柔化球（Dodecahedron with 1 subdivision）
       const geo = new THREE.DodecahedronGeometry(1.0, 1)
       const puff = new THREE.Mesh(geo, c.mat)
       puff.position.set(...c.pos)
       puff.scale.set(...c.scale)
-      puff.castShadow = true
+      puff.castShadow = false
       puff.receiveShadow = true
       tree.add(puff)
     }
 
-    // 4. 飄逸下垂柔美枝梢葉團（Drooping anime foliage accents）
-    for (const [dx, dy, dz] of [[-1.2, 2.6, 0.3], [1.1, 2.7, -0.3], [-0.2, 2.8, 0.9], [0.3, 2.7, -0.9]]) {
-      const drop = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.65, 5), matMid)
-      drop.rotation.x = Math.PI
-      drop.position.set(dx, dy, dz)
-      drop.scale.set(1.0, 1.0, 0.6)
-      tree.add(drop)
-    }
+    // 4. 飄逸下垂柔美枝梢葉團（Drooping anime foliage accents）- Merged
+    const dropGeoms: THREE.BufferGeometry[] = []
+    const baseDrop = new THREE.ConeGeometry(0.26, 0.65, 5)
+    baseDrop.rotateX(Math.PI)
+    baseDrop.scale(1.0, 1.0, 0.6)
 
-    this.add(tree)
-    // 實體樹幹碰撞（半徑 0.45m，絕不阻擋步道）
+    for (const [dx, dy, dz] of [[-1.2, 2.6, 0.3], [1.1, 2.7, -0.3], [-0.2, 2.8, 0.9], [0.3, 2.7, -0.9]]) {
+      const dg = baseDrop.clone()
+      dg.translate(dx, dy, dz)
+      dropGeoms.push(dg)
+    }
+    baseDrop.dispose()
+    const mergedDrops = BufferGeometryUtils.mergeGeometries(dropGeoms, false)
+    for (const dg of dropGeoms) dg.dispose()
+    tree.add(new THREE.Mesh(mergedDrops, matMid))
+
+    this.add(tree, false)
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 0.45, 3.0)
   }
 
@@ -1879,7 +1977,7 @@ export class FrontCourtyard {
     // 歇山式琉璃飛簷頂
     const archRoof = this.c.roof(2.4, 5.5, 4.55, 5.65)
     archRoof.position.set(gateX, 0, gateZ)
-    this.add(archRoof)
+    this.add(archRoof, true)
 
     // 牌匾：朝向前庭面（東面）題刻【昇龍聖境】，朝向小徑面（西面）題刻【紫氣東來】
     const plaqueEast = new THREE.Mesh(
@@ -1979,12 +2077,14 @@ export class FrontCourtyard {
     // (A) 底層漢白玉大圓台基座 (Tier 1)
     const baseTier1 = new THREE.Mesh(new THREE.CylinderGeometry(platR, platR + 0.4, 0.35, 32), marble)
     baseTier1.position.y = 0.175
+    baseTier1.castShadow = true
     baseTier1.receiveShadow = true
     platGroup.add(baseTier1)
 
     // (B) 頂層平整八角廣場地坪 (Tier 2)
     const baseTier2 = new THREE.Mesh(new THREE.CylinderGeometry(platR - 0.4, platR - 0.2, 0.25, 32), this.c.mat('#eee8dc', 0.94))
     baseTier2.position.y = 0.42
+    baseTier2.castShadow = true
     baseTier2.receiveShadow = true
     platGroup.add(baseTier2)
 
@@ -2002,8 +2102,15 @@ export class FrontCourtyard {
     stepsGroup.add(step1, step2, danbi)
     platGroup.add(stepsGroup)
 
-    // (D) 外環漢白玉雕花欄杆與蓮花望柱（圍繞半徑 13.5m，東向留出 4.6m 寬敞迎賓階梯）
+    // (D) 外環漢白玉雕花欄杆與蓮花望柱（圍繞半徑 13.5m，東向留出 4.6m 寬敞迎賓階梯） - Batched with mergeGeometries
     const postCount = 28
+    const marbleRailGeoms: THREE.BufferGeometry[] = []
+    const budGeoms: THREE.BufferGeometry[] = []
+
+    const boxPostGeo = new THREE.BoxGeometry(0.24, 0.75, 0.24)
+    const sphereBudGeo = new THREE.SphereGeometry(0.12, 10, 8)
+    const boxPanelGeo = new THREE.BoxGeometry(2.6, 0.42, 0.1)
+
     for (let i = 0; i < postCount; i++) {
       const a = (i / postCount) * Math.PI * 2
       // 東側 (a ≈ 0) 留出小徑進場大缺口
@@ -2012,18 +2119,37 @@ export class FrontCourtyard {
       const pz = Math.sin(a) * (platR - 0.6)
 
       // 漢白玉方柱
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.75, 0.24), marble)
-      post.position.set(px, 0.85, pz)
+      const pG = boxPostGeo.clone()
+      pG.translate(px, 0.85, pz)
+      marbleRailGeoms.push(pG)
+
       // 蓮花柱頭
-      const lotusBud = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), this.c.mat('#faf6ee', 0.8))
-      lotusBud.position.set(px, 1.28, pz)
+      const bG = sphereBudGeo.clone()
+      bG.translate(px, 1.28, pz)
+      budGeoms.push(bG)
+
       // 雕花尋杖欄板
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.42, 0.1), marble)
-      panel.position.set(px, 0.75, pz)
-      panel.rotation.y = a + Math.PI / 2
-      platGroup.add(post, lotusBud, panel)
+      const panG = boxPanelGeo.clone()
+      panG.rotateY(a + Math.PI / 2)
+      panG.translate(px, 0.75, pz)
+      marbleRailGeoms.push(panG)
+
       // 漢白玉圍欄實體物理防跌落碰撞
       this.c.physics.addStaticBox(new THREE.Vector3(platX + px, 0.545 + 0.45, platZ + pz), new THREE.Vector3(0.24, 0.9, 2.7), rotY(a + Math.PI / 2))
+    }
+    boxPostGeo.dispose()
+    sphereBudGeo.dispose()
+    boxPanelGeo.dispose()
+
+    if (marbleRailGeoms.length > 0) {
+      const mergedMarble = BufferGeometryUtils.mergeGeometries(marbleRailGeoms, false)
+      for (const mg of marbleRailGeoms) mg.dispose()
+      platGroup.add(new THREE.Mesh(mergedMarble, marble))
+    }
+    if (budGeoms.length > 0) {
+      const mergedBud = BufferGeometryUtils.mergeGeometries(budGeoms, false)
+      for (const bg of budGeoms) bg.dispose()
+      platGroup.add(new THREE.Mesh(mergedBud, this.c.mat('#faf6ee', 0.8)))
     }
 
     // (E) 原神璃月四方通天金頂石燈樓（分佈於昇龍觀音大平台四隅，晝夜長明神光）
