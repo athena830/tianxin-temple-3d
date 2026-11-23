@@ -144,9 +144,26 @@ export const NINE_GRID_META: { num: number; row: number; col: number; label: str
  * @param dateStr "YYYY-MM-DD" 或 "YYYYMMDD"
  */
 export function calculateNumerology(dateStr: string): NumerologyResult {
+  if (typeof dateStr !== 'string' || dateStr.length > 32) {
+    throw new Error('請輸入正確的西元出生年月日（格式 YYYY-MM-DD，共 8 碼數字）')
+  }
   const clean = dateStr.replace(/\D/g, '')
   if (clean.length !== 8) {
     throw new Error('請輸入正確的西元出生年月日（格式 YYYY-MM-DD，共 8 碼數字）')
+  }
+  const year = Number(clean.slice(0, 4))
+  const month = Number(clean.slice(4, 6))
+  const day = Number(clean.slice(6, 8))
+  const probe = new Date(Date.UTC(year, month - 1, day))
+  if (
+    year < 1800 || year > 2200 ||
+    month < 1 || month > 12 ||
+    day < 1 || day > 31 ||
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day
+  ) {
+    throw new Error('請輸入有效的西元出生日期（例如 1996-08-22）')
   }
 
   const birthDigits = clean.split('').map(Number)

@@ -916,14 +916,16 @@ export class TempleUi {
 
   private loadServiceDeskMemo(): string {
     try {
-      return localStorage.getItem('tianxin.service-desk.memo.v1') || ''
+      const raw = localStorage.getItem('tianxin.service-desk.memo.v1')
+      return typeof raw === 'string' ? raw.slice(0, 600) : ''
     } catch { return '' }
   }
 
   private saveServiceDeskMemo(text: string): void {
+    const safeMemo = typeof text === 'string' ? text.trim().slice(0, 600) : ''
     try {
-      localStorage.setItem('tianxin.service-desk.memo.v1', text)
-      this.serviceDeskMemo = text
+      localStorage.setItem('tianxin.service-desk.memo.v1', safeMemo)
+      this.serviceDeskMemo = safeMemo
       this.toast('旅人提問備忘已儲存在此裝置。')
     } catch { /* storage disabled */ }
   }
@@ -1085,7 +1087,7 @@ export class TempleUi {
         <div class="num-form-row">
           <label class="num-form-label">
             <span>西元出生年月日 (YYYY-MM-DD)</span>
-            <input type="date" class="num-date-input" name="birthdate" value="${dateVal}" required />
+            <input type="date" class="num-date-input" name="birthdate" value="${esc(dateVal)}" required />
           </label>
           <button type="submit" class="btn primary num-submit-btn">開始測算</button>
           <button type="button" class="btn" data-act="num-prefill" data-date="1996-08-22">範例 (1996-08-22)</button>
@@ -1164,10 +1166,11 @@ export class TempleUi {
       return
     }
     try {
-      this.numerologyDate = val
-      this.numerologyResult = calculateNumerology(val)
+      const result = calculateNumerology(val)
+      this.numerologyDate = result.birthDate
+      this.numerologyResult = result
       this.numerologyError = ''
-      this.toast(`已完成 ${val} 生命靈數排盤！`)
+      this.toast(`已完成 ${result.birthDate} 生命靈數排盤！`)
     } catch (err: any) {
       this.numerologyError = err?.message || '計算失敗，請確認日期格式'
     }
@@ -1707,11 +1710,12 @@ export class TempleUi {
     }
     else if (act === 'num-prefill') {
       const d = t.dataset.date || '1996-08-22'
-      this.numerologyDate = d
       try {
-        this.numerologyResult = calculateNumerology(d)
+        const result = calculateNumerology(d)
+        this.numerologyDate = result.birthDate
+        this.numerologyResult = result
         this.numerologyError = ''
-        this.toast(`已帶入範例日期 ${d}`)
+        this.toast(`已帶入範例日期 ${result.birthDate}`)
       } catch {}
       this.renderNumerologyExperience()
     }

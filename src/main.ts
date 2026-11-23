@@ -506,5 +506,10 @@ function safeGet(key: string): string | null {
 boot().catch(err => {
   console.error(err)
   const el = document.getElementById('ui')
-  if (el) el.innerHTML = `<div class="fatal">無法啟動：${String((err as Error)?.message ?? err).replace(/[<>&]/g, '')}</div>`
+  if (el) {
+    const box = document.createElement('div')
+    box.className = 'fatal'
+    box.textContent = `無法啟動：${String((err as Error)?.message ?? err)}`
+    el.replaceChildren(box)
+  }
 })

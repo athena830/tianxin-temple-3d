@@ -77,21 +77,31 @@ export async function fetchTaichungWeather(): Promise<TaichungWeatherInfo> {
       { signal: AbortSignal.timeout(4500) },
     )
     if (!res.ok) throw new Error('status ' + res.status)
-    const json = await res.json()
-    const cur = json.current
-    const rain = cur.rain ?? cur.precipitation ?? 0
-    const code = cur.weather_code ?? 0
+    const json: unknown = await res.json()
+    if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('invalid payload')
+    const cur = (json as Record<string, unknown>).current
+    if (!cur || typeof cur !== 'object' || Array.isArray(cur)) throw new Error('missing current weather')
+    const data = cur as Record<string, unknown>
+    const rawRain = typeof data.rain === 'number' && Number.isFinite(data.rain)
+      ? data.rain
+      : typeof data.precipitation === 'number' && Number.isFinite(data.precipitation)
+        ? data.precipitation
+        : 0
+    const rain = Math.max(0, Math.min(500, rawRain))
+    const code = typeof data.weather_code === 'number' && Number.isFinite(data.weather_code) ? data.weather_code : 0
+    const cloudCover = typeof data.cloud_cover === 'number' && Number.isFinite(data.cloud_cover) ? data.cloud_cover : 0
+    const temp = typeof data.temperature_2m === 'number' && Number.isFinite(data.temperature_2m) ? data.temperature_2m : 20
     // WMO 天氣代碼：51~67, 80~82 為降雨；95~99 為雷陣雨
     const isRainy = rain > 0.05 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95
-    const isCloudy = !isRainy && ((cur.cloud_cover ?? 0) > 40 || code === 2 || code === 3)
-    const isDay = cur.is_day === 1
+    const isCloudy = !isRainy && (cloudCover > 40 || code === 2 || code === 3)
+    const isDay = data.is_day === 1
     const cond: WeatherCondition = isRainy ? 'rainy' : isCloudy ? 'cloudy' : 'clear'
     const desc = isRainy ? '雨天' : isCloudy ? '多雲' : isDay ? '晴天' : '晴夜'
     return {
       condition: cond,
       description: desc,
       isDay,
-      temperature: Math.round(cur.temperature_2m ?? 20),
+      temperature: Math.round(Math.max(-50, Math.min(60, temp))),
       rainMm: +rain.toFixed(1),
     }
   } catch {
