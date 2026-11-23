@@ -2287,18 +2287,14 @@ export class TempleWorld {
       group.add(tail)
     }
 
-    // 四角飛簷燕尾翹角與鎏金仙人走獸圓珠
-    const cornerTipGeo = new THREE.ConeGeometry(0.24, 0.88, 8)
-    const cornerOrbGeo = new THREE.SphereGeometry(0.14, 10, 8)
+    // 四角飛簷起翹與收口瓦當（平滑貼合簷角，消除懸空金錐與孤立圓珠，保留東方建築飛簷輪廓）
+    const cornerCapGeo = new THREE.BoxGeometry(0.38, 0.16, 0.38)
     for (const x of [-half, half]) for (const z of [-depth / 2, depth / 2]) {
-      const tip = new THREE.Mesh(cornerTipGeo, tileMat)
-      tip.position.set(x * 1.05, eaveY + 0.44, z * 1.05)
-      tip.rotation.z = x < 0 ? 0.78 : -0.78
-      tip.rotation.x = z < 0 ? -0.28 : 0.28
-      group.add(tip)
-      const ornament = new THREE.Mesh(cornerOrbGeo, ridgeGoldMat)
-      ornament.position.set(x * 1.07, eaveY + 0.88, z * 1.07)
-      group.add(ornament)
+      const cap = new THREE.Mesh(cornerCapGeo, tileMat)
+      cap.position.set(x * 0.98, eaveY + 0.14, z * 0.98)
+      cap.rotation.z = x < 0 ? 0.35 : -0.35
+      cap.rotation.x = z < 0 ? -0.22 : 0.22
+      group.add(cap)
     }
     return group
   }

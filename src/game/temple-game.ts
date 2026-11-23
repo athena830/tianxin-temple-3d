@@ -138,6 +138,8 @@ export class TempleGame {
   private pendingStationId: ShrinePointId | null = null
   private readonly clickMarker: THREE.Mesh
   onNear: (point: ShrinePoint | null) => void = () => undefined
+  /** 開發驗證用：前庭大殿構圖專屬 Hero Camera 模式（預設關閉，不更動正式相機預設邏輯） */
+  heroCameraMode = false
   onGuide: (point: ShrinePoint | null, distance: number) => void = () => undefined
   onClickResult: (result: ClickResult) => void = () => undefined
 
@@ -274,6 +276,17 @@ export class TempleGame {
 
   get worshipping(): boolean { return this.ritualLeft > 0 }
   get inTemple(): boolean { return this.mode === 'browse' || this.mode === 'explore' || this.mode === 'panel' }
+
+  setHeroCamera(enabled: boolean): void {
+    this.heroCameraMode = enabled
+    this.camReady = false
+  }
+
+  toggleHeroCamera(): boolean {
+    this.heroCameraMode = !this.heroCameraMode
+    this.camReady = false
+    return this.heroCameraMode
+  }
 
   setQuality(quality: Quality): void {
     this.renderer.applyQuality(quality)
@@ -636,7 +649,8 @@ export class TempleGame {
       this.world.placeAvatar(feet, this.heading)
       const bow = this.ritualLeft > 0 ? 1 - this.ritualLeft / this.ritualLength : 0
       this.world.animateAvatar(dt, this.time, this.speedNow, this.reducedMotion, bow)
-      const target = new THREE.Vector3(feet.x, feet.y + LOOK_HEIGHT, feet.z)
+      const lookHeight = this.heroCameraMode ? LOOK_HEIGHT + 1.35 : LOOK_HEIGHT
+      const target = new THREE.Vector3(feet.x, feet.y + lookHeight, feet.z)
       if (!this.camReady) { this.camTarget.copy(target); this.camDistance = this.zoom; this.camReady = true }
       else this.camTarget.lerp(target, 1 - Math.exp(-14 * dt))
       const dir = new THREE.Vector3(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch))
