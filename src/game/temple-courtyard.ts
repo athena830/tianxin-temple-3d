@@ -827,27 +827,7 @@ export class FrontCourtyard {
       censerGroup.add(stick, tip)
     }
 
-    const smokeCurve = new THREE.Mesh(
-      new THREE.TubeGeometry(
-        new THREE.CatmullRomCurve3([
-          new THREE.Vector3(0, 0.28, 0),
-          new THREE.Vector3(0.015, 0.42, 0.01),
-          new THREE.Vector3(-0.02, 0.58, -0.015),
-          new THREE.Vector3(0.03, 0.74, 0.02),
-        ]),
-        12,
-        0.008,
-        6,
-        false
-      ),
-      new THREE.MeshStandardMaterial({
-        color: '#e4dacf',
-        transparent: true,
-        opacity: 0.35,
-        roughness: 0.9,
-      })
-    )
-    censerGroup.add(censerBody, censerRim, smokeCurve)
+    censerGroup.add(censerBody, censerRim)
     this.add(censerGroup)
 
     // 供桌陳設 2: 紅木籤筒與籤詩 (Fortune Stick Cylinder)
