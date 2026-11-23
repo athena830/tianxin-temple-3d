@@ -6,6 +6,7 @@ import type { LampId, OfferingId } from './temple-data'
 import { FrontCourtyard, GOLD_FURNACE, LOTUS_POND, PAVILION, STAND } from './temple-courtyard'
 import { NpcManager } from './npc-system'
 import { TemplePbrLibrary, createTempleIblTexture } from './temple-pbr-materials'
+import { TempleRoof3D } from './temple-roof-3d'
 
 export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
 
@@ -499,6 +500,7 @@ export class TempleWorld {
   private lunarPhaseInfo: LunarPhaseInfo = getLunarPhaseInfo()
   private lunarCheckTimer = 0
   readonly pbr = new TemplePbrLibrary()
+  private mainHallRoof3D?: TempleRoof3D
   private iblTexture: THREE.Texture | null = null
   private targetEnvIntensity = 0.68
   private readonly shadowHalfExtent = 34
@@ -1097,14 +1099,20 @@ export class TempleWorld {
     signText.position.set(0, 5.05, 0.065)
     hall.add(signText)
 
-    // Grand Hall Roof (大殿重檐歇山式大屋頂)
-    const roof = this.createRoof(20.6, 16.2, 5.35, 8.2)
-    roof.position.set(0, 0, -0.3)
-    this.roof.add(roof)
+    // Grand Hall Roof (大殿 3D 半寫實電影級重檐歇山式大屋頂樣板 - Phase 2)
+    const roof3D = new TempleRoof3D({
+      width: 20.6,
+      depth: 16.2,
+      eaveY: 5.35,
+      peakY: 8.2,
+      pbr: this.pbr,
+    })
+    roof3D.root.position.set(0, 0, -0.3)
+    this.roof.add(roof3D.root)
+    this.mainHallRoof3D = roof3D
     this.roof.position.set(0, 0, this.mainHallZ)
     this.roof.scale.set(this.mainHallScale, this.mainHallScale, this.mainHallScale)
     this.scene.add(this.roof)
-    this.addRoofFinial(hall, 0, 8.32)
 
     // Grand Genshin Liyue Octagonal Palace Lanterns (大殿前階璃月御製八角挑簷長明宮燈)
     // No lantern on the central axis so the statue stays fully visible from the courtyard.
@@ -2293,15 +2301,6 @@ export class TempleWorld {
       group.add(ornament)
     }
     return group
-  }
-
-  private addRoofFinial(parent: THREE.Object3D, x: number, y: number): void {
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 7), makeMat(C.gold, 0.4, 0.2))
-    ball.position.set(x, y, -0.3)
-    parent.add(ball)
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.55, 8), makeMat(C.gold, 0.4, 0.2))
-    tip.position.set(x, y + 0.34, -0.3)
-    parent.add(tip)
   }
 
   private textMaterial(text: string, foreground: string, background: string): THREE.MeshBasicMaterial {
@@ -4332,6 +4331,7 @@ export class TempleWorld {
   /** 依畫質檔位（low / medium / high）調整 PBR 貼圖細節與陰影解析度 */
   applyQuality(quality: Quality): void {
     this.pbr.applyQuality(quality)
+    this.mainHallRoof3D?.applyQuality(quality)
     const mapSize = quality === 'low' ? 512 : quality === 'medium' ? 1024 : 2048
     if (this.shadowMapResolution !== mapSize) {
       this.shadowMapResolution = mapSize
