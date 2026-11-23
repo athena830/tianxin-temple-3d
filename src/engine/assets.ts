@@ -1,16 +1,12 @@
 import * as THREE from 'three'
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 /**
  * Cached asset loading with one progress stream for the boot screen.
  *
- * The starter builds its world procedurally, so nothing is required here at boot. When adding
- * models or textures, put the files in `public/assets/` and preload them in `main.ts` with
- * `assets.gltf('assets/hero.glb')` before `game.start()` so the loading bar covers them.
+ * The world builds its geometry procedurally and loads textures on demand through `texture()`.
  */
 export class Assets {
   private readonly manager = new THREE.LoadingManager()
-  private readonly gltfLoader = new GLTFLoader(this.manager)
   private readonly textureLoader = new THREE.TextureLoader(this.manager)
   private readonly cache = new Map<string, Promise<unknown>>()
   private listeners = new Set<(progress: number) => void>()
@@ -25,10 +21,6 @@ export class Assets {
   onProgress(fn: (progress: number) => void): () => void {
     this.listeners.add(fn)
     return () => this.listeners.delete(fn)
-  }
-
-  gltf(url: string): Promise<GLTF> {
-    return this.memo(url, () => this.gltfLoader.loadAsync(url))
   }
 
   /** Color textures are tagged sRGB; pass `color: false` for normal/roughness maps. */

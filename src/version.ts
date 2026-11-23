@@ -1,2 +1,2 @@
-/** VER 3.73.5 — 安全性技術健檢與漏洞修補：修補生命靈數 DOM XSS、移除致命錯誤 innerHTML、強化本機儲存與氣象 API 驗證、新增 CSP／Referrer-Policy 安全標頭、修正 deploy.yml 保留 404.html 重導頁，並新增安全回歸測試。 */
-export const APP_VERSION = 'VER 3.73.5'
+/** VER 3.74.0 (v3-stage2：第二階段上線版) — 最佳化 iztro 打包體積（移除未使用外語語系與冗餘曆法依賴），使 JS gzip 壓縮體積自 2.03 MB 降至 1.91 MB 順利通過平台 2.00 MB 正式建置上限，並完成第二階段上線版發布。 */
+export const APP_VERSION = 'VER 3.74.0'
