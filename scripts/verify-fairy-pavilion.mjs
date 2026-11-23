@@ -195,11 +195,11 @@ async function run() {
       },
     },
     {
-      id: 'fairy_pavilion_side',
-      name: '3. Side View (側面視角)',
+      id: 'fairy_pavilion_rear',
+      name: '3. Rear View (亭後背面視角)',
       cam: {
-        pos: [-11.6, 2.6, 38.2],
-        target: [-11.8, 2.7, 30.0],
+        pos: [-20.4, 2.7, 30.0],
+        target: [-12.0, 2.7, 30.0],
       },
     },
     {

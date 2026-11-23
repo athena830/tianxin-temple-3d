@@ -606,18 +606,22 @@ export class FrontCourtyard {
       this.add(arm)
     }
 
-    // 5. 單層深綠琉璃攢尖亭頂 (Single-Tier Deep Emerald Glazed Roof)
+    // 5. 單層深綠琉璃攢尖亭頂 (Clean Single-Tier Deep Emerald Glazed Roof)
     const eaveY = beamY + 0.28
     const apexY = eaveY + 1.45
     const roofW = podW + 0.9
 
-    // 厚實簷口與金箔瓦當邊框 (Eave Fascia with Wadang)
-    const eaveFascia = new THREE.Mesh(new THREE.BoxGeometry(roofW, 0.16, roofW), darkGlaze)
+    // 厚實深色簷口 (Eave Fascia with Gold Wadang Trim)
+    const eaveFascia = new THREE.Mesh(new THREE.BoxGeometry(roofW, 0.14, roofW), darkGlaze)
     eaveFascia.position.set(cx, eaveY, cz)
     eaveFascia.castShadow = true
     this.add(eaveFascia)
 
-    // 四角攢尖深綠琉璃屋頂主體 (Emerald Pyramidal Roof)
+    const eaveGoldTrim = new THREE.Mesh(new THREE.BoxGeometry(roofW + 0.04, 0.03, roofW + 0.04), gold)
+    eaveGoldTrim.position.set(cx, eaveY - 0.055, cz)
+    this.add(eaveGoldTrim)
+
+    // 四角攢尖深綠琉璃屋頂主體 (Pure Emerald Pyramidal Glazed Roof - No black bars, no antennas)
     const roofGeo = new THREE.ConeGeometry((roofW * Math.SQRT2) / 2, 1.45, 4)
     const roofMesh = new THREE.Mesh(roofGeo, emeraldGlaze)
     roofMesh.position.set(cx, eaveY + 0.725, cz)
@@ -626,45 +630,29 @@ export class FrontCourtyard {
     roofMesh.receiveShadow = true
     this.add(roofMesh)
 
-    // 實體 3D 琉璃筒瓦隴 (Fluted Glazed Tile Ridges on 4 slopes)
-    const tileCount = 5
-    for (let s = 0; s < 4; s += 1) {
-      const rot = s * (Math.PI / 2)
-      for (let i = -tileCount; i <= tileCount; i += 1) {
-        if (Math.abs(i) === 0 && s === 0) continue
-        const offset = (i / (tileCount + 1)) * (roofW * 0.38)
-        const tile = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 2.1, 8), emeraldGlaze)
-        tile.rotation.set(-0.52, 0, 0)
-        tile.position.set(offset, 0.72, 1.1)
-
-        const group = new THREE.Group()
-        group.position.set(cx, eaveY, cz)
-        group.rotation.y = rot
-        group.add(tile)
-        this.add(group)
-      }
-    }
-
-    // 四角戧脊與飛簷微翹 (Corner Hip Ridges with Upturned Tips)
+    // 低矮平順四角戧脊與微翹翼角 (Low-profile Corner Hip Ridges & Subtle Upturned Eave Corners)
     for (let s = 0; s < 4; s += 1) {
       const rot = (s * Math.PI) / 2 + Math.PI / 4
       const hip = new THREE.Group()
       hip.position.set(cx, eaveY, cz)
       hip.rotation.y = rot
 
-      const ridgeBeam = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, roofW * 0.65), darkGlaze)
-      ridgeBeam.position.set(0, 0.72, 0)
+      // 平貼於屋脊縫線上的低矮屋脊 (Low-profile ridge line matching roof slope)
+      const ridgeBeam = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.07, roofW * 0.58), darkGlaze)
+      ridgeBeam.position.set(0, 0.68, 0)
       ridgeBeam.rotation.x = -0.42
       hip.add(ridgeBeam)
 
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.48, 6), darkGlaze)
-      tip.position.set(0, 0.16, roofW * 0.58)
-      tip.rotation.x = 0.65
-      hip.add(tip)
+      // 角端平滑微翹 (Subtle elegant upturned corner tip)
+      const tipCurv = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), darkGlaze)
+      tipCurv.scale.set(1.0, 0.75, 1.8)
+      tipCurv.position.set(0, 0.10, roofW * 0.55)
+      tipCurv.rotation.x = 0.35
+      hip.add(tipCurv)
 
-      const goldCap = new THREE.Mesh(new THREE.SphereGeometry(0.10, 8, 6), gold)
-      goldCap.position.set(0, 0.28, roofW * 0.60)
-      hip.add(goldCap)
+      const goldBead = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 6), gold)
+      goldBead.position.set(0, 0.16, roofW * 0.57)
+      hip.add(goldBead)
 
       this.add(hip)
     }
@@ -730,27 +718,56 @@ export class FrontCourtyard {
       this.c.physics.addStaticBox(new THREE.Vector3(cx - span, railY, cz + dz), new THREE.Vector3(0.25, railH, 0.95))
     }
 
-    // 莊嚴木雕如意雲紋背屏 (Carved Altar Back Screen behind Fairy)
+    // 莊嚴深紅褐色木雕神龕背屏 (Deep Reddish-Brown Wood-Carved Altar Screen)
+    const screenFrameMat = this.c.mat('#4e2017', 0.65) // 深紅褐色實木外框
+    const screenPanelMat = this.c.mat('#6b291d', 0.60) // 沉穩紅木雕花底板
+    const goldReliefMat = this.c.mat(PAL.gold, 0.45, 0.25) // 低密度暗金色如意浮雕
+
     const screenGroup = new THREE.Group()
     screenGroup.position.set(cx - 1.25, podH, cz)
 
-    const screenFrame = new THREE.Mesh(new THREE.BoxGeometry(0.10, 2.30, 2.35), darkMahogany)
+    // 深紅褐色木雕外框
+    const screenFrame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.30, 2.40), screenFrameMat)
     screenFrame.position.y = 1.15
+    screenGroup.add(screenFrame)
 
-    const screenInner = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.05, 2.10), red)
+    // 內嵌深紅褐木雕壁板
+    const screenInner = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.10, 2.20), screenPanelMat)
     screenInner.position.y = 1.15
+    screenGroup.add(screenInner)
 
-    const screenGoldBorder = new THREE.Mesh(new THREE.BoxGeometry(0.07, 2.07, 2.12), gold)
+    // 金色如意雲紋邊框浮雕
+    const screenGoldBorder = new THREE.Mesh(new THREE.BoxGeometry(0.088, 1.95, 2.05), goldReliefMat)
     screenGoldBorder.position.y = 1.15
-    screenGoldBorder.scale.set(1.02, 0.96, 0.96)
+    screenGroup.add(screenGoldBorder)
 
-    const screenCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.6, 12), gold)
+    const screenInnerField = new THREE.Mesh(new THREE.BoxGeometry(0.092, 1.85, 1.95), screenPanelMat)
+    screenInnerField.position.y = 1.15
+    screenGroup.add(screenInnerField)
+
+    // 頂部木雕如意卷草頂冠 (Carved Ruyi Crest at Top)
+    const screenCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 1.8, 12), screenFrameMat)
     screenCrown.rotation.x = Math.PI / 2
-    screenCrown.position.set(0, 2.32, 0)
+    screenCrown.position.set(0, 2.30, 0)
+    screenGroup.add(screenCrown)
 
-    screenGroup.add(screenFrame, screenInner, screenGoldBorder, screenCrown)
+    // 四角低密度如意雲紋飾徽 (Four Corner Ruyi Cloud Badges)
+    for (const dy of [-0.68, 0.68]) {
+      for (const dz of [-0.78, 0.78]) {
+        const badge = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.02, 12), goldReliefMat)
+        badge.rotation.z = Math.PI / 2
+        badge.position.set(0.05, 1.15 + dy, dz)
+        screenGroup.add(badge)
+      }
+    }
+
     this.add(screenGroup)
     this.c.physics.addStaticBox(new THREE.Vector3(cx - 1.25, podH + 1.15, cz), new THREE.Vector3(0.3, 2.3, 2.4))
+
+    // 神龕背屏專屬溫潤洗牆光 (Warm Niche Wash Light - never pitch black)
+    const screenWashLight = new THREE.PointLight('#ffcf9e', 0.95, 4.0, 1.8)
+    screenWashLight.position.set(cx - 0.95, podH + 1.65, cz)
+    this.c.scene.add(screenWashLight)
 
     // 7. 神壇核心：仙姑須彌神案與低矮供桌 (Altar Throne & Low Offering Table)
     const throneX = cx - 0.72
@@ -830,29 +847,10 @@ export class FrontCourtyard {
     censerGroup.add(censerBody, censerRim)
     this.add(censerGroup)
 
-    // 供桌陳設 2: 紅木籤筒與籤詩 (Fortune Stick Cylinder)
-    const sticksGroup = new THREE.Group()
-    sticksGroup.position.set(tableX + 0.12, burnerY, cz + 0.45)
-    const stickCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.20, 12), this.c.mat('#7a2618', 0.7))
-    stickCyl.position.y = 0.10
-    const stickRim = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.008, 6, 12), gold)
-    stickRim.rotation.x = Math.PI / 2
-    stickRim.position.y = 0.20
-    sticksGroup.add(stickCyl, stickRim)
-
-    for (let s = 0; s < 10; s += 1) {
-      const sa = (s / 10) * Math.PI * 2
-      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.26, 4), this.c.mat('#dfc495', 0.6))
-      st.position.set(Math.cos(sa) * 0.03, 0.18, Math.sin(sa) * 0.03)
-      st.rotation.set(Math.sin(sa) * 0.12, 0, Math.cos(sa) * 0.12)
-      sticksGroup.add(st)
-    }
-    this.add(sticksGroup)
-
-    // 供桌陳設 3: 一對紅木聖筊 (Pair of Divination Moon Blocks)
+    // 供桌正中央陳設 2: 一對紅木聖筊 (Pair of Divination Moon Blocks - centered right in front of censer)
     const bwaBweiGroup = new THREE.Group()
-    bwaBweiGroup.position.set(tableX + 0.22, burnerY, cz - 0.20)
-    const tray = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.015, 0.26), darkMahogany)
+    bwaBweiGroup.position.set(tableX + 0.22, burnerY, cz)
+    const tray = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.015, 0.24), darkMahogany)
     tray.position.y = 0.008
     bwaBweiGroup.add(tray)
 
@@ -864,10 +862,29 @@ export class FrontCourtyard {
     }
     this.add(bwaBweiGroup)
 
-    // 供桌陳設 4: 成對小型祈福供燈 (Pair of Altar Lamps)
-    for (const dz of [-0.65, 0.65]) {
+    // 供桌陳設 3: 紅木籤筒與籤詩 (Fortune Stick Cylinder on left side)
+    const sticksGroup = new THREE.Group()
+    sticksGroup.position.set(tableX + 0.08, burnerY, cz + 0.38)
+    const stickCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.06, 0.22, 12), this.c.mat('#7a2618', 0.7))
+    stickCyl.position.y = 0.11
+    const stickRim = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.008, 6, 12), gold)
+    stickRim.rotation.x = Math.PI / 2
+    stickRim.position.y = 0.22
+    sticksGroup.add(stickCyl, stickRim)
+
+    for (let s = 0; s < 10; s += 1) {
+      const sa = (s / 10) * Math.PI * 2
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.26, 4), this.c.mat('#dfc495', 0.6))
+      st.position.set(Math.cos(sa) * 0.035, 0.20, Math.sin(sa) * 0.035)
+      st.rotation.set(Math.sin(sa) * 0.12, 0, Math.cos(sa) * 0.12)
+      sticksGroup.add(st)
+    }
+    this.add(sticksGroup)
+
+    // 供桌陳設 4: 成對小型祈福供燈 (Pair of Symmetrical Altar Lamps on corners)
+    for (const dz of [-0.68, 0.68]) {
       const lampGroup = new THREE.Group()
-      lampGroup.position.set(tableX, burnerY, cz + dz)
+      lampGroup.position.set(tableX + 0.02, burnerY, cz + dz)
       const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.08, 10), bronze)
       lampBase.position.y = 0.04
       const lampGlass = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), this.c.mat('#ffd599', 0.3, 0.1))
@@ -879,32 +896,34 @@ export class FrontCourtyard {
       this.add(lampGroup)
 
       const lampLight = new THREE.PointLight('#ffa64d', 0.45, 2.2, 2.0)
-      lampLight.position.set(tableX, burnerY + 0.14, cz + dz)
+      lampLight.position.set(tableX + 0.02, burnerY + 0.14, cz + dz)
       this.c.scene.add(lampLight)
     }
 
-    // 供桌陳設 5: 象棋卦盤 (Xiangqi Chessboard on Offering Table)
+    // 供桌陳設 5: 象棋卦盤 (縮小並嵌入神案右後方，降低視覺優先權，保留 chessboard 名稱與互動)
+    const boardX = tableX - 0.15
+    const boardZ = cz - 0.46
     const board = new THREE.Mesh(
-      new THREE.BoxGeometry(0.68, 0.03, 0.82),
+      new THREE.BoxGeometry(0.32, 0.015, 0.38),
       new THREE.MeshStandardMaterial({ map: this.boardTexture(), roughness: 0.75 })
     )
-    board.position.set(tableX - 0.08, burnerY + 0.015, cz)
+    board.position.set(boardX, burnerY + 0.008, boardZ)
     board.name = 'chessboard'
     this.add(board, false)
 
     const pieces: [number, number, string][] = [
       [0, 0, PAL.red],
-      [-0.18, 0, '#34302a'],
-      [0.18, 0, PAL.red],
-      [0, -0.22, '#34302a'],
-      [0, 0.22, PAL.red],
+      [-0.08, 0, '#34302a'],
+      [0.08, 0, PAL.red],
+      [0, -0.10, '#34302a'],
+      [0, 0.10, PAL.red],
     ]
     for (const [dx, dz, color] of pieces) {
-      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.065, 0.035, 12), this.c.mat('#e8d7b0', 0.6))
-      p.position.set(tableX - 0.08 + dx, burnerY + 0.045, cz + dz)
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.042, 0.008, 4, 12), this.c.mat(color, 0.5))
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.030, 0.016, 12), this.c.mat('#e8d7b0', 0.6))
+      p.position.set(boardX + dx, burnerY + 0.022, boardZ + dz)
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.020, 0.004, 4, 12), this.c.mat(color, 0.5))
       ring.rotation.x = Math.PI / 2
-      ring.position.set(tableX - 0.08 + dx, burnerY + 0.065, cz + dz)
+      ring.position.set(boardX + dx, burnerY + 0.031, boardZ + dz)
       this.add(p, false)
       this.add(ring, false)
     }
@@ -932,54 +951,56 @@ export class FrontCourtyard {
     plaqueGlow.position.set(plaqueX + 0.55, plaqueY - 0.05, cz)
     this.c.scene.add(plaqueGlow)
 
-    // 正面成對懸掛宮燈 (Symmetrical Pair of Hanging Palace Lanterns with Bronze Chains)
+    // 正面成對懸掛宮燈 (縮小至約 48%，改由亭簷短鏈精巧懸掛)
     for (const dz of [-span + 0.35, span - 0.35]) {
       const lx = cx + span + 0.04
       const lz = cz + dz
-      const lTopY = beamY + 0.12
+      const lTopY = beamY + 0.16
 
       const lanternGroup = new THREE.Group()
       lanternGroup.position.set(lx, lTopY, lz)
 
-      const hook = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.008, 6, 12), bronze)
+      const hook = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.005, 6, 10), bronze)
       hook.rotation.y = Math.PI / 2
-      hook.position.y = -0.03
+      hook.position.y = -0.02
       lanternGroup.add(hook)
 
-      for (let c = 0; c < 4; c += 1) {
-        const link = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.006, 4, 8), bronze)
-        link.position.y = -0.07 - c * 0.035
+      for (let c = 0; c < 2; c += 1) {
+        const link = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.004, 4, 8), bronze)
+        link.position.y = -0.04 - c * 0.022
         link.rotation.y = c % 2 === 0 ? 0 : Math.PI / 2
         lanternGroup.add(link)
       }
 
-      const roofCap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.26, 0.09, 8), red)
-      roofCap.position.y = -0.25
+      const chainDrop = 0.08
+
+      const roofCap = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.13, 0.045, 8), red)
+      roofCap.position.y = -chainDrop - 0.022
       lanternGroup.add(roofCap)
 
       const silkMat = this.c.mat('#fff0c4', 0.25)
       silkMat.emissive.set('#ff9e3b')
-      silkMat.emissiveIntensity = 1.1
+      silkMat.emissiveIntensity = 0.85
       this.lanternMats.push(silkMat)
 
-      const silkBody = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.20, 0.36, 8), silkMat)
-      silkBody.position.y = -0.46
+      const silkBody = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.10, 0.18, 8), silkMat)
+      silkBody.position.y = -chainDrop - 0.12
       lanternGroup.add(silkBody)
 
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.015, 6, 16), gold)
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.008, 6, 16), gold)
       rim.rotation.x = Math.PI / 2
-      rim.position.y = -0.28
+      rim.position.y = -chainDrop - 0.035
       lanternGroup.add(rim)
 
-      const botCap = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), red)
+      const botCap = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.11, 6), red)
       botCap.rotation.x = Math.PI
-      botCap.position.y = -0.72
+      botCap.position.y = -chainDrop - 0.25
       lanternGroup.add(botCap)
 
       this.add(lanternGroup)
 
-      const lanternLight = new THREE.PointLight('#ffaa48', 0.85, 4.5, 1.8)
-      lanternLight.position.set(lx, lTopY - 0.46, lz)
+      const lanternLight = new THREE.PointLight('#ffaa48', 0.55, 3.2, 1.8)
+      lanternLight.position.set(lx, lTopY - chainDrop - 0.12, lz)
       this.c.scene.add(lanternLight)
     }
 
