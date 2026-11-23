@@ -1,0 +1,177 @@
+{
+  "stage": "2.2",
+  "blenderVersion": "5.3.0",
+  "blendSourceFile": "D:\\Tianxin-temple\\assets\\source\\dragon-head.blend",
+  "blendStage2BackupFile": "D:\\Tianxin-temple\\assets\\source\\dragon-head-stage2.blend",
+  "blendStage2_1BackupFile": "D:\\Tianxin-temple\\assets\\source\\dragon-head-stage2.1.blend",
+  "blendFileSize": 3172913,
+  "glbFile": "D:\\Tianxin-temple\\public\\assets\\models\\temple-dragon-head-preview.glb",
+  "glbFileSize": 3839760,
+  "reImportSummary": {
+    "meshObjectCount": 12,
+    "totalVertices": 84474,
+    "totalEdges": 221171,
+    "totalTriangles": 137490,
+    "stage2BaselineTriangles": 154968,
+    "stage2_1BaselineTriangles": 118014,
+    "triangleDeltaFromStage2": -17478,
+    "triangleDeltaFromStage2_1": 19476,
+    "uniqueMaterials": [
+      "Jiannian_Emerald_Glaze",
+      "Jiannian_Eye_Obsidian",
+      "Jiannian_Fang_Ivory",
+      "Jiannian_Imperial_Gold",
+      "Jiannian_Oral_Crimson",
+      "Jiannian_Vermilion_Ceramic"
+    ],
+    "overallDimensionsMeters": [
+      1.9645,
+      1.9497,
+      2.4565
+    ],
+    "boundingBoxMin": [
+      -0.9823,
+      -0.8797,
+      -0.7375
+    ],
+    "boundingBoxMax": [
+      0.9823,
+      1.07,
+      1.719
+    ],
+    "meshes": [
+      {
+        "name": "Dragon_Antlers",
+        "vertices": 6520,
+        "edges": 15197,
+        "triangles": 8788,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Imperial_Gold"
+        ]
+      },
+      {
+        "name": "Dragon_Cranium_And_Snout",
+        "vertices": 20939,
+        "edges": 58021,
+        "triangles": 37120,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Vermilion_Ceramic"
+        ]
+      },
+      {
+        "name": "Dragon_Dorsal_Mane_And_Collar_Gold",
+        "vertices": 1513,
+        "edges": 3227,
+        "triangles": 1794,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Imperial_Gold"
+        ]
+      },
+      {
+        "name": "Dragon_Eye_Irises",
+        "vertices": 1096,
+        "edges": 2850,
+        "triangles": 1760,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Imperial_Gold"
+        ]
+      },
+      {
+        "name": "Dragon_Eyeballs",
+        "vertices": 1180,
+        "edges": 3072,
+        "triangles": 1904,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Eye_Obsidian"
+        ]
+      },
+      {
+        "name": "Dragon_Eyelids",
+        "vertices": 12823,
+        "edges": 35503,
+        "triangles": 22704,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Vermilion_Ceramic"
+        ]
+      },
+      {
+        "name": "Dragon_Flame_Mane_Locks",
+        "vertices": 4406,
+        "edges": 10394,
+        "triangles": 6072,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Vermilion_Ceramic"
+        ]
+      },
+      {
+        "name": "Dragon_Lower_Jaw",
+        "vertices": 7378,
+        "edges": 20918,
+        "triangles": 13552,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Vermilion_Ceramic"
+        ]
+      },
+      {
+        "name": "Dragon_Neck_Scales_Emerald",
+        "vertices": 1766,
+        "edges": 3020,
+        "triangles": 1482,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Emerald_Glaze"
+        ]
+      },
+      {
+        "name": "Dragon_Teeth_Fangs",
+        "vertices": 7368,
+        "edges": 19528,
+        "triangles": 12200,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Fang_Ivory"
+        ]
+      },
+      {
+        "name": "Dragon_Tongue",
+        "vertices": 13656,
+        "edges": 35898,
+        "triangles": 22280,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Oral_Crimson"
+        ]
+      },
+      {
+        "name": "Dragon_Whiskers_And_Gold_Brows",
+        "vertices": 5829,
+        "edges": 13543,
+        "triangles": 7834,
+        "normalsValid": true,
+        "materials": [
+          "Jiannian_Imperial_Gold"
+        ]
+      }
+    ]
+  },
+  "renderedViews": {
+    "front": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_front.png",
+    "side_left": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_side_left.png",
+    "side_right": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_side_right.png",
+    "angle45": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_angle45.png",
+    "top": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_top.png",
+    "bottom_jaw": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_bottom_jaw.png",
+    "closeup_eye_brow": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_closeup_eye_brow.png",
+    "closeup_snout_mouth_teeth": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_closeup_snout_mouth_teeth.png",
+    "closeup_whisker_neck": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_closeup_whisker_neck.png",
+    "wireframe": "D:\\Tianxin-temple\\shots\\dragon-head-blender\\blender_wireframe.png"
+  }
+}

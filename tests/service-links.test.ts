@@ -1,4 +1,3 @@
-// @ts-expect-error 專案未安裝 @types/node；vitest 執行於 Node 環境可正常使用
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {

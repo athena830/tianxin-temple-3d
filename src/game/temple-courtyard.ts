@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Physics } from '../engine/physics'
+import type { TemplePbrLibrary } from './temple-pbr-materials'
 
 /**
  * Stage 2A: entrance arch, front courtyard, Tiangong urn and the Tianxin Xiangu consultation pavilion.
@@ -21,6 +22,7 @@ export type BuildContext = {
   mat: (color: string, roughness?: number, metalness?: number) => THREE.MeshStandardMaterial
   roof: (width: number, depth: number, eaveY: number, peakY: number) => THREE.Group
   text: (text: string, fg: string, bg: string) => THREE.MeshBasicMaterial
+  pbr?: TemplePbrLibrary
 }
 
 const PAL = {
@@ -69,6 +71,7 @@ export interface CourtyardSkyLanternGroup {
 export class FrontCourtyard {
   private readonly lanternMats: THREE.MeshStandardMaterial[] = []
   private fairyMesh?: THREE.Mesh
+  private fairyBaseY = 0.72
   private readonly skyLanternGroups: CourtyardSkyLanternGroup[] = []
   private readonly playerLanternStandPos = new THREE.Vector3(-12.5, 0, 23.5)
   private playerLanternGroup?: CourtyardSkyLanternGroup
@@ -105,10 +108,12 @@ export class FrontCourtyard {
   private addGround(): void {
     const { halfX, back, front } = SITE
     const depth = front - back
-    const floor = this.box(halfX * 2, 0.8, depth, this.c.mat(PAL.stone, 0.96), 0, -0.42, (front + back) / 2, true)
+    const floorMat = this.c.pbr ? this.c.pbr.get('courtyardStone', 15, 22) : this.c.mat(PAL.stone, 0.96)
+    const floor = this.box(halfX * 2, 0.8, depth, floorMat, 0, -0.42, (front + back) / 2, true)
     floor.castShadow = false
     // Entrance plaza outside the arch, where the visitor first appears.
-    const plaza = this.box(26, 0.8, 8, this.c.mat(PAL.paving, 0.95), 0, -0.42, front + 4, true)
+    const plazaMat = this.c.pbr ? this.c.pbr.get('plinthStone', 7, 2) : this.c.mat(PAL.paving, 0.95)
+    const plaza = this.box(26, 0.8, 8, plazaMat, 0, -0.42, front + 4, true)
     plaza.castShadow = false
     const outside = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), this.c.mat(PAL.ground, 1))
     outside.rotation.x = -Math.PI / 2
@@ -156,7 +161,8 @@ export class FrontCourtyard {
   }
 
   private pillar(x: number, z: number, h: number, r: number, collide = false, color = PAL.red): void {
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r, h, 12), this.c.mat(color, 0.72))
+    const pillarMat = color === PAL.red && this.c.pbr ? this.c.pbr.get('vermilionWood', 1, 2) : this.c.mat(color, 0.72)
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r, h, 14), pillarMat)
     p.position.set(x, h / 2, z)
     this.add(p)
     if (collide) this.c.physics.addStaticCylinder(new THREE.Vector3(x, h / 2, z), r, h)
@@ -166,19 +172,23 @@ export class FrontCourtyard {
     const start = -8.5
     const end = GATE_Z + 7.5
     const len = end - start
-    const road = new THREE.Mesh(new THREE.BoxGeometry(ROAD_HALF * 2 + 0.1, 0.035, len), this.c.mat(PAL.road, 0.92))
+    const roadMat = this.c.pbr ? this.c.pbr.get('imperialRoad', 1.5, 22) : this.c.mat(PAL.road, 0.92)
+    const road = new THREE.Mesh(new THREE.BoxGeometry(ROAD_HALF * 2 + 0.1, 0.035, len), roadMat)
     road.position.set(0, 0.015, (start + end) / 2)
     road.receiveShadow = true
     this.c.scene.add(road)
-    const line = this.c.mat(PAL.roadLine, 0.88)
+    const lineMat = this.c.pbr ? this.c.pbr.get('plinthStone', 2, 1) : this.c.mat(PAL.roadLine, 0.88)
+    const tileGeo = new THREE.BoxGeometry(ROAD_HALF * 2 - 0.1, 0.025, 0.16)
     for (let z = end - 1.5; z > start; z -= 3) {
-      const tile = new THREE.Mesh(new THREE.BoxGeometry(ROAD_HALF * 2 - 0.1, 0.025, 0.16), line)
+      const tile = new THREE.Mesh(tileGeo, lineMat)
       tile.position.set(0, 0.04, z)
+      tile.receiveShadow = true
       this.c.scene.add(tile)
     }
     // Low curb stones along both edges, flush enough to step over (purely visual).
+    const curbMat = this.c.pbr ? this.c.pbr.get('plinthStone', 1, 16) : this.c.mat('#b9aa91', 0.9)
     for (const side of [-1, 1]) {
-      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, GATE_Z - 1), this.c.mat('#b9aa91', 0.9))
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, GATE_Z - 1), curbMat)
       curb.position.set(side * (ROAD_HALF + 0.12), 0.04, GATE_Z / 2 - 0.5)
       curb.receiveShadow = true
       this.c.scene.add(curb)
@@ -188,14 +198,52 @@ export class FrontCourtyard {
   /** Three-bay entrance arch. All three bays are walkable; lanterns hang only over the side bays, above 4.2 m. */
   private addGateArch(): void {
     const z = GATE_Z
-    const gold = this.c.mat(PAL.gold, 0.5, 0.18)
+    const gold = this.c.pbr ? this.c.pbr.get('gildedGold', 1, 1) : this.c.mat(PAL.gold, 0.5, 0.18)
+    const vermilion = this.c.pbr ? this.c.pbr.get('vermilionWood', 2, 1) : this.c.mat(PAL.red, 0.72)
+    const darkTimber = this.c.pbr ? this.c.pbr.get('darkTimber', 2, 1) : this.c.mat('#30231a', 0.85)
+    const plinthStone = this.c.pbr ? this.c.pbr.get('plinthStone', 1, 1) : this.c.mat('#a8a08f', 0.95)
+    const collarGeo = new THREE.CylinderGeometry(1, 1, 0.18, 16)
+    const baseOctGeo = new THREE.CylinderGeometry(0.68, 0.76, 0.32, 8)
     for (const [x, h, r] of [[-6, 5.6, 0.4], [-2.6, 6.4, 0.46], [2.6, 6.4, 0.46], [6, 5.6, 0.4]] as const) {
       this.pillar(x, z, h, r, true)
-      this.box(1.25, 0.4, 1.25, gold, x, 0.2, z)
+      this.box(1.25, 0.34, 1.25, plinthStone, x, 0.17, z)
+      // 覆盆八角石柱礎與柱頭金箍（純視覺立體細節，不影響碰撞）
+      const octBase = new THREE.Mesh(baseOctGeo, gold)
+      octBase.position.set(x, 0.42, z)
+      this.add(octBase)
+      const capCollar = new THREE.Mesh(collarGeo, gold)
+      capCollar.scale.set(r * 1.12, 1, r * 1.12)
+      capCollar.position.set(x, h - 0.55, z)
+      this.add(capCollar)
     }
-    this.box(5.9, 0.6, 0.95, PAL.red, 0, 6.15, z)
-    for (const side of [-1, 1]) this.box(3.9, 0.5, 0.85, PAL.red, side * 4.3, 5.35, z)
-    const plaque = this.box(3.8, 1.05, 0.24, '#30231a', 0, 5.4, z + 0.5)
+    this.box(5.9, 0.6, 0.95, vermilion, 0, 6.15, z)
+    this.box(6.1, 0.14, 1.06, gold, 0, 5.84, z)
+    for (const side of [-1, 1]) {
+      this.box(3.9, 0.5, 0.85, vermilion, side * 4.3, 5.35, z)
+      this.box(4.05, 0.12, 0.94, gold, side * 4.3, 5.08, z)
+    }
+    // 山門飛簷斗栱組（共用幾何體實例，強化傳統大木作立體輪廓）
+    const dgBaseGeo = new THREE.BoxGeometry(0.32, 0.14, 0.32)
+    const dgArmGeo = new THREE.BoxGeometry(0.66, 0.12, 0.2)
+    const dgBeakGeo = new THREE.BoxGeometry(0.18, 0.12, 0.64)
+    const addGateDougong = (dx: number, dy: number) => {
+      for (const faceDir of [-1, 1]) {
+        const dg = new THREE.Group()
+        dg.position.set(dx, dy, z + faceDir * 0.52)
+        const b = new THREE.Mesh(dgBaseGeo, gold)
+        const arm = new THREE.Mesh(dgArmGeo, vermilion)
+        arm.position.y = 0.12
+        const beak = new THREE.Mesh(dgBeakGeo, gold)
+        beak.position.set(0, 0.2, faceDir * 0.12)
+        beak.rotation.x = faceDir * 0.18
+        dg.add(b, arm, beak)
+        this.add(dg)
+      }
+    }
+    for (const dx of [-1.8, -0.6, 0.6, 1.8]) addGateDougong(dx, 6.32)
+    for (const dx of [-5.1, -3.5, 3.5, 5.1]) addGateDougong(dx, 5.5)
+
+    const plaque = this.box(3.8, 1.05, 0.24, darkTimber, 0, 5.4, z + 0.5)
     plaque.castShadow = false
     for (const dz of [0.63, -0.63]) {
       const face = new THREE.Mesh(new THREE.PlaneGeometry(3.45, 0.82), this.c.text('玉 皇 宮', '#e5c57d', '#38251b'))
@@ -398,178 +446,592 @@ export class FrontCourtyard {
   }
 
   /**
-   * Open hexagonal pavilion beside the courtyard, left of the road. Posts sit at 30° + k·60° (0° = +X),
-   * so a flat side faces the road (east) and another faces the entrance; both are open, the other four have rails.
+   * 台灣傳統宮廟風格問事／擲筊亭：天心仙姑亭 (Tianxin Fairy Divination Pavilion)
+   *
+   * 1. 神壇核心：仙姑法相立於木雕蓮花神座之上（全上半身與面容清晰可見），前方配置低矮朱紅雕花供桌。
+   *    桌上陳設：朱砂銅香爐（飄起輕柔香煙）、紅木籤筒、一對紅木聖筊、成對小型供燈、傳統象棋卦盤。
+   *    神像背後立有厚重大木雕如意雲紋背屏，阻絕背景干擾，形成莊嚴神龕焦點。
+   * 2. 四柱與結構：維持小型四柱亭尺度，四柱皆配置青石覆盆石柱礎、朱紅柱身與金色柱頭雀替；
+   *    三面配置厚實朱紅木欄杆（含如意雲紋雕花），正面寬敞全開。
+   *    亭底設置 28cm 灰白石台基，前側配置兩階精緻踏步與抱鼓石。
+   * 3. 屋頂：單層深綠琉璃攢尖亭頂，具備實體 3D 筒瓦隴、金色瓦當與滴水牙子，四角飛簷微翹，中央立三疊鎏金寶頂；
+   *    簷下配設大額枋與一斗三升斗拱系統。
+   * 4. 匾額與燈光：簷下正中央配置「天心仙姑」金字深框匾額；正面成對懸掛宮燈由金屬鏈牢固吊掛（絕無漂浮）；
+   *    全亭採用柔暖橘金光照亮神案與仙姑臉龐，溫潤祥和。
    */
   private addPavilion(): void {
     const { x: cx, z: cz } = PAVILION
-    const r = 3.4
-    const postH = 3.15
-    const red = this.c.mat(PAL.red, 0.7)
-    const wood = this.c.mat(PAL.wood, 0.8)
-    const deg = Math.PI / 180
-    const platform = new THREE.Mesh(new THREE.CylinderGeometry(r + 0.7, r + 0.85, 0.2, 6), this.c.mat('#b3a68f', 0.94))
-    platform.position.set(cx, 0.08, cz)
-    platform.rotation.y = 0
-    this.add(platform)
-    platform.castShadow = false
-    this.c.physics.addStaticCylinder(new THREE.Vector3(cx, 0.08, cz), r + 0.75, 0.2)
-    const corner = (a: number, rad = r) => new THREE.Vector3(cx + Math.cos(a) * rad, 0, cz + Math.sin(a) * rad)
-    for (let k = 0; k < 6; k += 1) {
-      const p = corner((30 + k * 60) * deg)
-      this.pillar(p.x, p.z, postH + 0.18, 0.18, true)
-      const beamA = (30 + k * 60) * deg, beamB = (90 + k * 60) * deg
-      const a = corner(beamA), b = corner(beamB)
-      const mid = a.clone().add(b).multiplyScalar(0.5)
-      const phi = (60 + k * 60) * deg
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(r, 0.26, 0.2), wood)
-      beam.position.set(mid.x, postH + 0.05, mid.z)
-      beam.rotation.y = -(phi + Math.PI / 2)
-      this.add(beam)
+    const podW = 5.0
+    const podH = 0.28
+    const span = 1.85
+    const postH = 3.10
+
+    const red = this.c.mat(PAL.red, 0.72)
+    const wood = this.c.mat(PAL.wood, 0.82)
+    const darkMahogany = this.c.mat('#2c170f', 0.85)
+    const gold = this.c.mat(PAL.gold, 0.38, 0.3)
+    const stone = this.c.mat('#a59d8f', 0.92)
+    const stonePlinth = this.c.mat('#8a8274', 0.94)
+    const emeraldGlaze = this.c.mat('#224734', 0.52, 0.28)
+    const darkGlaze = this.c.mat('#183526', 0.6)
+    const bronze = this.c.mat('#5a4732', 0.45, 0.35)
+    const cinnabar = this.c.mat('#b83424', 0.55)
+
+    // 1. 低矮灰白石台基 (Low Stone Podium)
+    const podiumGeo = new THREE.BoxGeometry(podW, podH, podW)
+    const podium = new THREE.Mesh(podiumGeo, stone)
+    podium.position.set(cx, podH / 2, cz)
+    podium.receiveShadow = true
+    this.add(podium)
+    this.c.physics.addStaticBox(new THREE.Vector3(cx, podH / 2, cz), new THREE.Vector3(podW, podH, podW))
+
+    // 2. 前側兩階踏步 (Front Stone Steps facing +X towards road)
+    const step1 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.10, 2.4), stone)
+    step1.position.set(cx + podW / 2 + 0.38, 0.05, cz)
+    step1.receiveShadow = true
+    this.add(step1)
+
+    const step2 = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.19, 2.4), stone)
+    step2.position.set(cx + podW / 2 + 0.15, 0.095, cz)
+    step2.receiveShadow = true
+    this.add(step2)
+    this.c.physics.addStaticBox(new THREE.Vector3(cx + podW / 2 + 0.28, 0.10, cz), new THREE.Vector3(0.7, 0.20, 2.4))
+
+    // 兩側抱鼓石 (Drum Stones flanking steps)
+    for (const dz of [-1.28, 1.28]) {
+      const drumBase = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.36, 0.24), stonePlinth)
+      drumBase.position.set(cx + podW / 2 + 0.28, 0.18, cz + dz)
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.18, 16), stone)
+      drum.rotation.z = Math.PI / 2
+      drum.position.set(cx + podW / 2 + 0.35, 0.44, cz + dz)
+      this.add(drumBase)
+      this.add(drum)
     }
-    // Rails on four sides; sides centred at 0° (road) and 60° (toward entrance) stay open.
-    for (const phiDeg of [120, 180, 240, 300]) {
-      const phi = phiDeg * deg
-      const d = r * Math.cos(30 * deg)
-      const mx = cx + Math.cos(phi) * d, mz = cz + Math.sin(phi) * d
-      const angle = -(phi + Math.PI / 2)
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(r - 0.4, 0.09, 0.12), red)
-      rail.position.set(mx, 0.85, mz)
-      rail.rotation.y = angle
-      const low = rail.clone()
-      low.position.y = 0.38
-      this.add(rail); this.add(low)
-      for (let i = -2; i <= 2; i += 1) {
-        const t = (i / 5) * (r - 0.6)
-        const bal = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.55, 0.06), wood)
-        bal.position.set(mx - Math.sin(phi) * t, 0.6, mz + Math.cos(phi) * t)
+
+    // 亭外石階兩側古樸青石盆栽 (Subdued Bonsai Planters flanking steps)
+    this.lotusPot(cx + podW / 2 + 0.45, cz - 1.85)
+    this.lotusPot(cx + podW / 2 + 0.45, cz + 1.85)
+
+    // 3. 四角立柱與青石柱礎 (Four Corner Pillars & Stone Plinths)
+    const pillarY = podH + 0.22 + postH / 2
+    const pillarCoords: [number, number][] = [
+      [cx + span, cz - span], // Front-Left
+      [cx + span, cz + span], // Front-Right
+      [cx - span, cz - span], // Rear-Left
+      [cx - span, cz + span], // Rear-Right
+    ]
+
+    for (const [px, pz] of pillarCoords) {
+      // 青石覆盆石柱礎
+      const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.22, 8), stonePlinth)
+      plinth.position.set(px, podH + 0.11, pz)
+      plinth.receiveShadow = true
+      this.add(plinth)
+
+      // 朱紅圓木柱身
+      const pillarMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.16, postH, 16), red)
+      pillarMesh.position.set(px, pillarY, pz)
+      pillarMesh.castShadow = true
+      pillarMesh.receiveShadow = true
+      this.add(pillarMesh)
+      this.c.physics.addStaticCylinder(new THREE.Vector3(px, pillarY, pz), 0.16, postH)
+
+      // 柱頂金箍
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.08, 16), gold)
+      collar.position.set(px, podH + 0.22 + postH - 0.04, pz)
+      this.add(collar)
+
+      // 柱頂櫨斗 (Gilded Head Block)
+      const dou = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.14, 0.36), red)
+      dou.position.set(px, podH + 0.22 + postH + 0.07, pz)
+      const douCap = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.03, 0.38), gold)
+      douCap.position.set(px, podH + 0.22 + postH + 0.14, pz)
+      this.add(dou)
+      this.add(douCap)
+    }
+
+    // 4. 大額枋、普拍枋與雕花雀替 (Architraves & Corbels)
+    const beamY = podH + 0.22 + postH + 0.20
+    const beamSpan = span * 2
+
+    // 四面主額枋
+    const beams = [
+      { pos: [cx + span, beamY, cz], size: [0.18, 0.26, beamSpan + 0.2] }, // Front (+X)
+      { pos: [cx - span, beamY, cz], size: [0.18, 0.26, beamSpan + 0.2] }, // Rear (-X)
+      { pos: [cx, beamY, cz - span], size: [beamSpan + 0.2, 0.26, 0.18] }, // Left (-Z)
+      { pos: [cx, beamY, cz + span], size: [beamSpan + 0.2, 0.26, 0.18] }, // Right (+Z)
+    ]
+    for (const b of beams) {
+      const beamMesh = new THREE.Mesh(new THREE.BoxGeometry(b.size[0], b.size[1], b.size[2]), red)
+      beamMesh.position.set(b.pos[0], b.pos[1], b.pos[2])
+      beamMesh.castShadow = true
+      this.add(beamMesh)
+
+      // 描金回紋飾帶
+      const inlay = new THREE.Mesh(
+        new THREE.BoxGeometry(
+          b.size[0] > 0.3 ? b.size[0] * 0.95 : b.size[0] + 0.02,
+          0.08,
+          b.size[2] > 0.3 ? b.size[2] * 0.95 : b.size[2] + 0.02
+        ),
+        gold
+      )
+      inlay.position.set(b.pos[0], b.pos[1], b.pos[2])
+      this.add(inlay)
+    }
+
+    // 柱角雕花雀替托木 (Carved Corbels at all column-beam joints)
+    for (const [px, pz] of pillarCoords) {
+      const corbelDx = px > cx ? -0.32 : 0.32
+      const corbelDz = pz > cz ? -0.32 : 0.32
+
+      const corbelX = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.24, 0.14), red)
+      corbelX.position.set(px + corbelDx, beamY - 0.16, pz)
+      this.add(corbelX)
+
+      const corbelZ = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.24, 0.36), red)
+      corbelZ.position.set(px, beamY - 0.16, pz + corbelDz)
+      this.add(corbelZ)
+    }
+
+    // 簡潔一斗三升斗拱 (Simple Dougong Brackets along the beams)
+    for (const [bx, bz, isX] of [
+      [cx + span, cz, true],
+      [cx - span, cz, true],
+      [cx, cz - span, false],
+      [cx, cz + span, false],
+    ] as const) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(isX ? 0.22 : 0.72, 0.10, isX ? 0.72 : 0.22), red)
+      arm.position.set(bx, beamY + 0.18, bz)
+      this.add(arm)
+    }
+
+    // 5. 單層深綠琉璃攢尖亭頂 (Clean Single-Tier Deep Emerald Glazed Roof)
+    const eaveY = beamY + 0.28
+    const apexY = eaveY + 1.45
+    const roofW = podW + 0.9
+
+    // 厚實深色簷口 (Eave Fascia with Gold Wadang Trim)
+    const eaveFascia = new THREE.Mesh(new THREE.BoxGeometry(roofW, 0.14, roofW), darkGlaze)
+    eaveFascia.position.set(cx, eaveY, cz)
+    eaveFascia.castShadow = true
+    this.add(eaveFascia)
+
+    const eaveGoldTrim = new THREE.Mesh(new THREE.BoxGeometry(roofW + 0.04, 0.03, roofW + 0.04), gold)
+    eaveGoldTrim.position.set(cx, eaveY - 0.055, cz)
+    this.add(eaveGoldTrim)
+
+    // 四角攢尖深綠琉璃屋頂主體 (Pure Emerald Pyramidal Glazed Roof - No black bars, no antennas)
+    const roofGeo = new THREE.ConeGeometry((roofW * Math.SQRT2) / 2, 1.45, 4)
+    const roofMesh = new THREE.Mesh(roofGeo, emeraldGlaze)
+    roofMesh.position.set(cx, eaveY + 0.725, cz)
+    roofMesh.rotation.y = Math.PI / 4 // Rotate 45 deg so flat slopes face X and Z
+    roofMesh.castShadow = true
+    roofMesh.receiveShadow = true
+    this.add(roofMesh)
+
+    // 中央三疊鎏金寶頂 (Gilded Triple Gourd Pagoda Finial)
+    const finialGroup = new THREE.Group()
+    finialGroup.position.set(cx, apexY, cz)
+
+    const lotusBase = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.44, 0.14, 12), gold)
+    lotusBase.position.y = 0.07
+
+    const lowerGourd = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), gold)
+    lowerGourd.position.y = 0.28
+    lowerGourd.scale.set(1, 0.9, 1)
+
+    const gourdWaist = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.024, 6, 16), red)
+    gourdWaist.rotation.x = Math.PI / 2
+    gourdWaist.position.y = 0.42
+
+    const upperGourd = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), gold)
+    upperGourd.position.y = 0.56
+
+    const jewelCap = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.26, 8), gold)
+    jewelCap.position.y = 0.76
+
+    finialGroup.add(lotusBase, lowerGourd, gourdWaist, upperGourd, jewelCap)
+    this.add(finialGroup)
+
+    // 6. 厚實朱紅木欄杆與木雕背屏 (Balustrades & Altar Back Screen)
+    const railH = 0.76
+    const railY = podH + railH / 2
+
+    // 左 (-Z) 與 右 (+Z) 厚實雕花欄杆
+    for (const rz of [cz - span, cz + span]) {
+      const railBox = new THREE.Mesh(new THREE.BoxGeometry(beamSpan - 0.35, 0.10, 0.12), red)
+      railBox.position.set(cx, podH + railH, rz)
+      const railLow = new THREE.Mesh(new THREE.BoxGeometry(beamSpan - 0.35, 0.08, 0.12), red)
+      railLow.position.set(cx, podH + 0.12, rz)
+      this.add(railBox)
+      this.add(railLow)
+
+      for (let i = -3; i <= 3; i += 1) {
+        const bal = new THREE.Mesh(new THREE.BoxGeometry(0.07, railH - 0.18, 0.07), darkMahogany)
+        bal.position.set(cx + (i / 4) * (span - 0.35), podH + railH / 2, rz)
         this.add(bal)
       }
-      this.c.physics.addStaticBox(new THREE.Vector3(mx, 0.6, mz), new THREE.Vector3(r - 0.3, 1.2, 0.25), rotY(angle))
+      this.c.physics.addStaticBox(new THREE.Vector3(cx, railY, rz), new THREE.Vector3(beamSpan - 0.2, railH, 0.25))
     }
-    // Hexagonal roof with up-turned eaves and a gold finial.
-    const eave = new THREE.Mesh(new THREE.CylinderGeometry(r + 1.25, r + 1.3, 0.18, 6), this.c.mat('#465b50', 0.75))
-    eave.position.set(cx, postH + 0.25, cz)
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(r + 1.2, 1.9, 6), this.c.mat('#34433c', 0.82))
-    roof.position.set(cx, postH + 1.3, cz)
-    const finial = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), this.c.mat(PAL.gold, 0.4, 0.25))
-    finial.position.set(cx, postH + 2.4, cz)
-    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.5, 8), this.c.mat(PAL.gold, 0.4, 0.25))
-    spike.position.set(cx, postH + 2.75, cz)
-    this.add(eave); this.add(roof); this.add(finial); this.add(spike)
-    for (let k = 0; k < 6; k += 1) {
-      const a = (30 + k * 60) * deg
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 6), this.c.mat('#465b50', 0.75))
-      const p = corner(a, r + 1.3)
-      tip.position.set(p.x, postH + 0.55, p.z)
-      tip.rotation.set(Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7)
-      this.add(tip)
+
+    // 後側 (-X) 欄杆 (位於背屏兩側)
+    for (const dz of [-1.35, 1.35]) {
+      const rearRail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 0.85), red)
+      rearRail.position.set(cx - span, podH + railH, cz + dz)
+      const rearLow = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.85), red)
+      rearLow.position.set(cx - span, podH + 0.12, cz + dz)
+      this.add(rearRail)
+      this.add(rearLow)
+      for (let i = -1; i <= 1; i += 1) {
+        const bal = new THREE.Mesh(new THREE.BoxGeometry(0.07, railH - 0.18, 0.07), darkMahogany)
+        bal.position.set(cx - span, podH + railH / 2, cz + dz + (i * 0.24))
+        this.add(bal)
+      }
+      this.c.physics.addStaticBox(new THREE.Vector3(cx - span, railY, cz + dz), new THREE.Vector3(0.25, railH, 0.95))
     }
-    // Plaque under the eave on the road side, readable from the road and the entrance.
-    const plaque = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.62, 2.1), this.c.mat('#30231a'))
-    const px = cx + r * Math.cos(30 * deg) + 0.06
-    plaque.position.set(px, postH - 0.28, cz)
-    this.add(plaque, false)
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(1.95, 0.5), this.c.text('天 心 仙 姑', '#e9c97f', '#36241a'))
-    face.position.set(px + 0.07, postH - 0.28, cz)
-    face.rotation.y = Math.PI / 2
-    this.c.scene.add(face)
-    // Stone table, chessboard and four stools.
-    const table = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 0.8, 16), this.c.mat('#aaa08c', 0.9))
-    table.position.set(cx, 0.58, cz)
-    this.add(table)
-    this.c.physics.addStaticCylinder(new THREE.Vector3(cx, 0.6, cz), 0.8, 1.2)
-    const board = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, 1.1), new THREE.MeshStandardMaterial({ map: this.boardTexture(), roughness: 0.75 }))
-    board.position.set(cx, 1.0, cz)
+
+    // 莊嚴雙面深紅褐色木雕神龕背屏 (Double-Sided Deep Reddish-Brown Wood-Carved Altar Screen)
+    const screenFrameMat = new THREE.MeshStandardMaterial({ color: '#542217', roughness: 0.62, side: THREE.DoubleSide })
+    const screenPanelMat = new THREE.MeshStandardMaterial({ color: '#6e2b1e', roughness: 0.58, side: THREE.DoubleSide })
+    const goldReliefMat = new THREE.MeshStandardMaterial({ color: '#cba358', roughness: 0.45, metalness: 0.28, side: THREE.DoubleSide })
+
+    const screenGroup = new THREE.Group()
+    screenGroup.position.set(cx - 1.25, podH, cz)
+
+    // 1. 深紅褐色木雕主外框 (Main Timber Frame)
+    const screenFrame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.30, 2.40), screenFrameMat)
+    screenFrame.position.y = 1.15
+    screenGroup.add(screenFrame)
+
+    // 頂部木雕如意卷草頂冠 (Carved Ruyi Crest at Top)
+    const screenCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 1.8, 12), screenFrameMat)
+    screenCrown.rotation.x = Math.PI / 2
+    screenCrown.position.set(0, 2.30, 0)
+    screenGroup.add(screenCrown)
+
+    // 2. 正面神壇雕花飾板 (+X Face, facing fairy and front altar)
+    const frontInner = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.10, 2.20), screenPanelMat)
+    frontInner.position.set(0.04, 1.15, 0)
+    screenGroup.add(frontInner)
+
+    const frontGoldBorder = new THREE.Mesh(new THREE.BoxGeometry(0.045, 1.95, 2.05), goldReliefMat)
+    frontGoldBorder.position.set(0.04, 1.15, 0)
+    screenGroup.add(frontGoldBorder)
+
+    const frontField = new THREE.Mesh(new THREE.BoxGeometry(0.048, 1.85, 1.95), screenPanelMat)
+    frontField.position.set(0.04, 1.15, 0)
+    screenGroup.add(frontField)
+
+    // 正面四角如意雲紋飾徽
+    for (const dy of [-0.68, 0.68]) {
+      for (const dz of [-0.78, 0.78]) {
+        const badge = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.02, 12), goldReliefMat)
+        badge.rotation.z = Math.PI / 2
+        badge.position.set(0.065, 1.15 + dy, dz)
+        screenGroup.add(badge)
+      }
+    }
+
+    // 3. 背面木雕雕花飾板 (-X Face, facing the back of pavilion)
+    const rearInner = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.10, 2.20), screenPanelMat)
+    rearInner.position.set(-0.04, 1.15, 0)
+    screenGroup.add(rearInner)
+
+    // 背面上中下三道深紅木橫檻 (Horizontal Rails)
+    for (const hy of [0.25, 1.15, 2.05]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.11, 2.18), screenFrameMat)
+      rail.position.set(-0.045, hy, 0)
+      screenGroup.add(rail)
+    }
+
+    // 背面三道深紅木豎檻 (Vertical Stile Rails)
+    for (const rz of [-0.70, 0, 0.70]) {
+      const stile = new THREE.Mesh(new THREE.BoxGeometry(0.045, 2.08, 0.10), screenFrameMat)
+      stile.position.set(-0.045, 1.15, rz)
+      screenGroup.add(stile)
+    }
+
+    // 背面低對比暗金如意雲紋圓飾 (Low-Contrast Antique Gold Medallions facing Rear)
+    for (const rz of [-0.70, 0, 0.70]) {
+      const rearBadgeUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.02, 16), goldReliefMat)
+      rearBadgeUpper.rotation.z = Math.PI / 2
+      rearBadgeUpper.position.set(-0.068, 1.60, rz)
+      screenGroup.add(rearBadgeUpper)
+
+      const rearBadgeLower = new THREE.Mesh(new THREE.CylinderGeometry(0.070, 0.070, 0.02, 16), goldReliefMat)
+      rearBadgeLower.rotation.z = Math.PI / 2
+      rearBadgeLower.position.set(-0.068, 0.70, rz)
+      screenGroup.add(rearBadgeLower)
+    }
+
+    this.add(screenGroup)
+    this.c.physics.addStaticBox(new THREE.Vector3(cx - 1.25, podH + 1.15, cz), new THREE.Vector3(0.3, 2.3, 2.4))
+
+    // 正面神龕溫潤洗牆光 (Front Niche Warm Wash Light)
+    const screenWashLight = new THREE.PointLight('#ffcf9e', 0.95, 4.0, 1.8)
+    screenWashLight.position.set(cx - 0.95, podH + 1.65, cz)
+    this.c.scene.add(screenWashLight)
+
+    // 背面專屬暖光照明 (Dedicated Rear Warm Illumination - guarantees warm reddish brown wood & gold visibility)
+    const rearWashLight = new THREE.PointLight('#ffd5a3', 1.25, 6.0, 1.6)
+    rearWashLight.position.set(cx - 2.8, podH + 1.80, cz)
+    this.c.scene.add(rearWashLight)
+
+    const rearWashLight2 = new THREE.PointLight('#ffbe78', 0.85, 5.0, 1.8)
+    rearWashLight2.position.set(cx - 2.2, podH + 2.40, cz)
+    this.c.scene.add(rearWashLight2)
+
+    // 7. 神壇核心：仙姑須彌神案與低矮供桌 (Altar Throne & Low Offering Table)
+    const throneX = cx - 0.72
+    const throneGroup = new THREE.Group()
+    throneGroup.position.set(throneX, podH, cz)
+
+    const thronePlinth = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.16, 1.05), darkMahogany)
+    thronePlinth.position.y = 0.08
+
+    const throneWaist = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.18, 0.90), red)
+    throneWaist.position.y = 0.25
+
+    const throneLotus = new THREE.Mesh(new THREE.CylinderGeometry(0.50, 0.44, 0.12, 16), gold)
+    throneLotus.position.y = 0.38
+    throneLotus.scale.set(0.65, 1, 1.05)
+
+    throneGroup.add(thronePlinth, throneWaist, throneLotus)
+    this.add(throneGroup)
+
+    // 低矮朱紅雕花供桌 (Low Offering Table)
+    const tableX = cx + 0.18
+    const tableH = 0.44
+    const tableW = 1.68
+    const tableD = 0.72
+
+    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(tableD, 0.06, tableW), cinnabar)
+    tableTop.position.set(tableX, podH + tableH - 0.03, cz)
+    tableTop.castShadow = true
+    tableTop.receiveShadow = true
+    this.add(tableTop)
+
+    const apron = new THREE.Mesh(new THREE.BoxGeometry(tableD - 0.06, 0.14, tableW - 0.06), darkMahogany)
+    apron.position.set(tableX, podH + tableH - 0.13, cz)
+    this.add(apron)
+
+    const apronGold = new THREE.Mesh(new THREE.BoxGeometry(tableD - 0.04, 0.02, tableW - 0.04), gold)
+    apronGold.position.set(tableX, podH + tableH - 0.08, cz)
+    this.add(apronGold)
+
+    for (const dx of [-tableD / 2 + 0.08, tableD / 2 - 0.08]) {
+      for (const dz of [-tableW / 2 + 0.08, tableW / 2 - 0.08]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, tableH - 0.06, 0.08), darkMahogany)
+        leg.position.set(tableX + dx, podH + (tableH - 0.06) / 2, cz + dz)
+        this.add(leg)
+      }
+    }
+    this.c.physics.addStaticBox(new THREE.Vector3(tableX, podH + tableH / 2, cz), new THREE.Vector3(tableD, tableH, tableW))
+
+    // 供桌陳設 1: 朱砂銅香爐 (Incense Burner)
+    const burnerX = tableX + 0.18
+    const burnerY = podH + tableH
+    const censerGroup = new THREE.Group()
+    censerGroup.position.set(burnerX, burnerY, cz)
+
+    const censerBody = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.12, 16), bronze)
+    censerBody.position.y = 0.06
+    const censerRim = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.015, 6, 16), gold)
+    censerRim.rotation.x = Math.PI / 2
+    censerRim.position.y = 0.12
+
+    for (let k = 0; k < 3; k += 1) {
+      const ang = k * ((Math.PI * 2) / 3)
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.012, 0.04, 8), bronze)
+      leg.position.set(Math.cos(ang) * 0.08, 0.02, Math.sin(ang) * 0.08)
+      censerGroup.add(leg)
+    }
+
+    for (let s = -1; s <= 1; s += 1) {
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.20, 6), this.c.mat('#8a2818', 0.8))
+      stick.position.set(s * 0.025, 0.18, 0)
+      stick.rotation.z = s * 0.05
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.005, 6, 6), this.c.mat('#ff6622', 0.2, 0.8))
+      tip.position.set(s * 0.025, 0.28, 0)
+      censerGroup.add(stick, tip)
+    }
+
+    censerGroup.add(censerBody, censerRim)
+    this.add(censerGroup)
+
+    // 供桌正中央陳設 2: 一對紅木聖筊 (Pair of Divination Moon Blocks - centered right in front of censer)
+    const bwaBweiGroup = new THREE.Group()
+    bwaBweiGroup.position.set(tableX + 0.22, burnerY, cz)
+    const tray = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.015, 0.24), darkMahogany)
+    tray.position.y = 0.008
+    bwaBweiGroup.add(tray)
+
+    for (const [offsetZ, rotX] of [[-0.05, 0], [0.05, Math.PI]] as const) {
+      const block = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.018, 6, 8, Math.PI), cinnabar)
+      block.rotation.set(rotX, 0, Math.PI / 2)
+      block.position.set(0, 0.025, offsetZ)
+      bwaBweiGroup.add(block)
+    }
+    this.add(bwaBweiGroup)
+
+    // 供桌陳設 3: 紅木籤筒與籤詩 (Fortune Stick Cylinder on left side)
+    const sticksGroup = new THREE.Group()
+    sticksGroup.position.set(tableX + 0.08, burnerY, cz + 0.38)
+    const stickCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.06, 0.22, 12), this.c.mat('#7a2618', 0.7))
+    stickCyl.position.y = 0.11
+    const stickRim = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.008, 6, 12), gold)
+    stickRim.rotation.x = Math.PI / 2
+    stickRim.position.y = 0.22
+    sticksGroup.add(stickCyl, stickRim)
+
+    for (let s = 0; s < 10; s += 1) {
+      const sa = (s / 10) * Math.PI * 2
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.26, 4), this.c.mat('#dfc495', 0.6))
+      st.position.set(Math.cos(sa) * 0.035, 0.20, Math.sin(sa) * 0.035)
+      st.rotation.set(Math.sin(sa) * 0.12, 0, Math.cos(sa) * 0.12)
+      sticksGroup.add(st)
+    }
+    this.add(sticksGroup)
+
+    // 供桌陳設 4: 成對小型祈福供燈 (Pair of Symmetrical Altar Lamps on corners)
+    for (const dz of [-0.68, 0.68]) {
+      const lampGroup = new THREE.Group()
+      lampGroup.position.set(tableX + 0.02, burnerY, cz + dz)
+      const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.08, 10), bronze)
+      lampBase.position.y = 0.04
+      const lampGlass = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), this.c.mat('#ffd599', 0.3, 0.1))
+      lampGlass.position.y = 0.12
+      lampGlass.scale.set(1, 1.3, 1)
+      const lampCap = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.05, 8), gold)
+      lampCap.position.y = 0.20
+      lampGroup.add(lampBase, lampGlass, lampCap)
+      this.add(lampGroup)
+
+      const lampLight = new THREE.PointLight('#ffa64d', 0.45, 2.2, 2.0)
+      lampLight.position.set(tableX + 0.02, burnerY + 0.14, cz + dz)
+      this.c.scene.add(lampLight)
+    }
+
+    // 供桌陳設 5: 象棋卦盤 (縮小並嵌入神案右後方，降低視覺優先權，保留 chessboard 名稱與互動)
+    const boardX = tableX - 0.15
+    const boardZ = cz - 0.46
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.015, 0.38),
+      new THREE.MeshStandardMaterial({ map: this.boardTexture(), roughness: 0.75 })
+    )
+    board.position.set(boardX, burnerY + 0.008, boardZ)
     board.name = 'chessboard'
     this.add(board, false)
-    const pieces: [number, number, string][] = [[0, 0, PAL.red], [-0.26, 0, '#34302a'], [0.26, 0, PAL.red], [0, -0.3, '#34302a'], [0, 0.3, PAL.red]]
+
+    const pieces: [number, number, string][] = [
+      [0, 0, PAL.red],
+      [-0.08, 0, '#34302a'],
+      [0.08, 0, PAL.red],
+      [0, -0.10, '#34302a'],
+      [0, 0.10, PAL.red],
+    ]
     for (const [dx, dz, color] of pieces) {
-      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.09, 0.05, 14), this.c.mat('#e8d7b0', 0.6))
-      p.position.set(cx + dx, 1.045, cz + dz)
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 4, 14), this.c.mat(color, 0.5))
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.030, 0.016, 12), this.c.mat('#e8d7b0', 0.6))
+      p.position.set(boardX + dx, burnerY + 0.022, boardZ + dz)
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.020, 0.004, 4, 12), this.c.mat(color, 0.5))
       ring.rotation.x = Math.PI / 2
-      ring.position.set(cx + dx, 1.075, cz + dz)
-      this.add(p, false); this.add(ring, false)
-    }
-    for (let k = 0; k < 4; k += 1) {
-      const a = (45 + k * 90) * deg
-      const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.2, 0.45, 12), this.c.mat('#aaa08c', 0.9))
-      stool.position.set(cx + Math.cos(a) * 1.3, 0.4, cz + Math.sin(a) * 1.3)
-      this.add(stool)
+      ring.position.set(boardX + dx, burnerY + 0.031, boardZ + dz)
+      this.add(p, false)
+      this.add(ring, false)
     }
 
-    // =========================================================================
-    // 問事亭專屬盛景・璀璨通明仙境照明系統 (Tianxin Pavilion Luminous Illumination)
-    // =========================================================================
-
-    // 1. 亭心天花琉璃大宮燈實體模型（懸掛於亭頂正中）
-    const chandelier = new THREE.Group()
-    chandelier.position.set(cx, postH - 0.1, cz)
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.55, 6), this.c.mat(PAL.gold, 0.4, 0.3))
-    cord.position.y = -0.15
-    const chanRoof = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.48, 0.14, 8), this.c.mat(PAL.red, 0.7))
-    chanRoof.position.y = -0.42
-    const chanSilkMat = this.c.mat('#fff1c2', 0.25)
-    chanSilkMat.emissive.set('#ffb84d')
-    chanSilkMat.emissiveIntensity = 1.4
-    this.lanternMats.push(chanSilkMat)
-    const chanBody = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.35, 0.52, 8), chanSilkMat)
-    chanBody.position.y = -0.72
-    const chanRim = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.02, 6, 16), this.c.mat(PAL.gold, 0.4, 0.3))
-    chanRim.rotation.x = Math.PI / 2
-    chanRim.position.y = -0.45
-    const chanBot = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.38, 6), this.c.mat(PAL.red, 0.7))
-    chanBot.rotation.x = Math.PI
-    chanBot.position.y = -1.15
-    chandelier.add(cord, chanRoof, chanBody, chanRim, chanBot)
-    this.add(chandelier)
-
-    // 2. 亭頂中央核心大宮燈主光（強度 3.6，半徑 15m，全面照亮問事亭內部每一個角落）
-    const light = new THREE.PointLight('#fff2d1', 3.6, 15, 1.5)
-    light.position.set(cx, postH - 0.7, cz)
-    this.c.scene.add(light)
-
-    // 3. 頂棚樑架與飛簷金光漫射（朝上照射六角錐頂與斗拱樑架，掃除深色陰影）
-    const roofUplight = new THREE.PointLight('#ffd17d', 2.4, 8.5, 1.5)
-    roofUplight.position.set(cx, postH + 0.45, cz)
-    this.c.scene.add(roofUplight)
-
-    // 4. 棋盤與石桌專屬潔白明亮聚光
-    const tableLight = new THREE.PointLight('#ffffff', 1.8, 5.2, 1.8)
-    tableLight.position.set(cx, 1.75, cz)
-    this.c.scene.add(tableLight)
-
-    // 5. 亭底御台基座金輝地光（在石桌下漫射，照亮六角石地坪、石凳與石階）
-    const floorLight = new THREE.PointLight('#ffe4a0', 2.8, 9.0, 1.6)
-    floorLight.position.set(cx, 0.38, cz)
-    this.c.scene.add(floorLight)
-
+    // 8. 仙姑法相神案安裝 (Tianxin Fairy)
     this.addTianxinFairy(cx, cz)
 
-    // 6. 六角飛簷全周長明宮燈（全部 6 個簷角皆懸掛紅綢宮燈並散發暖金光輝）
-    for (let k = 0; k < 6; k += 1) {
-      const a = (30 + k * 60) * deg
-      const p = corner(a, r + 0.9)
-      this.lantern(p.x, postH - 0.25, p.z, 0.28)
-      const lanternGlow = new THREE.PointLight('#ff9b40', 1.25, 6.0, 1.8)
-      lanternGlow.position.set(p.x, postH - 0.45, p.z)
-      this.c.scene.add(lanternGlow)
+    // 9. 匾額與成對懸掛宮燈 (Plaque & Symmetrical Palace Lanterns)
+    const plaqueX = cx + span + 0.08
+    const plaqueY = beamY + 0.02
+    const plaqueFrame = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.48, 1.52), darkMahogany)
+    plaqueFrame.position.set(plaqueX, plaqueY, cz)
+    this.add(plaqueFrame, false)
+
+    const plaqueGoldBorder = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.44, 1.48), gold)
+    plaqueGoldBorder.position.set(plaqueX, plaqueY, cz)
+    this.add(plaqueGoldBorder, false)
+
+    const plaqueFace = new THREE.Mesh(new THREE.PlaneGeometry(1.42, 0.38), this.c.text('天 心 仙 姑', '#f5d68d', '#2e1910'))
+    plaqueFace.position.set(plaqueX + 0.045, plaqueY, cz)
+    plaqueFace.rotation.y = Math.PI / 2
+    this.c.scene.add(plaqueFace)
+
+    const plaqueGlow = new THREE.PointLight('#ffe4a8', 1.1, 4.0, 1.8)
+    plaqueGlow.position.set(plaqueX + 0.55, plaqueY - 0.05, cz)
+    this.c.scene.add(plaqueGlow)
+
+    // 正面成對懸掛宮燈 (縮小至約 48%，改由亭簷短鏈精巧懸掛)
+    for (const dz of [-span + 0.35, span - 0.35]) {
+      const lx = cx + span + 0.04
+      const lz = cz + dz
+      const lTopY = beamY + 0.16
+
+      const lanternGroup = new THREE.Group()
+      lanternGroup.position.set(lx, lTopY, lz)
+
+      const hook = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.005, 6, 10), bronze)
+      hook.rotation.y = Math.PI / 2
+      hook.position.y = -0.02
+      lanternGroup.add(hook)
+
+      for (let c = 0; c < 2; c += 1) {
+        const link = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.004, 4, 8), bronze)
+        link.position.y = -0.04 - c * 0.022
+        link.rotation.y = c % 2 === 0 ? 0 : Math.PI / 2
+        lanternGroup.add(link)
+      }
+
+      const chainDrop = 0.08
+
+      const roofCap = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.13, 0.045, 8), red)
+      roofCap.position.y = -chainDrop - 0.022
+      lanternGroup.add(roofCap)
+
+      const silkMat = this.c.mat('#fff0c4', 0.25)
+      silkMat.emissive.set('#ff9e3b')
+      silkMat.emissiveIntensity = 0.85
+      this.lanternMats.push(silkMat)
+
+      const silkBody = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.10, 0.18, 8), silkMat)
+      silkBody.position.y = -chainDrop - 0.12
+      lanternGroup.add(silkBody)
+
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.008, 6, 16), gold)
+      rim.rotation.x = Math.PI / 2
+      rim.position.y = -chainDrop - 0.035
+      lanternGroup.add(rim)
+
+      const botCap = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.11, 6), red)
+      botCap.rotation.x = Math.PI
+      botCap.position.y = -chainDrop - 0.25
+      lanternGroup.add(botCap)
+
+      this.add(lanternGroup)
+
+      const lanternLight = new THREE.PointLight('#ffaa48', 0.55, 3.2, 1.8)
+      lanternLight.position.set(lx, lTopY - chainDrop - 0.12, lz)
+      this.c.scene.add(lanternLight)
     }
 
-    // 7. 亭額金匾「天心仙姑」專屬迎賓明光
-    const plaqueGlow = new THREE.PointLight('#ffeaa8', 1.6, 5.0, 1.8)
-    plaqueGlow.position.set(px + 0.8, postH - 0.2, cz)
-    this.c.scene.add(plaqueGlow)
-    for (const dz of [-2.6, 2.6]) this.lotusPot(cx + r + 1.45, cz + dz)
-    // Signboard near the road so the pavilion is identifiable on entry.
+    // 10. 柔暖橘金照明系統 (Warm Amber Altar Illumination)
+    const altarLight = new THREE.PointLight('#ffe0a8', 1.35, 6.5, 1.6)
+    altarLight.position.set(cx + 0.35, podH + 1.55, cz)
+    this.c.scene.add(altarLight)
+
+    const ceilingLight = new THREE.PointLight('#ffc878', 0.85, 4.8, 1.8)
+    ceilingLight.position.set(cx, beamY + 0.35, cz)
+    this.c.scene.add(ceilingLight)
+
+    // 11. 步道入口立地告示木牌 (Signboard near Road)
     const sign = new THREE.Group()
     sign.position.set(-4.0, 0, 35.5)
-    // Upright post cleanly supports the signboard from underneath up to the base of the plaque
     const signPostH = 1.58
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, signPostH, 0.14), wood)
     post.position.set(0, signPostH / 2, 0)
-    // Back brace securing the plaque from behind without obstructing the front text
     const backBrace = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.58, 0.08), wood)
     backBrace.position.set(0, 1.85, -0.07)
     const boardMesh = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.6, 0.1), this.c.mat('#36241a'))
@@ -581,7 +1043,6 @@ export class FrontCourtyard {
     this.add(sign)
     this.c.physics.addStaticBox(new THREE.Vector3(-4.0, 1, 35.5), new THREE.Vector3(0.3, 2, 0.3))
 
-    // 8. 步道入口立地告示木牌專屬明光
     const signGlow = new THREE.PointLight('#ffea9f', 1.5, 5.5, 2.0)
     signGlow.position.set(-4.0, 2.2, 35.8)
     this.c.scene.add(signGlow)
@@ -591,7 +1052,6 @@ export class FrontCourtyard {
     const loader = new THREE.TextureLoader()
     const applyFairy = (tex: THREE.Texture) => {
       tex.colorSpace = THREE.SRGBColorSpace
-      // Height 1.45m, preserving aspect ratio of (290 / 511)
       const aspect = 290 / 511
       const fairyH = 1.45
       const fairyW = fairyH * aspect
@@ -604,13 +1064,12 @@ export class FrontCourtyard {
         metalness: 0.02,
         side: THREE.DoubleSide,
       })
-      // 天心仙姑立牌自然素雅材質，不自發光（由問事亭內宮燈光芒自然映照）
       mat.emissive.set(0x000000)
       mat.emissiveIntensity = 0.0
 
       const mesh = new THREE.Mesh(geo, mat)
-      // Placed behind the chessboard facing visitors entering the pavilion from the road (+X / +Z)
-      mesh.position.set(cx - 0.95, 0.4 + fairyH / 2, cz)
+      // Placed on the Sumeru throne, facing visitors entering the pavilion from the road (+X)
+      mesh.position.set(cx - 0.72, this.fairyBaseY + fairyH / 2, cz)
       mesh.rotation.y = Math.PI / 2
       mesh.castShadow = true
       mesh.receiveShadow = true
@@ -2054,7 +2513,7 @@ export class FrontCourtyard {
   update(dt: number, time: number): void {
     for (const m of this.lanternMats) m.emissiveIntensity = 0.5 + Math.sin(time * 1.7) * 0.05
     if (this.fairyMesh) {
-      this.fairyMesh.position.y = 0.4 + 1.45 / 2 + Math.sin(time * 1.8) * 0.02
+      this.fairyMesh.position.y = this.fairyBaseY + 1.45 / 2 + Math.sin(time * 1.8) * 0.02
     }
 
     // Sky Lanterns dynamic lifecycle and illumination

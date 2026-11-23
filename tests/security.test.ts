@@ -1,4 +1,3 @@
-// @ts-expect-error 專案未安裝 @types/node；vitest 執行於 Node 環境可正常使用
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { calculateNumerology } from '../src/game/numerology-engine'
