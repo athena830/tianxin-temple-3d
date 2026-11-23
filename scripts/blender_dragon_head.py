@@ -7,22 +7,8 @@ import json
 from mathutils import Vector, Euler, Quaternion, Matrix
 
 """
-玉皇宮 Phase 3 — Stage 2：半寫實 3D 祥龍龍首樣板 (Stylized Realism Eastern Temple Dragon Head)
-Blender 5.3.0 Procedural Organic Lofted Subdivision Sculpting & Assembly Pipeline (Pass 2 Refined)
-
-Key Anatomical Refinements:
-1. Front-View Eye & Brow Visibility: Elevated cranial vault & supra-orbital brow ridges (z ~ 0.36..0.54)
-   with a downward-sloping Ruyi nasal bridge (z ~ 0.24 -> 0.08) so both fierce eyes, golden irises,
-   and overhanging flame brows are 100% unobstructed and commanding from the Front view.
-2. Sculpted Flared Nostril Rims & Deep Nostril Chambers: Distinct 3D Ruyi nostril scrolls on the upper
-   muzzle with deep dark interior nostril cavities.
-3. Crimson Upper & Lower Gum Arches (齒齦弓): All fangs, incisors, and molars are rooted deeply inside
-   sculpted crimson gum ridges with zero exposed root caps.
-4. Deep-Rooted Cheek Mane, Flame Brows & Flowing Whiskers: Every whisker and flame lock has its root
-   tucked deep inside the skull/cheek/jaw volume with zero floating or exposed cylinder ends.
-5. Surface-Conformed Overlapping 3D Neck Scales: 5 staggered rows of curved hexagonal shield scales
-   projected directly onto the dorsal & lateral neck surface normals (-95° to +95°) so the neck is
-   armored in continuous overlapping emerald and gold Jiannian scales.
+玉皇宮 Phase 3 — Stage 2.2：祥龍龍首最終美術精修
+(Stylized Realism Taiwanese Jiannian Temple Dragon Head — Final Artistic Polish)
 """
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,6 +16,7 @@ BLEND_OUT = os.path.join(ROOT_DIR, "assets", "source", "dragon-head.blend")
 GLB_OUT = os.path.join(ROOT_DIR, "public", "assets", "models", "temple-dragon-head-preview.glb")
 REPORT_OUT = os.path.join(ROOT_DIR, "public", "assets", "models", "temple-dragon-head-report.json")
 RENDER_DIR = os.path.join(ROOT_DIR, "shots", "dragon-head-blender")
+AFTER_DIR = os.path.join(ROOT_DIR, "shots", "stage2.2-after")
 
 if "--" in sys.argv:
     args = sys.argv[sys.argv.index("--") + 1:]
@@ -41,8 +28,9 @@ if "--" in sys.argv:
 os.makedirs(os.path.dirname(BLEND_OUT), exist_ok=True)
 os.makedirs(os.path.dirname(GLB_OUT), exist_ok=True)
 os.makedirs(RENDER_DIR, exist_ok=True)
+os.makedirs(AFTER_DIR, exist_ok=True)
 
-print(f"[DragonHead] Running on Blender {bpy.app.version_string}")
+print(f"[DragonHead 2.2] Running on Blender {bpy.app.version_string}")
 
 # ---------------------------------------------------------------------------
 # 1. Clean Factory Scene
@@ -62,19 +50,228 @@ def link_to_master(obj):
         if col != master_col:
             col.objects.unlink(obj)
 
+def smooth_step(edge0, edge1, x):
+    t = max(0.0, min(1.0, (x - edge0) / (edge1 - edge0)))
+    return t * t * (3.0 - 2.0 * t)
+
+def gaussian(x, mu, sigma):
+    return math.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
+def linear_to_srgb(c):
+    c = max(0.0, min(1.0, c))
+    if c <= 0.0031308:
+        return 12.92 * c
+    return 1.055 * (c ** (1.0 / 2.4)) - 0.055
+
+def close_ring_cap_watertight(bm, ring, y_offset=0.0, reverse_winding=False):
+    n = len(ring)
+    center_co = sum((v.co for v in ring), Vector((0.0, 0.0, 0.0))) / float(n)
+    mid_ring = [
+        bm.verts.new(center_co.lerp(v.co, 0.45) + Vector((0.0, y_offset * 0.5, 0.0)))
+        for v in ring
+    ]
+    v_apex = bm.verts.new(center_co + Vector((0.0, y_offset, 0.0)))
+
+    for i in range(n):
+        ni = (i + 1) % n
+        if not reverse_winding:
+            bm.faces.new((ring[i], ring[ni], mid_ring[ni], mid_ring[i]))
+            bm.faces.new((mid_ring[i], mid_ring[ni], v_apex))
+        else:
+            bm.faces.new((ring[ni], ring[i], mid_ring[i], mid_ring[ni]))
+            bm.faces.new((mid_ring[ni], mid_ring[i], v_apex))
+
 # ---------------------------------------------------------------------------
-# 2. Principled BSDF Materials (Linear RGB calibrated for Taiwanese Jiannian)
+# 2. Handcrafted Jiannian Ceramic Multi-Channel PBR Textures (sRGB-Calibrated, Isotropic)
 # ---------------------------------------------------------------------------
-def create_jiannian_material(name, base_color, metallic=0.05, roughness=0.25, coat_weight=0.30, coat_roughness=0.16, specular=0.60):
+print("[DragonHead 2.2] Generating sRGB-calibrated isotropic Jiannian ceramic Albedo, Roughness & Normal maps...")
+
+def generate_jiannian_multichannel_textures(size=256):
+    """
+    Generates isotropic, domain-warped porcelain glaze & kiln variation maps (zero diagonal plaid artifacts!)
+    with proper linear_to_srgb encoding for Albedo textures so Blender 5.3 and Three.js render exact temple hues.
+    """
+    norm_img = bpy.data.images.new("Jiannian_Ceramic_Normal", width=size, height=size, alpha=False)
+    norm_img.colorspace_settings.name = 'Non-Color'
+
+    orm_img = bpy.data.images.new("Jiannian_Ceramic_ORM", width=size, height=size, alpha=False)
+    orm_img.colorspace_settings.name = 'Non-Color'
+
+    verm_img = bpy.data.images.new("Jiannian_Vermilion_Albedo", width=size, height=size, alpha=False)
+    gold_img = bpy.data.images.new("Jiannian_Gold_Albedo", width=size, height=size, alpha=False)
+    emer_img = bpy.data.images.new("Jiannian_Emerald_Albedo", width=size, height=size, alpha=False)
+    tooth_img = bpy.data.images.new("Jiannian_Tooth_Albedo", width=size, height=size, alpha=False)
+
+    height_grid = [[0.0] * size for _ in range(size)]
+    verm_pixels = [1.0] * (size * size * 4)
+    gold_pixels = [1.0] * (size * size * 4)
+    emer_pixels = [1.0] * (size * size * 4)
+    tooth_pixels = [1.0] * (size * size * 4)
+    orm_pixels = [1.0] * (size * size * 4)
+    norm_pixels = [1.0] * (size * size * 4)
+
+    two_pi = 2.0 * math.pi
+
+    for iy in range(size):
+        v = iy / size
+        for ix in range(size):
+            u = ix / size
+            # Domain-warped isotropic coordinates (eliminates directional stripes/plaid!)
+            wu = u + 0.08 * math.sin(v * two_pi * 3.0) + 0.04 * math.cos(u * two_pi * 5.0)
+            wv = v + 0.08 * math.cos(u * two_pi * 3.0) + 0.04 * math.sin(v * two_pi * 5.0)
+
+            # Isotropic multi-octave ceramic glaze undulation (product of orthogonal modes, zero diagonal bands)
+            n1 = math.sin(wu * two_pi * 2.0) * math.cos(wv * two_pi * 2.0)
+            n2 = math.cos(wu * two_pi * 5.0 + 0.8) * math.sin(wv * two_pi * 5.0 + 0.4)
+            n3 = math.sin(wu * two_pi * 11.0 + 1.7) * math.cos(wv * two_pi * 11.0 + 2.3)
+            n4 = math.cos(wu * two_pi * 23.0 + 0.5) * math.sin(wv * two_pi * 23.0 + 1.1)
+
+            h = 0.45 * n1 + 0.30 * n2 + 0.16 * n3 + 0.09 * n4
+            height_grid[iy][ix] = h
+
+            # Handcrafted ceramic roughness variation in [0.42, 0.54] (mean 0.48)
+            r_val = max(0.38, min(0.58, 0.48 + 0.035 * n1 + 0.025 * n2 + 0.015 * n3))
+
+            idx = (iy * size + ix) * 4
+            # Subtle organic kiln glaze color modulation (-1..+1)
+            mod = 0.55 * n1 + 0.30 * n2 + 0.15 * n3
+
+            # 1) Vermilion Ceramic Albedo (Linear target ~(0.43, 0.026, 0.014) with subtle ±6% kiln depth)
+            vr_lin = 0.43 + 0.028 * mod
+            vg_lin = 0.026 + 0.005 * mod
+            vb_lin = 0.014 + 0.003 * mod
+            verm_pixels[idx]     = linear_to_srgb(vr_lin)
+            verm_pixels[idx + 1] = linear_to_srgb(vg_lin)
+            verm_pixels[idx + 2] = linear_to_srgb(vb_lin)
+            verm_pixels[idx + 3] = 1.0
+
+            # 2) Imperial Gold Albedo (Linear target ~(0.71, 0.42, 0.064) with subtle antique gold leaf variation)
+            gr_lin = 0.71 + 0.045 * mod
+            gg_lin = 0.42 + 0.032 * mod
+            gb_lin = 0.064 + 0.008 * mod
+            gold_pixels[idx]     = linear_to_srgb(gr_lin)
+            gold_pixels[idx + 1] = linear_to_srgb(gg_lin)
+            gold_pixels[idx + 2] = linear_to_srgb(gb_lin)
+            gold_pixels[idx + 3] = 1.0
+
+            # 3) Emerald Glaze Albedo (Linear target ~(0.013, 0.19, 0.115) with subtle celadon-jade glaze pooling)
+            er_lin = 0.013 + 0.003 * mod
+            eg_lin = 0.190 + 0.022 * mod
+            eb_lin = 0.115 + 0.014 * mod
+            emer_pixels[idx]     = linear_to_srgb(er_lin)
+            emer_pixels[idx + 1] = linear_to_srgb(eg_lin)
+            emer_pixels[idx + 2] = linear_to_srgb(eb_lin)
+            emer_pixels[idx + 3] = 1.0
+
+            # 4) Tooth Bone-Ivory Albedo (v = 0 at gumline root -> v = 1 at biting tip)
+            # Warm amber-ivory root neck blending smoothly into natural aged bone-ivory crown (not chalky white!)
+            root_t = smooth_step(0.05, 0.36, v)
+            tip_t = smooth_step(0.65, 1.0, v)
+            flute_var = 1.0 + 0.025 * math.cos(u * two_pi * 4.0) + 0.015 * n2
+            tr_lin = (0.42 * (1.0 - root_t) + (0.68 + 0.06 * tip_t) * root_t) * flute_var
+            tg_lin = (0.24 * (1.0 - root_t) + (0.58 + 0.06 * tip_t) * root_t) * flute_var
+            tb_lin = (0.14 * (1.0 - root_t) + (0.41 + 0.05 * tip_t) * root_t) * flute_var
+            tooth_pixels[idx]     = linear_to_srgb(tr_lin)
+            tooth_pixels[idx + 1] = linear_to_srgb(tg_lin)
+            tooth_pixels[idx + 2] = linear_to_srgb(tb_lin)
+            tooth_pixels[idx + 3] = 1.0
+
+            orm_pixels[idx]     = 1.0
+            orm_pixels[idx + 1] = r_val
+            orm_pixels[idx + 2] = r_val
+            orm_pixels[idx + 3] = 1.0
+
+    bump_scale = 0.80
+    for iy in range(size):
+        iy_prev = (iy - 1) % size
+        iy_next = (iy + 1) % size
+        for ix in range(size):
+            ix_prev = (ix - 1) % size
+            ix_next = (ix + 1) % size
+            dh_du = (height_grid[iy][ix_next] - height_grid[iy][ix_prev]) * bump_scale
+            dh_dv = (height_grid[iy_next][ix] - height_grid[iy_prev][ix]) * bump_scale
+
+            nx = -dh_du
+            ny = -dh_dv
+            nz = 1.0
+            inv_len = 1.0 / math.sqrt(nx * nx + ny * ny + nz * nz)
+            nx *= inv_len
+            ny *= inv_len
+            nz *= inv_len
+
+            idx = (iy * size + ix) * 4
+            norm_pixels[idx]     = nx * 0.5 + 0.5
+            norm_pixels[idx + 1] = ny * 0.5 + 0.5
+            norm_pixels[idx + 2] = nz * 0.5 + 0.5
+            norm_pixels[idx + 3] = 1.0
+
+    for img, pix in (
+        (norm_img, norm_pixels),
+        (orm_img, orm_pixels),
+        (verm_img, verm_pixels),
+        (gold_img, gold_pixels),
+        (emer_img, emer_pixels),
+        (tooth_img, tooth_pixels),
+    ):
+        img.pixels.foreach_set(pix)
+        img.update()
+        img.pack()
+
+    return norm_img, orm_img, verm_img, gold_img, emer_img, tooth_img
+
+(
+    jiannian_norm_img,
+    jiannian_orm_img,
+    verm_albedo_img,
+    gold_albedo_img,
+    emer_albedo_img,
+    tooth_albedo_img,
+) = generate_jiannian_multichannel_textures(256)
+
+def assign_box_uvs(mesh, uv_scale=2.5):
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    uv_layer = bm.loops.layers.uv.verify()
+    for f in bm.faces:
+        n = f.normal
+        ax, ay, az = abs(n.x), abs(n.y), abs(n.z)
+        for loop in f.loops:
+            co = loop.vert.co
+            if ax >= ay and ax >= az:
+                u, v = co.y * uv_scale, co.z * uv_scale
+            elif ay >= ax and ay >= az:
+                u, v = co.x * uv_scale, co.z * uv_scale
+            else:
+                u, v = co.x * uv_scale, co.y * uv_scale
+            loop[uv_layer].uv = (u, v)
+    bm.to_mesh(mesh)
+    bm.free()
+
+def create_jiannian_material(
+    name,
+    base_color,
+    albedo_img=None,
+    use_roughness_map=True,
+    metallic=0.02,
+    roughness=0.48,
+    coat_weight=0.08,
+    coat_roughness=0.40,
+    specular=0.34,
+    normal_strength=0.16,
+    use_glaze_maps=True
+):
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
-    nodes = mat.node_tree.nodes
+    nt = mat.node_tree
+    nodes = nt.nodes
+    links = nt.links
     bsdf = nodes.get("Principled BSDF")
     if not bsdf:
         for n in nodes:
             if n.type == 'BSDF_PRINCIPLED':
                 bsdf = n
                 break
+
     bsdf.inputs["Base Color"].default_value = base_color
     bsdf.inputs["Metallic"].default_value = metallic
     bsdf.inputs["Roughness"].default_value = roughness
@@ -84,134 +281,183 @@ def create_jiannian_material(name, base_color, metallic=0.05, roughness=0.25, co
         bsdf.inputs["Coat Weight"].default_value = coat_weight
     if "Coat Roughness" in bsdf.inputs:
         bsdf.inputs["Coat Roughness"].default_value = coat_roughness
+
+    if albedo_img is not None:
+        tex_col = nodes.new("ShaderNodeTexImage")
+        tex_col.image = albedo_img
+        tex_col.location = (-520, 260)
+        links.new(tex_col.outputs["Color"], bsdf.inputs["Base Color"])
+
+    if use_glaze_maps and use_roughness_map:
+        tex_orm = nodes.new("ShaderNodeTexImage")
+        tex_orm.image = jiannian_orm_img
+        tex_orm.location = (-580, 40)
+
+        sep_rgb = nodes.new("ShaderNodeSeparateColor")
+        sep_rgb.location = (-300, 40)
+        links.new(tex_orm.outputs["Color"], sep_rgb.inputs["Color"])
+        links.new(sep_rgb.outputs["Green"], bsdf.inputs["Roughness"])
+
+    if use_glaze_maps and normal_strength > 0.0:
+        tex_norm = nodes.new("ShaderNodeTexImage")
+        tex_norm.image = jiannian_norm_img
+        tex_norm.location = (-520, -200)
+
+        norm_node = nodes.new("ShaderNodeNormalMap")
+        norm_node.inputs["Strength"].default_value = normal_strength
+        norm_node.location = (-240, -200)
+
+        links.new(tex_norm.outputs["Color"], norm_node.inputs["Color"])
+        links.new(norm_node.outputs["Normal"], bsdf.inputs["Normal"])
+
     return mat
 
 mat_vermilion = create_jiannian_material(
     "Jiannian_Vermilion_Ceramic",
-    base_color=(0.46, 0.022, 0.012, 1.0),
-    metallic=0.06,
-    roughness=0.25,
-    coat_weight=0.32,
-    coat_roughness=0.15,
-    specular=0.62
+    base_color=(0.43, 0.026, 0.014, 1.0),
+    albedo_img=verm_albedo_img,
+    use_roughness_map=True,
+    metallic=0.02,
+    roughness=0.48,
+    coat_weight=0.08,
+    coat_roughness=0.40,
+    specular=0.33,
+    normal_strength=0.16
 )
 
 mat_gold = create_jiannian_material(
     "Jiannian_Imperial_Gold",
-    base_color=(0.74, 0.40, 0.048, 1.0),
-    metallic=0.80,
-    roughness=0.28,
-    coat_weight=0.18,
-    coat_roughness=0.20,
-    specular=0.68
+    base_color=(0.71, 0.42, 0.064, 1.0),
+    albedo_img=gold_albedo_img,
+    use_roughness_map=True,
+    metallic=0.60,
+    roughness=0.45,
+    coat_weight=0.08,
+    coat_roughness=0.40,
+    specular=0.42,
+    normal_strength=0.12
 )
 
 mat_emerald = create_jiannian_material(
     "Jiannian_Emerald_Glaze",
-    base_color=(0.010, 0.175, 0.110, 1.0),
-    metallic=0.08,
-    roughness=0.23,
-    coat_weight=0.38,
-    coat_roughness=0.14,
-    specular=0.62
+    base_color=(0.013, 0.19, 0.115, 1.0),
+    albedo_img=emer_albedo_img,
+    use_roughness_map=True,
+    metallic=0.03,
+    roughness=0.36,
+    coat_weight=0.18,
+    coat_roughness=0.28,
+    specular=0.44,
+    normal_strength=0.15
 )
 
 mat_ivory = create_jiannian_material(
     "Jiannian_Fang_Ivory",
-    base_color=(0.84, 0.76, 0.60, 1.0),
-    metallic=0.02,
-    roughness=0.26,
-    coat_weight=0.22,
-    coat_roughness=0.18,
-    specular=0.55
+    base_color=(0.68, 0.58, 0.41, 1.0),
+    albedo_img=tooth_albedo_img,
+    use_roughness_map=False,
+    metallic=0.01,
+    roughness=0.36,
+    coat_weight=0.14,
+    coat_roughness=0.26,
+    specular=0.42,
+    normal_strength=0.06,
+    use_glaze_maps=True
 )
 
 mat_crimson = create_jiannian_material(
     "Jiannian_Oral_Crimson",
-    base_color=(0.16, 0.008, 0.010, 1.0),
-    metallic=0.03,
-    roughness=0.35,
-    coat_weight=0.28,
-    coat_roughness=0.20,
-    specular=0.50
+    base_color=(0.15, 0.010, 0.012, 1.0),
+    albedo_img=None,
+    use_roughness_map=True,
+    metallic=0.01,
+    roughness=0.48,
+    coat_weight=0.10,
+    coat_roughness=0.34,
+    specular=0.34,
+    normal_strength=0.12
 )
 
 mat_obsidian = create_jiannian_material(
     "Jiannian_Eye_Obsidian",
-    base_color=(0.012, 0.012, 0.016, 1.0),
-    metallic=0.10,
-    roughness=0.06,
-    coat_weight=0.90,
-    coat_roughness=0.04,
-    specular=0.88
+    base_color=(0.008, 0.008, 0.012, 1.0),
+    albedo_img=None,
+    use_roughness_map=False,
+    metallic=0.05,
+    roughness=0.07,
+    coat_weight=0.85,
+    coat_roughness=0.05,
+    specular=0.85,
+    normal_strength=0.0,
+    use_glaze_maps=False
 )
 
-def smooth_step(edge0, edge1, x):
-    t = max(0.0, min(1.0, (x - edge0) / (edge1 - edge0)))
-    return t * t * (3.0 - 2.0 * t)
-
-def gaussian(x, mu, sigma):
-    return math.exp(-0.5 * ((x - mu) / sigma) ** 2)
-
-# Helper to query exact neck spine center and radii at any y in [0.15, 0.92]
 def get_neck_profile(y):
-    nt = max(0.0, (y - 0.15) / 0.77)
-    z_c = 0.24 - 0.34 * (nt ** 1.25)
-    rx = 0.38 - 0.03 * nt
-    rz = 0.36 - 0.03 * nt
+    nt = max(0.0, (y - 0.15) / 0.75)
+    z_c = 0.24 - 0.33 * (nt ** 1.22)
+    rx = 0.37 - 0.03 * nt
+    rz = 0.35 - 0.03 * nt
     return z_c, rx, rz
 
+def ceramic_micro_wave(x, y, z, amp=0.0012):
+    w1 = math.sin(x * 19.0 + y * 17.0) * math.cos(y * 21.0 - z * 18.0)
+    w2 = math.cos(x * 37.0 - z * 31.0) * math.sin(y * 33.0 + x * 23.0)
+    return amp * (0.65 * w1 + 0.35 * w2)
+
 # ---------------------------------------------------------------------------
-# 3A. Continuous Quad-Lofted Organic Cranium, Ruyi Snout, Eye Sockets & Palate
+# 3A. Sculpted Cranium, Scowling Supraorbital Brow Bone, Deep Eye Sockets & Faceted Ruyi Snout
 # ---------------------------------------------------------------------------
-print("[DragonHead] Sculpting quad-lofted organic cranium, Ruyi snout, eye sockets & vaulted palate...")
+print("[DragonHead 2.2] Sculpting fierce overhanging brow bone, deep eye sockets & faceted bamboo-ridge Ruyi snout...")
 
 def build_upper_cranium_and_snout():
     bm = bmesh.new()
-    n_y = 52
-    n_theta = 48
-    y_start = 0.92   # Rear neck base
-    y_end = -1.06    # Front Ruyi snout tip
+    n_y = 70
+    n_theta = 64
+    y_start = 0.90
+    y_end = -0.87
 
     rings = []
     for iy in range(n_y):
         ty = iy / (n_y - 1)
-        y = y_start + ty * (y_end - y_start)
+        y_linear = y_start + ty * (y_end - y_start)
 
-        # Spine centerline height Z(y):
-        # High cranium at y in [-0.35, +0.15] (z_center ~ 0.26),
-        # sloping downward along the snout bridge to z_center = 0.06 at y = -1.06 so eyes are 100% visible from Front view!
-        if y > 0.15:
-            z_center, neck_rx, neck_rz = get_neck_profile(y)
-        elif y > -0.32:
-            z_center = 0.24 + 0.05 * gaussian(y, -0.10, 0.18)
+        if y_linear > 0.15:
+            z_center, _, _ = get_neck_profile(y_linear)
+        elif y_linear > -0.32:
+            z_center = 0.24 + 0.058 * gaussian(y_linear, -0.09, 0.17)
         else:
-            st = (-0.32 - y) / 0.74  # 0 at eye socket (-0.32), 1 at snout tip (-1.06)
-            z_center = 0.24 - 0.17 * (st ** 1.15) - 0.035 * gaussian(y, -0.58, 0.14) + 0.045 * gaussian(y, -0.94, 0.10)
+            st = max(0.0, (-0.32 - y_linear) / 0.55)
+            z_center = (
+                0.24
+                - 0.160 * (st ** 1.05)
+                - 0.046 * gaussian(y_linear, -0.46, 0.085)
+                + 0.042 * gaussian(y_linear, -0.78, 0.075)
+            )
 
-        tip_taper = math.sqrt(max(0.04, 1.0 - max(0.0, (-0.96 - y) / 0.115) ** 2))
+        tip_taper = math.sqrt(max(0.015, 1.0 - max(0.0, (-0.77 - y_linear) / 0.105) ** 2))
 
-        if y > 0.18:
-            _, w_base, h_top = get_neck_profile(y)
-            # Smooth blend near occiput (y ~ 0.18..0.30)
-            occ_blend = gaussian(y, 0.0, 0.24)
+        if y_linear > 0.16:
+            _, w_base, h_top = get_neck_profile(y_linear)
+            occ_blend = gaussian(y_linear, 0.0, 0.22)
             w_base += 0.14 * occ_blend
             h_top += 0.12 * occ_blend
         else:
             w_base = (
-                0.33
-                * (1.0 - 0.16 * gaussian(y, -0.58, 0.14))  # Muzzle waist
-                + 0.14 * gaussian(y, -0.88, 0.11)          # Flared Ruyi nostril wings
-                + 0.22 * gaussian(y, -0.10, 0.22)          # Broad cheek jowls & temporal vault
+                0.335
+                * (1.0 - 0.22 * gaussian(y_linear, -0.50, 0.10))
+                + 0.155 * gaussian(y_linear, -0.73, 0.085)
+                + 0.215 * gaussian(y_linear, -0.08, 0.21)
             ) * tip_taper
 
-            # Notice: snout top height is kept compact (0.18..0.21) while forehead rises high (+0.32)
-            snout_suppress = smooth_step(-0.45, -0.15, y)
+            snout_suppress = smooth_step(-0.46, -0.16, y_linear)
             h_top = (
-                (0.17 + 0.08 * snout_suppress) * tip_taper
-                + 0.28 * gaussian(y, -0.08, 0.22)          # High twin forehead domes (天庭隆起)
-                + 0.05 * gaussian(y, -0.92, 0.09)          # Compact upturned Ruyi nose tip
+                (0.142 + 0.09 * snout_suppress) * tip_taper
+                + 0.295 * gaussian(y_linear, -0.07, 0.20)
+                + 0.042 * gaussian(y_linear, -0.77, 0.070) * tip_taper
             )
+
+        mouth_open_zone = (1.0 - smooth_step(-0.14, 0.06, y_linear)) * smooth_step(-0.84, -0.74, y_linear)
+        z_lip_target = 0.045 + 0.025 * max(0.0, min(1.0, (y_linear + 0.78) / 0.65)) + 0.015 * math.sin(y_linear * 13.0)
 
         ring_verts = []
         for it in range(n_theta):
@@ -223,68 +469,120 @@ def build_upper_cranium_and_snout():
             rx = w_base
             rz_up = h_top
 
-            # 1) Twin Forehead Horn Bosses & Central Sagittal Groove (龍額雙角隆起與中線淺溝)
-            forehead_zone = gaussian(y, -0.08, 0.20)
-            if cos_t > 0.15:
-                boss_bump = 0.13 * forehead_zone * gaussian(abs_t, 0.52, 0.24)
-                sagittal_dip = -0.05 * forehead_zone * gaussian(abs_t, 0.0, 0.15)
-                rz_up += boss_bump + sagittal_dip
-                rx += 0.07 * forehead_zone * gaussian(abs_t, 0.55, 0.24)
+            # 1) Twin Frontal Horn Pedicles, Deep Tian-Ting Sagittal Furrow & Corrugator Scowl Creases
+            forehead_zone = gaussian(y_linear, -0.07, 0.19)
+            if cos_t > 0.10:
+                boss_bump = 0.155 * forehead_zone * gaussian(abs_t, 0.50, 0.21)
+                sagittal_dip = -0.075 * forehead_zone * gaussian(abs_t, 0.0, 0.13)
+                temple_facet = 0.036 * forehead_zone * gaussian(abs_t, 0.82, 0.14)
+                rz_up += boss_bump + sagittal_dip + temple_facet
+                rx += 0.078 * forehead_zone * gaussian(abs_t, 0.54, 0.21)
 
-            # 2) Fierce Overhanging S-Curved Brow Ridge (怒目火焰眉骨 - wide & elevated)
-            brow_y_center = -0.32 + 0.15 * ((abs_t - 0.65) / 0.45)
-            brow_zone = gaussian(y, brow_y_center, 0.11) * gaussian(abs_t, 0.78, 0.22)
-            rx += 0.16 * brow_zone
-            rz_up += 0.13 * brow_zone
+            glabella_scowl = gaussian(y_linear, -0.34, 0.075)
+            scowl_furrow = -0.038 * glabella_scowl * (gaussian(abs_t, 0.0, 0.06) + 0.70 * gaussian(abs_t, 0.18, 0.05))
+            scowl_ridge = 0.058 * glabella_scowl * gaussian(abs_t, 0.32, 0.09)
+            rz_up += scowl_furrow + scowl_ridge
 
-            # 3) Deep Recessed Eye Socket directly below Brow Ridge (深邃眼窩凹槽)
-            eye_socket_zone = gaussian(y, -0.35, 0.10) * gaussian(abs_t, 1.15, 0.20)
-            rx -= 0.11 * eye_socket_zone
-            rz_up -= 0.04 * eye_socket_zone
+            # 2) Fierce Overhanging Diagonal Supraorbital Brow Bone (怒目斜壓眉弓)
+            brow_y_center = -0.34 + 0.16 * ((abs_t - 0.52) / 0.45)
+            brow_arch = gaussian(y_linear, brow_y_center, 0.088) * gaussian(abs_t, 0.78, 0.22)
+            brow_z_profile = -0.020 * gaussian(abs_t, 0.42, 0.14) + 0.155 * smooth_step(0.44, 0.86, abs_t)
+            rx += 0.195 * brow_arch
+            rz_up += brow_z_profile * gaussian(y_linear, brow_y_center, 0.088) * gaussian(abs_t, 0.76, 0.24)
 
-            # 4) Muscular Cheek Jowls & Cheekbone Arch (飽滿龍腮與顴骨轉折)
-            cheek_zone = gaussian(y, -0.06, 0.20) * gaussian(abs_t, 1.55, 0.32)
-            rx += 0.17 * cheek_zone
+            # 3) Deeply Recessed Shadowed Orbital Socket directly beneath Overhanging Brow Bone
+            eye_socket_zone = gaussian(y_linear, -0.34, 0.095) * gaussian(abs_t, 1.12, 0.21)
+            rx -= 0.160 * eye_socket_zone
+            rz_up -= 0.068 * eye_socket_zone
 
-            # 5) Dorsal Nasal Bridge Ridge & Transverse Scale Ribs (鼻樑中央隆脊與橫節紋)
-            nasal_zone = smooth_step(-0.88, -0.72, y) * (1.0 - smooth_step(-0.38, -0.24, y))
-            if abs_t < 0.45:
-                nasal_ridge = 0.045 * nasal_zone * gaussian(abs_t, 0.0, 0.18)
-                nasal_rib = 0.009 * nasal_zone * math.cos(y * 36.0) * gaussian(abs_t, 0.0, 0.22)
-                rz_up += nasal_ridge + nasal_rib
+            # 4) Sculpted Angular Zygomatic Cheekbone, Infraorbital Furrow & Muscular Masseter Jowl
+            infraorbital_groove = gaussian(y_linear, -0.36, 0.07) * gaussian(abs_t, 1.28, 0.10)
+            zygo_arch = gaussian(y_linear, -0.22, 0.12) * gaussian(abs_t, 1.44, 0.20)
+            sub_zygo_dip = gaussian(y_linear, -0.26, 0.09) * gaussian(abs_t, 1.72, 0.13)
+            jowl_boss = gaussian(y_linear, -0.05, 0.18) * gaussian(abs_t, 1.54, 0.26)
+            rx += -0.035 * infraorbital_groove + 0.110 * zygo_arch - 0.042 * sub_zygo_dip + 0.160 * jowl_boss
+            rz_up += 0.040 * zygo_arch
 
-            # 6) Flared Ruyi Nostril Wings & Deep Front-Facing Nostril Cavities (翻捲鼻翼與立體鼻孔深腔)
-            nostril_wing = gaussian(y, -0.88, 0.08) * gaussian(abs_t, 0.85, 0.25)
-            rx += 0.11 * nostril_wing
-            rz_up += 0.065 * nostril_wing
+            # 5) Angular 5-Node Bamboo-Ridge Nasal Bridge, Bony Side Planes & Deep Nasolabial Valleys
+            nasal_zone = smooth_step(-0.82, -0.68, y_linear) * (1.0 - smooth_step(-0.37, -0.25, y_linear))
+            if abs_t < 0.82:
+                nasal_keel = 0.072 * nasal_zone * (1.0 - min(1.0, abs_t / 0.26) ** 1.4)
+                bamboo_nodes = 0.020 * nasal_zone * math.cos((y_linear + 0.34) * 44.0) * gaussian(abs_t, 0.0, 0.20)
+                nasal_bone_edge = 0.025 * nasal_zone * gaussian(abs_t, 0.26, 0.07)
+                nasolabial_valley = -0.066 * nasal_zone * gaussian(abs_t, 0.48, 0.11)
+                rz_up += nasal_keel + bamboo_nodes + nasal_bone_edge + nasolabial_valley
+                rx += 0.024 * nasal_zone * gaussian(abs_t, 0.26, 0.08) - 0.050 * nasal_zone * gaussian(abs_t, 0.48, 0.11)
 
-            nostril_hole = gaussian(y, -0.94, 0.045) * gaussian(abs_t, 0.78, 0.16)
-            rx -= 0.095 * nostril_hole
-            rz_up -= 0.085 * nostril_hole
+            # 6) Front Ruyi Cloud-Shield Nose Pad, Softened Philtrum Groove & Diagonal Muzzle Vibrissae Folds
+            ruyi_nose_shield = gaussian(y_linear, -0.79, 0.055)
+            philtrum_groove = -0.026 * gaussian(y_linear, -0.82, 0.055) * gaussian(abs_t, 0.0, 0.12)
+            ruyi_lobes = 0.044 * ruyi_nose_shield * gaussian(abs_t, 0.24, 0.14)
+            rz_up += ruyi_lobes + philtrum_groove
+            rx += 0.032 * ruyi_lobes
 
-            # 7) Undulating Rolled Upper Lip Rim (上顎翻唇波浪唇線)
-            mouth_open_zone = 1.0 - smooth_step(-0.14, 0.06, y)
-            lip_rim_zone = mouth_open_zone * gaussian(abs_t, 1.88, 0.22)
-            lip_wave = 1.0 + 0.20 * math.sin(y * 11.5)
-            rx += 0.085 * lip_rim_zone * lip_wave
+            muzzle_pad_zone = gaussian(y_linear, -0.63, 0.11) * gaussian(abs_t, 1.32, 0.26)
+            vibrissae_folds = 0.016 * muzzle_pad_zone * math.cos((y_linear - 0.16 * abs_t) * 46.0)
+            rx += vibrissae_folds
+            rz_up += 0.5 * vibrissae_folds
 
-            x = rx * sin_t
+            # 7) Flared Alar Nostril Turrets, Deep Alar Crease & Deep Concave Nostril Chambers
+            nostril_wing = gaussian(y_linear, -0.72, 0.065) * gaussian(abs_t, 0.84, 0.18)
+            alar_crease = -0.042 * gaussian(y_linear, -0.69, 0.045) * gaussian(abs_t, 1.06, 0.10)
+            rx += 0.092 * nostril_wing + alar_crease
+            rz_up += 0.068 * nostril_wing + 0.5 * alar_crease
 
-            if cos_t >= -0.22:
-                z = z_center + rz_up * cos_t - 0.025 * lip_rim_zone
+            nostril_pit = gaussian(y_linear, -0.73, 0.044) * gaussian(abs_t, 0.70, 0.14)
+            rx -= 0.135 * nostril_pit
+            rz_up -= 0.120 * nostril_pit
+
+            # 8) Solid Convex Nose Cap & Thick Rolled Upper Lip Overhanging the Vaulted Palate
+            t_lip_start = 0.56 * math.pi
+            t_lip_end = 0.73 * math.pi
+
+            lip_swell = mouth_open_zone * gaussian(abs_t, t_lip_start, 0.18)
+            rx_outer_base = rx + (0.075 * tip_taper) * lip_swell
+            x_closed = rx_outer_base * sin_t
+
+            cheek_pull = smooth_step(0.32 * math.pi, t_lip_start, abs_t) * (1.0 - smooth_step(-0.12, 0.08, y_linear))
+            z_ellipse = z_center + rz_up * 0.88 * cos_t
+            z_outer_target = (1.0 - cheek_pull) * z_ellipse + cheek_pull * (z_lip_target + 0.065 * (cos_t - math.cos(t_lip_start)))
+            z_closed = z_outer_target
+
+            if mouth_open_zone > 0.001 and abs_t > t_lip_start:
+                sin_start = math.sin(t_lip_start)
+                r_lip_outer = (rx + 0.075 * tip_taper) * sin_start
+                z_lip_outer = z_lip_target
+
+                if abs_t <= t_lip_end:
+                    u_lip = (abs_t - t_lip_start) / (t_lip_end - t_lip_start)
+                    roll_angle = u_lip * math.pi
+                    lip_half_thick = (0.045 + 0.010 * gaussian(y_linear, -0.62, 0.12)) * tip_taper
+                    lip_drop = 0.038 * tip_taper
+
+                    r_rolled = r_lip_outer - lip_half_thick * (1.0 - math.cos(roll_angle))
+                    z_rolled = z_lip_outer - lip_drop * math.sin(roll_angle)
+                else:
+                    u_pal = (abs_t - t_lip_end) / (math.pi - t_lip_end)
+                    lip_half_thick = (0.045 + 0.010 * gaussian(y_linear, -0.62, 0.12)) * tip_taper
+                    r_gum_inner = max(0.012, r_lip_outer - 2.0 * lip_half_thick)
+
+                    r_rolled = r_gum_inner * math.cos(u_pal * math.pi * 0.5)
+                    palate_arch = 0.135 * math.sin(u_pal * math.pi * 0.5) * tip_taper
+                    palate_rugae = 0.008 * math.cos(y_linear * 44.0) * math.sin(u_pal * math.pi)
+                    z_rolled = z_lip_outer + palate_arch + palate_rugae
+
+                x_mouth = (1.0 if theta >= 0.0 else -1.0) * r_rolled
+                x = (1.0 - mouth_open_zone) * x_closed + mouth_open_zone * x_mouth
+                z = (1.0 - mouth_open_zone) * z_closed + mouth_open_zone * z_rolled
             else:
-                bottom_t = (abs_t - math.acos(-0.22)) / (math.pi - math.acos(-0.22))
-                neck_bottom_z = z_center + h_top * 0.95 * cos_t
+                x = x_closed
+                z = z_closed
 
-                # Vaulted oral palate roof inside open upper jaw
-                lip_edge_z = z_center - 0.22 * rz_up - 0.025
-                palate_arch = 0.11 * math.sin(bottom_t * math.pi * 0.5) * tip_taper
-                palate_ribs = 0.007 * math.cos(y * 42.0) * math.sin(bottom_t * math.pi * 0.5)
-                mouth_roof_z = lip_edge_z + palate_arch + palate_ribs
+            micro = ceramic_micro_wave(x, y_linear, z, amp=0.0012)
+            x += micro * sin_t
+            z += micro * cos_t
 
-                z = (1.0 - mouth_open_zone) * neck_bottom_z + mouth_open_zone * mouth_roof_z
-
-            v = bm.verts.new((x, y, z))
+            v = bm.verts.new((x, y_linear, z))
             ring_verts.append(v)
         rings.append(ring_verts)
 
@@ -295,30 +593,8 @@ def build_upper_cranium_and_snout():
             nit = (it + 1) % n_theta
             bm.faces.new((r0[it], r0[nit], r1[nit], r1[it]))
 
-    # Cap front snout tip and rear neck base using quad grid_fill (eliminates polar triangle-fan pinching under SUBSURF!)
-    front_edges = []
-    for it in range(n_theta):
-        nit = (it + 1) % n_theta
-        for e in rings[-1][it].link_edges:
-            if e.other_vert(rings[-1][it]) == rings[-1][nit]:
-                front_edges.append(e)
-                break
-    try:
-        bmesh.ops.grid_fill(bm, edges=front_edges, mat_nr=0, use_interp_simple=True)
-    except Exception:
-        bmesh.ops.contextual_create(bm, geom=front_edges)
-
-    back_edges = []
-    for it in range(n_theta):
-        nit = (it + 1) % n_theta
-        for e in rings[0][it].link_edges:
-            if e.other_vert(rings[0][it]) == rings[0][nit]:
-                back_edges.append(e)
-                break
-    try:
-        bmesh.ops.grid_fill(bm, edges=back_edges, mat_nr=0, use_interp_simple=True)
-    except Exception:
-        bmesh.ops.contextual_create(bm, geom=back_edges)
+    close_ring_cap_watertight(bm, rings[-1], y_offset=-0.010, reverse_winding=False)
+    close_ring_cap_watertight(bm, rings[0], y_offset=0.010, reverse_winding=True)
 
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     mesh = bpy.data.meshes.new("Dragon_Cranium_And_Snout_Mesh")
@@ -336,6 +612,7 @@ def build_upper_cranium_and_snout():
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier=sub.name)
+    assign_box_uvs(obj.data, uv_scale=2.6)
     bpy.ops.object.shade_smooth()
     obj.data.materials.append(mat_vermilion)
     return obj
@@ -343,28 +620,40 @@ def build_upper_cranium_and_snout():
 cranium_obj = build_upper_cranium_and_snout()
 
 # ---------------------------------------------------------------------------
-# 3B. Continuous Quad-Lofted Roaring Lower Jaw & Deep Oral Floor Trough
+# 3B. Thick Muscular Mandible, Watertight Convex Chin Symphysis & Cheek Commissure Folds
 # ---------------------------------------------------------------------------
-print("[DragonHead] Sculpting quad-lofted roaring lower jaw & deep oral floor trough...")
+print("[DragonHead 2.2] Sculpting thick muscular lower mandible, carved chin boss & cheek commissure folds...")
 
 def build_roaring_lower_jaw():
     bm = bmesh.new()
-    n_y = 28
-    n_theta = 36
-    y_start = 0.05   # Embedded inside jaw hinge joint
-    y_end = -0.94    # Upturned dragon chin tip
+    n_y = 36
+    n_theta = 44
+    y_start = 0.04
+    y_end = -0.80
 
     rings = []
     for iy in range(n_y):
         ty = iy / (n_y - 1)
-        y = y_start + ty * (y_end - y_start)
+        y_linear = y_start + ty * (y_end - y_start)
 
-        z_jaw = -0.05 - 0.38 * ty + 0.08 * (ty ** 3.2)
-        tip_taper = math.sqrt(max(0.05, 1.0 - max(0.0, (ty - 0.88) / 0.125) ** 2))
-        rear_taper = smooth_step(0.0, 0.12, ty)
+        z_jaw = -0.05 - 0.34 * ty + 0.080 * (ty ** 2.8)
+        tip_taper = math.sqrt(max(0.018, 1.0 - max(0.0, (ty - 0.84) / 0.165) ** 2))
+        rear_taper = smooth_step(0.0, 0.10, ty)
 
-        w_jaw = (0.40 - 0.10 * ty + 0.05 * gaussian(y, -0.78, 0.14)) * tip_taper * (0.75 + 0.25 * rear_taper)
-        h_jaw = (0.14 + 0.04 * gaussian(y, -0.82, 0.12)) * tip_taper
+        w_jaw = (
+            0.38
+            - 0.085 * ty
+            + 0.054 * gaussian(y_linear, -0.65, 0.12)
+        ) * tip_taper * (0.78 + 0.22 * rear_taper)
+
+        h_jaw = (
+            0.165
+            + 0.044 * gaussian(y_linear, -0.18, 0.14)
+            + 0.052 * gaussian(y_linear, -0.68, 0.10)
+        ) * tip_taper
+
+        commissure_zone = gaussian(y_linear, -0.10, 0.095)
+        trough_env = math.sin(ty * math.pi) * (1.0 - smooth_step(0.70, 0.82, ty))
 
         ring_verts = []
         for it in range(n_theta):
@@ -374,19 +663,26 @@ def build_roaring_lower_jaw():
             cos_t = math.cos(theta)
 
             rx = w_jaw
-            gum_ridge = gaussian(abs_t, 1.32, 0.24) * tip_taper
-            rx += 0.055 * gum_ridge
+            lip_roll = gaussian(abs_t, 1.24, 0.24) * tip_taper * trough_env
+            rx += 0.068 * lip_roll
             x = rx * sin_t
 
             if cos_t >= 0.0:
-                oral_trough = -0.11 * gaussian(abs_t, 0.0, 0.55) * math.sin(ty * math.pi)
-                gum_wall_lift = 0.065 * gaussian(abs_t, 1.18, 0.26) * math.sin(ty * math.pi)
-                z = z_jaw + h_jaw * 0.45 * cos_t + oral_trough + gum_wall_lift
+                oral_trough = -0.120 * gaussian(abs_t, 0.0, 0.52) * trough_env
+                lip_wall_lift = 0.065 * gaussian(abs_t, 1.18, 0.24) * trough_env
+                commissure_lift = 0.178 * commissure_zone * gaussian(abs_t, 1.26, 0.26)
+                z = z_jaw + h_jaw * 0.44 * cos_t + oral_trough + lip_wall_lift + commissure_lift
             else:
-                chin_boss = 0.055 * gaussian(y, -0.82, 0.12) * gaussian(abs_t, math.pi, 0.65)
-                z = z_jaw + (h_jaw + chin_boss) * cos_t
+                chin_boss = 0.062 * gaussian(y_linear, -0.68, 0.10) * gaussian(abs_t, math.pi, 0.55) * tip_taper
+                chin_cleft = -0.016 * gaussian(y_linear, -0.72, 0.07) * gaussian(abs_t, math.pi, 0.14) * tip_taper
+                mandible_keel = 0.028 * gaussian(abs_t, 2.15, 0.24) * tip_taper
+                z = z_jaw + (h_jaw + chin_boss + chin_cleft + mandible_keel) * cos_t
 
-            v = bm.verts.new((x, y, z))
+            micro = ceramic_micro_wave(x, y_linear, z, amp=0.0010)
+            x += micro * sin_t
+            z += micro * cos_t
+
+            v = bm.verts.new((x, y_linear, z))
             ring_verts.append(v)
         rings.append(ring_verts)
 
@@ -397,29 +693,8 @@ def build_roaring_lower_jaw():
             nit = (it + 1) % n_theta
             bm.faces.new((r0[it], r0[nit], r1[nit], r1[it]))
 
-    front_edges = []
-    for it in range(n_theta):
-        nit = (it + 1) % n_theta
-        for e in rings[-1][it].link_edges:
-            if e.other_vert(rings[-1][it]) == rings[-1][nit]:
-                front_edges.append(e)
-                break
-    try:
-        bmesh.ops.grid_fill(bm, edges=front_edges, mat_nr=0, use_interp_simple=True)
-    except Exception:
-        bmesh.ops.contextual_create(bm, geom=front_edges)
-
-    back_edges = []
-    for it in range(n_theta):
-        nit = (it + 1) % n_theta
-        for e in rings[0][it].link_edges:
-            if e.other_vert(rings[0][it]) == rings[0][nit]:
-                back_edges.append(e)
-                break
-    try:
-        bmesh.ops.grid_fill(bm, edges=back_edges, mat_nr=0, use_interp_simple=True)
-    except Exception:
-        bmesh.ops.contextual_create(bm, geom=back_edges)
+    close_ring_cap_watertight(bm, rings[-1], y_offset=-0.010, reverse_winding=False)
+    close_ring_cap_watertight(bm, rings[0], y_offset=0.010, reverse_winding=True)
 
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     mesh = bpy.data.meshes.new("Dragon_Lower_Jaw_Mesh")
@@ -437,6 +712,7 @@ def build_roaring_lower_jaw():
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier=sub.name)
+    assign_box_uvs(obj.data, uv_scale=2.6)
     bpy.ops.object.shade_smooth()
     obj.data.materials.append(mat_vermilion)
     return obj
@@ -446,9 +722,9 @@ lower_jaw_obj = build_roaring_lower_jaw()
 # ---------------------------------------------------------------------------
 # 4. Seamless Branched Stag Antlers (雙鹿角：自然分叉、根部角座厚度、Voxel融合無接縫)
 # ---------------------------------------------------------------------------
-print("[DragonHead] Sculpting seamless branched stag antlers...")
+print("[DragonHead 2.2] Sculpting seamless branched stag antlers...")
 
-def create_tapered_curve_mesh(name, points_radii, resolution_u=20, bevel_res=8):
+def create_tapered_curve_mesh(name, points_radii, resolution_u=18, bevel_res=6):
     curve_data = bpy.data.curves.new(name + "_Curve", type='CURVE')
     curve_data.dimensions = '3D'
     curve_data.resolution_u = resolution_u
@@ -478,11 +754,11 @@ antler_parts = []
 for side in (-1, 1):
     side_parts = []
     bpy.ops.mesh.primitive_torus_add(
-        major_radius=0.105,
-        minor_radius=0.038,
+        major_radius=0.108,
+        minor_radius=0.040,
         major_segments=22,
         minor_segments=12,
-        location=(side * 0.22, -0.06, 0.54),
+        location=(side * 0.22, -0.05, 0.55),
         rotation=(math.radians(-26), math.radians(side * 20), 0)
     )
     burr = bpy.context.active_object
@@ -491,13 +767,13 @@ for side in (-1, 1):
     side_parts.append(burr)
 
     main_beam = create_tapered_curve_mesh(f"Antler_Beam_{side}", [
-        ((side * 0.21, -0.06, 0.42), 0.105),
-        ((side * 0.24, 0.00, 0.58), 0.090),
-        ((side * 0.34, 0.18, 0.86), 0.074),
-        ((side * 0.46, 0.44, 1.18), 0.060),
+        ((side * 0.21, -0.05, 0.42), 0.106),
+        ((side * 0.24, 0.01, 0.59), 0.090),
+        ((side * 0.34, 0.19, 0.87), 0.074),
+        ((side * 0.46, 0.45, 1.18), 0.060),
         ((side * 0.52, 0.68, 1.48), 0.044),
         ((side * 0.44, 0.84, 1.72), 0.015),
-    ], resolution_u=22, bevel_res=8)
+    ], resolution_u=20, bevel_res=7)
     side_parts.append(main_beam)
 
     tine1 = create_tapered_curve_mesh(f"Antler_Tine1_{side}", [
@@ -505,7 +781,7 @@ for side in (-1, 1):
         ((side * 0.36, -0.02, 0.92), 0.048),
         ((side * 0.34, -0.18, 1.08), 0.030),
         ((side * 0.28, -0.26, 1.22), 0.013),
-    ], resolution_u=16, bevel_res=7)
+    ], resolution_u=14, bevel_res=6)
     side_parts.append(tine1)
 
     tine2 = create_tapered_curve_mesh(f"Antler_Tine2_{side}", [
@@ -513,14 +789,14 @@ for side in (-1, 1):
         ((side * 0.58, 0.40, 1.20), 0.042),
         ((side * 0.72, 0.42, 1.36), 0.026),
         ((side * 0.78, 0.40, 1.50), 0.012),
-    ], resolution_u=16, bevel_res=7)
+    ], resolution_u=14, bevel_res=6)
     side_parts.append(tine2)
 
     tine3 = create_tapered_curve_mesh(f"Antler_Tine3_{side}", [
         ((side * 0.49, 0.56, 1.34), 0.046),
         ((side * 0.56, 0.76, 1.48), 0.032),
         ((side * 0.60, 0.94, 1.60), 0.013),
-    ], resolution_u=14, bevel_res=6)
+    ], resolution_u=12, bevel_res=6)
     side_parts.append(tine3)
 
     bpy.ops.object.select_all(action='DESELECT')
@@ -555,98 +831,304 @@ bpy.context.view_layer.objects.active = antler_parts[0]
 bpy.ops.object.join()
 antlers_obj = bpy.context.active_object
 antlers_obj.name = "Dragon_Antlers"
+assign_box_uvs(antlers_obj.data, uv_scale=2.2)
 antlers_obj.data.materials.append(mat_gold)
 
 # ---------------------------------------------------------------------------
-# 5. Eyes, Eyelids, Golden Iris Rings & Sculpted Nostril Rims
+# 5. Sleek Scowling Phoenix Eyelids, Solid Vertical-Slit Golden Iris & Spiral Ruyi Nostril Wings
 # ---------------------------------------------------------------------------
-print("[DragonHead] Building prominent recessed eyes, sculpted eyelids, irises & nostril rims...")
+print("[DragonHead 2.2] Sculpting sleek scowling phoenix eyelids, solid vertical-slit golden iris & spiral Ruyi nostril wings...")
+
+def build_fierce_slit_spherical_iris(name, eye_center, radius, gaze_dir):
+    """
+    Builds a solid, flush golden iris ring with a vertical-elliptical dragon slit pupil (威嚴東方龍束瞳).
+    Guarantees r_local >= 1.006 * radius across the entire iris body so ZERO black eyeball pokes through!
+    """
+    bm = bmesh.new()
+    n_rad = 12
+    n_seg = 40
+
+    z_axis = gaze_dir.normalized()
+    up_ref = Vector((0.0, 0.0, 1.0))
+    x_axis = up_ref.cross(z_axis).normalized()
+    y_axis = z_axis.cross(x_axis).normalized()
+
+    rings = []
+    for ir in range(n_rad):
+        tr = ir / (n_rad - 1)
+        # Positive convex-ruff iris profile: always strictly above radius (1.002 at edges, 1.042 at pupillary crest)
+        arch_base = math.sin(tr * math.pi)
+        pupillary_ruff = 0.30 * gaussian(tr, 0.22, 0.14)
+
+        ring_verts = []
+        for iseg in range(n_seg):
+            phi = (iseg / n_seg) * 2.0 * math.pi
+            cos_p = math.cos(phi)
+            sin_p = math.sin(phi)
+
+            # Vertical-elliptical dragon pupil at tr=0 (alpha_x = 12.0 deg, alpha_y = 19.5 deg)
+            # transitioning smoothly to circular outer limbus at tr=1 (alpha_outer = 34.0 deg)
+            alpha_inner_phi = math.radians(12.0 * (cos_p ** 2) + 19.5 * (sin_p ** 2))
+            alpha_outer_phi = math.radians(34.0)
+            alpha = alpha_inner_phi + tr * (alpha_outer_phi - alpha_inner_phi)
+
+            sin_a = math.sin(alpha)
+            cos_a = math.cos(alpha)
+
+            striation = 0.0006 * math.cos(phi * 24.0) * arch_base
+            r_local = radius * (0.998 + 0.036 * (arch_base + pupillary_ruff)) + striation
+
+            local_dir = (
+                cos_a * z_axis
+                + sin_a * cos_p * x_axis
+                + sin_a * sin_p * y_axis
+            ).normalized()
+            pt = eye_center + r_local * local_dir
+            ring_verts.append(bm.verts.new(pt))
+        rings.append(ring_verts)
+
+    for ir in range(n_rad - 1):
+        r0 = rings[ir]
+        r1 = rings[ir + 1]
+        for iseg in range(n_seg):
+            niseg = (iseg + 1) % n_seg
+            bm.faces.new((r0[iseg], r0[niseg], r1[niseg], r1[iseg]))
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    obj = bpy.data.objects.new(name, mesh)
+    link_to_master(obj)
+    assign_box_uvs(obj.data, uv_scale=3.2)
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.shade_smooth()
+    return obj
+
+def build_scowling_phoenix_eyelid_wrap(name, side, eye_center, radius, gaze_dir):
+    """
+    Builds a single-layer, taut, scowling phoenix/almond dragon eyelid wrap (緊緻單層丹鳳怒目眼瞼):
+    - NO secondary balloon bump on top of the eyelid!
+    - The upper eyelid margin presses diagonally across the top of the iris with a fierce scowl line,
+      pinching into a sharp hooked inner tear-duct canthus and swept outer flame canthus,
+      and blending smoothly back into the skull's deep orbital socket beneath the overhanging brow bone.
+    """
+    bm = bmesh.new()
+    n_u = 48
+    n_v = 18
+
+    z_axis = gaze_dir.normalized()
+    world_up = Vector((side * -0.26, 0.28, 0.92)).normalized()
+    x_axis = world_up.cross(z_axis).normalized()
+    y_axis = z_axis.cross(x_axis).normalized()
+    if y_axis.z < 0:
+        y_axis = -y_axis
+        x_axis = -x_axis
+
+    inner_sign = 1.0 if (x_axis.y < 0.0) else -1.0
+
+    rings = []
+    for iu in range(n_u):
+        phi = (iu / n_u) * 2.0 * math.pi
+        cos_p = math.cos(phi)
+        sin_p = math.sin(phi)
+
+        is_upper = max(0.0, sin_p)
+        is_lower = max(0.0, -sin_p)
+        is_corner = cos_p * cos_p
+        is_inner_corner = max(0.0, inner_sign * cos_p)
+        is_outer_corner = max(0.0, -inner_sign * cos_p)
+
+        # Taut almond dragon fissure: upper lid lowers to 27.5 deg to hood top of iris; corners flare to 45 deg
+        upper_scowl_press = 5.5 * is_upper * (0.65 + 0.35 * is_inner_corner)
+        lower_taut_rim = 2.0 * is_lower
+        corner_flare = 14.0 * (is_corner ** 1.15)
+        alpha_aperture = math.radians(33.0 - upper_scowl_press - lower_taut_rim + corner_flare)
+        alpha_back = math.radians(135.0)
+
+        loop_verts = []
+        for iv in range(n_v):
+            tv = iv / (n_v - 1)
+            alpha = alpha_aperture + (tv ** 1.1) * (alpha_back - alpha_aperture)
+            sin_a = math.sin(alpha)
+            cos_a = math.cos(alpha)
+
+            # Single sleek palpebral fold crest at tv=0.20 tapering smoothly back into the skull socket!
+            primary_fold = gaussian(tv, 0.20, 0.14) + 0.45 * gaussian(tv, 0.50, 0.24)
+            inner_rim_tuck = -0.024 * gaussian(tv, 0.0, 0.045)
+            deep_socket_close = -0.025 * smooth_step(0.88, 1.0, tv)
+
+            fold_amp = 0.044 * is_upper + 0.028 * is_lower + 0.024 * is_corner
+            r_lid = radius * (1.032 + inner_rim_tuck + deep_socket_close) + fold_amp * primary_fold
+
+            canthus_hook = (
+                -0.028 * (is_inner_corner ** 2.2)
+                + 0.032 * (is_outer_corner ** 2.0)
+                - 0.012 * is_upper * (1.0 - is_corner) * (1.0 - tv)
+            ) * (1.0 - 0.45 * tv)
+
+            dir_vec = (
+                cos_a * z_axis
+                + sin_a * cos_p * x_axis
+                + (sin_a * sin_p + canthus_hook) * y_axis
+            ).normalized()
+
+            pt = eye_center + r_lid * dir_vec
+            loop_verts.append(bm.verts.new(pt))
+        rings.append(loop_verts)
+
+    for iu in range(n_u):
+        niu = (iu + 1) % n_u
+        r0 = rings[iu]
+        r1 = rings[niu]
+        for iv in range(n_v - 1):
+            bm.faces.new((r0[iv], r1[iv], r1[iv + 1], r0[iv + 1]))
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    obj = bpy.data.objects.new(name, mesh)
+    link_to_master(obj)
+    sub = obj.modifiers.new(name="Subsurf", type='SUBSURF')
+    sub.levels = 1
+    sub.render_levels = 1
+    bpy.context.view_layer.update()
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=sub.name)
+    assign_box_uvs(obj.data, uv_scale=3.0)
+    bpy.ops.object.shade_smooth()
+    return obj
+
+def build_spiral_ruyi_nostril_wing(name, side, nostril_loc, nostril_dir):
+    bm = bmesh.new()
+    n_u = 36
+    n_v = 16
+    z_axis = nostril_dir.normalized()
+    up_ref = Vector((0.0, 0.0, 1.0))
+    x_axis = up_ref.cross(z_axis).normalized()
+    y_axis = z_axis.cross(x_axis).normalized()
+
+    rings = []
+    for iu in range(n_u):
+        u = (iu / n_u) * 2.0 * math.pi
+        cos_u = math.cos(u)
+        sin_u = math.sin(u)
+
+        is_dorsal = max(0.0, sin_u)
+        is_outer = max(0.0, side * cos_u)
+        is_ventral = max(0.0, -sin_u)
+        wing_flare = 1.0 + 0.48 * is_dorsal + 0.34 * is_outer - 0.14 * is_ventral
+        alar_pinch = 0.012 * math.cos(u * 3.0)
+
+        loop_verts = []
+        for iv in range(n_v):
+            tv = iv / (n_v - 1)
+            if tv < 0.55:
+                st = tv / 0.55
+                r_ring = 0.014 + (0.046 + 0.025 * wing_flare + alar_pinch) * (st ** 0.75)
+                z_off = -0.065 + (0.065 + 0.034 * wing_flare) * math.sin(st * math.pi * 0.5)
+            else:
+                st = (tv - 0.55) / 0.45
+                r_crest = 0.060 + 0.025 * wing_flare + alar_pinch
+                r_ring = r_crest + 0.014 * math.sin(st * math.pi) - 0.008 * st
+                z_off = 0.034 * wing_flare * math.cos(st * math.pi * 0.5) - 0.044 * (st ** 1.4)
+
+            pt = (
+                nostril_loc
+                + (r_ring * 1.18 * cos_u) * x_axis
+                + (r_ring * 0.92 * sin_u) * y_axis
+                + z_off * z_axis
+            )
+            loop_verts.append(bm.verts.new(pt))
+        rings.append(loop_verts)
+
+    for iu in range(n_u):
+        niu = (iu + 1) % n_u
+        r0 = rings[iu]
+        r1 = rings[niu]
+        for iv in range(n_v - 1):
+            bm.faces.new((r0[iv], r1[iv], r1[iv + 1], r0[iv + 1]))
+
+    tunnel_ring = [rings[iu][0] for iu in range(n_u)]
+    close_ring_cap_watertight(bm, tunnel_ring, y_offset=0.015, reverse_winding=True)
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    obj = bpy.data.objects.new(name, mesh)
+    link_to_master(obj)
+    sub = obj.modifiers.new(name="Subsurf", type='SUBSURF')
+    sub.levels = 1
+    sub.render_levels = 1
+    bpy.context.view_layer.update()
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=sub.name)
+    assign_box_uvs(obj.data, uv_scale=3.2)
+    bpy.ops.object.shade_smooth()
+    return obj
 
 eye_objs = []
 lid_objs = []
 iris_objs = []
+nostril_cav_objs = []
 
 for side in (-1, 1):
-    # Elevated and angled forward so eyes & golden irises are 100% visible from Front, 45° and Side views!
-    eye_center = Vector((side * 0.385, -0.355, 0.305))
+    eye_center = Vector((side * 0.362, -0.340, 0.312))
+    eye_radius = 0.100
+    gaze_dir = Vector((side * 0.43, -0.89, -0.07)).normalized()
 
-    # 1) Glossy Obsidian Eyeball Core
+    # 1) Obsidian Eyeball Core
     bpy.ops.mesh.primitive_uv_sphere_add(
-        segments=24,
-        ring_count=16,
-        radius=0.105,
+        segments=28,
+        ring_count=18,
+        radius=eye_radius,
         location=eye_center
     )
     eyeball = bpy.context.active_object
     eyeball.name = f"Eyeball_{side}"
-    eyeball.scale = (0.98, 1.06, 0.98)
     link_to_master(eyeball)
     bpy.ops.object.shade_smooth()
     eye_objs.append(eyeball)
 
-    # 2) Golden Iris Ring oriented toward forward-lateral viewer (+32 deg outward, -68 deg forward)
-    gaze_dir = Vector((side * 0.38, -0.91, -0.12)).normalized()
-    bpy.ops.mesh.primitive_torus_add(
-        major_radius=0.060,
-        minor_radius=0.017,
-        major_segments=24,
-        minor_segments=12,
-        location=eye_center + gaze_dir * 0.082,
-    )
-    iris = bpy.context.active_object
-    iris.name = f"Eye_Iris_{side}"
-    iris.rotation_euler = gaze_dir.to_track_quat('Z', 'Y').to_euler()
-    link_to_master(iris)
-    bpy.ops.object.shade_smooth()
+    # 2) Solid Vertical-Slit Striated Golden Iris
+    iris = build_fierce_slit_spherical_iris(f"Eye_Iris_{side}", eye_center, eye_radius, gaze_dir)
     iris_objs.append(iris)
 
-    # 3) Upper & Lower Sculpted Eyelid Folds wrapping the eyeball rim
-    upper_lid = create_tapered_curve_mesh(f"Upper_Eyelid_{side}", [
-        ((side * 0.28, -0.45, 0.29), 0.022),
-        ((side * 0.38, -0.44, 0.39), 0.036),
-        ((side * 0.47, -0.34, 0.38), 0.034),
-        ((side * 0.48, -0.24, 0.30), 0.020),
-    ], resolution_u=16, bevel_res=6)
-    lid_objs.append(upper_lid)
+    # 3) Sleek Single-Layer Scowling Phoenix Eyelid Wrap
+    eyelid_wrap = build_scowling_phoenix_eyelid_wrap(f"Orbital_Eyelid_Wrap_{side}", side, eye_center, eye_radius, gaze_dir)
+    lid_objs.append(eyelid_wrap)
 
-    lower_lid = create_tapered_curve_mesh(f"Lower_Eyelid_{side}", [
-        ((side * 0.29, -0.44, 0.28), 0.018),
-        ((side * 0.39, -0.43, 0.21), 0.028),
-        ((side * 0.47, -0.33, 0.22), 0.026),
-        ((side * 0.47, -0.24, 0.29), 0.018),
-    ], resolution_u=16, bevel_res=6)
-    lid_objs.append(lower_lid)
-
-    # 4) Sculpted Ruyi Nostril Scroll Rim & Dark Nostril Interior Cavity (立體翻捲鼻翼環與深黑鼻孔內腔)
-    nostril_loc = Vector((side * 0.23, -0.94, 0.14))
-    nostril_dir = Vector((side * 0.35, -0.88, 0.32)).normalized()
-    bpy.ops.mesh.primitive_torus_add(
-        major_radius=0.068,
-        minor_radius=0.026,
-        major_segments=22,
-        minor_segments=10,
-        location=nostril_loc,
-    )
-    n_rim = bpy.context.active_object
-    n_rim.name = f"Nostril_Rim_{side}"
-    n_rim.rotation_euler = nostril_dir.to_track_quat('Z', 'Y').to_euler()
-    n_rim.scale = (1.15, 0.88, 1.0)
-    link_to_master(n_rim)
-    lid_objs.append(n_rim)
+    # 4) Flared Spiral Ruyi Nostril Wing with Deep Concave Nostril Tunnel
+    nostril_loc = Vector((side * 0.252, -0.725, 0.236))
+    nostril_dir = Vector((side * 0.44, -0.75, 0.49)).normalized()
+    n_wing = build_spiral_ruyi_nostril_wing(f"Nostril_Wing_{side}", side, nostril_loc, nostril_dir)
+    lid_objs.append(n_wing)
 
     bpy.ops.mesh.primitive_uv_sphere_add(
-        segments=16,
-        ring_count=12,
-        radius=0.056,
-        location=nostril_loc - nostril_dir * 0.018
+        segments=14,
+        ring_count=10,
+        radius=0.036,
+        location=nostril_loc - nostril_dir * 0.042
     )
     n_cav = bpy.context.active_object
     n_cav.name = f"Nostril_Cavity_{side}"
-    n_cav.scale = (1.0, 0.75, 0.85)
+    n_cav.scale = (0.95, 0.85, 0.65)
     link_to_master(n_cav)
-    eye_objs.append(n_cav)
+    bpy.ops.object.shade_smooth()
+    nostril_cav_objs.append(n_cav)
 
-def join_and_assign(obj_list, name, material):
+def join_and_assign(obj_list, name, material, uv_scale=2.6, assign_uv=True):
     bpy.ops.object.select_all(action='DESELECT')
     for o in obj_list:
         o.select_set(True)
@@ -654,210 +1136,629 @@ def join_and_assign(obj_list, name, material):
     bpy.ops.object.join()
     joined = bpy.context.active_object
     joined.name = name
+    if assign_uv:
+        assign_box_uvs(joined.data, uv_scale=uv_scale)
     bpy.ops.object.shade_smooth()
     joined.data.materials.clear()
     joined.data.materials.append(material)
     return joined
 
-eyes_mesh = join_and_assign(eye_objs, "Dragon_Eyeballs", mat_obsidian)
-iris_mesh = join_and_assign(iris_objs, "Dragon_Eye_Irises", mat_gold)
-lids_mesh = join_and_assign(lid_objs, "Dragon_Eyelids", mat_vermilion)
+eyes_mesh = join_and_assign(eye_objs, "Dragon_Eyeballs", mat_obsidian, uv_scale=3.0)
+iris_mesh = join_and_assign(iris_objs, "Dragon_Eye_Irises", mat_gold, uv_scale=3.2)
+lids_mesh = join_and_assign(lid_objs, "Dragon_Eyelids", mat_vermilion, uv_scale=2.8)
 
 # ---------------------------------------------------------------------------
-# 6. Curved Fangs, Teeth Rows & Curled Dragon Tongue (上下龍牙、齒列與口腔內捲曲龍舌)
+# 6. Anatomical Dentition with UV Root-to-Tip Shading & Smooth Scalloped Alveolar Gum Arches
 # ---------------------------------------------------------------------------
-print("[DragonHead] Sculpting curved fangs, dentition & curled dragon tongue...")
+print("[DragonHead 2.2] Sculpting smooth scalloped alveolar gum arches, curved dental arch & root-shaded bone-ivory teeth...")
+
+def catmull_rom_spline(pts, num_samples):
+    n = len(pts)
+    if n < 2:
+        return [Vector(pts[0])] * num_samples
+    ext = [Vector(pts[0]) * 2.0 - Vector(pts[1])] + [Vector(p) for p in pts] + [Vector(pts[-1]) * 2.0 - Vector(pts[-2])]
+    out = []
+    for i in range(num_samples):
+        t_global = (i / (num_samples - 1)) * (n - 1)
+        seg = min(n - 2, int(t_global))
+        t = t_global - seg
+        p0, p1, p2, p3 = ext[seg], ext[seg + 1], ext[seg + 2], ext[seg + 3]
+        t2 = t * t
+        t3 = t2 * t
+        pos = 0.5 * (
+            (2.0 * p1)
+            + (-p0 + p2) * t
+            + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+            + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3
+        )
+        out.append(pos)
+    return out
+
+def create_sculpted_fang_mesh(name, spine_pts, rx_base, ry_base, flute_depth=0.08, n_u=12, n_v=14):
+    bm = bmesh.new()
+    centers = catmull_rom_spline(spine_pts, n_u)
+    rings = []
+
+    for iu in range(n_u):
+        tu = iu / (n_u - 1)
+        c = centers[iu]
+        if iu < n_u - 1:
+            tang = (centers[iu + 1] - c).normalized()
+        else:
+            tang = (c - centers[iu - 1]).normalized()
+
+        ref = Vector((1.0, 0.0, 0.0)) if abs(tang.x) < 0.85 else Vector((0.0, 1.0, 0.0))
+        b_axis = tang.cross(ref).normalized()
+        n_axis = b_axis.cross(tang).normalized()
+
+        taper = (1.0 - (tu ** 1.32)) * (1.0 + 0.14 * math.sin(tu * math.pi))
+        rx = max(0.002, rx_base * taper)
+        ry = max(0.002, ry_base * taper)
+
+        ring_verts = []
+        for iv in range(n_v):
+            ang = (iv / n_v) * 2.0 * math.pi
+            flute = 1.0 + flute_depth * math.cos(ang * 2.0) * math.sin(tu * math.pi)
+            local_pt = c + (rx * math.cos(ang) * flute) * n_axis + (ry * math.sin(ang) * flute) * b_axis
+            ring_verts.append(bm.verts.new(local_pt))
+        rings.append(ring_verts)
+
+    uv_layer = bm.loops.layers.uv.verify()
+
+    for iu in range(n_u - 1):
+        v0 = iu / n_u
+        v1 = (iu + 1) / n_u
+        r0 = rings[iu]
+        r1 = rings[iu + 1]
+        for iv in range(n_v):
+            niv = (iv + 1) % n_v
+            u0 = iv / n_v
+            u1 = (iv + 1) / n_v
+            f = bm.faces.new((r0[iv], r0[niv], r1[niv], r1[iv]))
+            f.loops[0][uv_layer].uv = (u0, v0)
+            f.loops[1][uv_layer].uv = (u1, v0)
+            f.loops[2][uv_layer].uv = (u1, v1)
+            f.loops[3][uv_layer].uv = (u0, v1)
+
+    tip_pt = centers[-1] + (centers[-1] - centers[-2]).normalized() * 0.004
+    v_tip = bm.verts.new(tip_pt)
+    v_last = (n_u - 1) / n_u
+    for iv in range(n_v):
+        niv = (iv + 1) % n_v
+        u0 = iv / n_v
+        u1 = (iv + 1) / n_v
+        f = bm.faces.new((rings[-1][iv], rings[-1][niv], v_tip))
+        f.loops[0][uv_layer].uv = (u0, v_last)
+        f.loops[1][uv_layer].uv = (u1, v_last)
+        f.loops[2][uv_layer].uv = ((u0 + u1) * 0.5, 0.99)
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    obj = bpy.data.objects.new(name, mesh)
+    link_to_master(obj)
+    return obj
 
 teeth_objs = []
+oral_crimson_objs = list(nostril_cav_objs)
+
+# High-Resolution Scalloped Upper & Lower Alveolar Gum Arches positioned right at the visible tooth emergence margin!
+# (Smoothly cradles every tooth root without co-planar sleeve sawtooth z-fighting!)
+upper_gum_arch = create_tapered_curve_mesh("Upper_Alveolar_Gum_Arch", [
+    ((-0.28, -0.16,  0.072), 0.038),
+    ((-0.26, -0.39,  0.062), 0.044),
+    ((-0.23, -0.62,  0.052), 0.050),
+    ((-0.13, -0.74,  0.048), 0.042),
+    (( 0.00, -0.77,  0.048), 0.038),
+    (( 0.13, -0.74,  0.048), 0.042),
+    (( 0.23, -0.62,  0.052), 0.050),
+    (( 0.26, -0.39,  0.062), 0.044),
+    (( 0.28, -0.16,  0.072), 0.038),
+], resolution_u=32, bevel_res=8)
+oral_crimson_objs.append(upper_gum_arch)
+
+lower_gum_arch = create_tapered_curve_mesh("Lower_Alveolar_Gum_Arch", [
+    ((-0.26, -0.20, -0.172), 0.034),
+    ((-0.24, -0.44, -0.212), 0.038),
+    ((-0.195,-0.675,-0.242), 0.044),
+    ((-0.11, -0.71, -0.232), 0.036),
+    (( 0.00, -0.725,-0.230), 0.034),
+    (( 0.11, -0.71, -0.232), 0.036),
+    (( 0.195,-0.675,-0.242), 0.044),
+    (( 0.24, -0.44, -0.212), 0.038),
+    (( 0.26, -0.20, -0.172), 0.034),
+], resolution_u=32, bevel_res=8)
+oral_crimson_objs.append(lower_gum_arch)
 
 for side in (-1, 1):
-    # 1) Large Upper Canine Fangs (根部深埋於上顎唇緣內部 z=0.06，絕不外露)
-    u_fang = create_tapered_curve_mesh(f"Upper_Fang_{side}", [
-        ((side * 0.25, -0.84, 0.07), 0.044),
-        ((side * 0.26, -0.86, -0.04), 0.036),
-        ((side * 0.25, -0.85, -0.15), 0.022),
-        ((side * 0.23, -0.81, -0.24), 0.005),
-    ], resolution_u=14, bevel_res=6)
-    teeth_objs.append(u_fang)
-
-    # 2) Large Lower Canine Fangs (根部深埋於下顎齒槽 z=-0.34 內部)
-    l_fang = create_tapered_curve_mesh(f"Lower_Fang_{side}", [
-        ((side * 0.21, -0.80, -0.34), 0.038),
-        ((side * 0.22, -0.82, -0.25), 0.030),
-        ((side * 0.21, -0.81, -0.17), 0.018),
-        ((side * 0.19, -0.78, -0.09), 0.005),
-    ], resolution_u=14, bevel_res=6)
-    teeth_objs.append(l_fang)
-
-    # 3) Upper & Lower Front Incisors (根部深埋於上下顎內部)
-    for idx, x_off in enumerate((0.055, 0.145)):
-        u_inc = create_tapered_curve_mesh(f"Upper_Incisor_{side}_{idx}", [
-            ((side * x_off, -0.92, 0.08), 0.022),
-            ((side * x_off, -0.93, 0.00), 0.016),
-            ((side * x_off, -0.91, -0.07), 0.004),
-        ], resolution_u=10, bevel_res=5)
+    # 1) Curved Horseshoe Anterior Incisors (前門齒列：非等距弧形排列，I1小且內收、I2中、I3大且外傾類犬齒)
+    incisor_specs = [
+        (0.028, -0.772, 0.078, -0.002, 0.013, -0.722, -0.258, -0.172, 0.012, 0.002),
+        (0.068, -0.760, 0.076, -0.022, 0.016, -0.710, -0.254, -0.152, 0.015, 0.008),
+        (0.126, -0.738, 0.074, -0.054, 0.022, -0.692, -0.250, -0.124, 0.019, 0.018),
+    ]
+    for idx, (xo, yu, zru, ztu, ru, yl, zrl, ztl, rl, fx) in enumerate(incisor_specs):
+        u_inc = create_sculpted_fang_mesh(
+            f"Upper_Incisor_{side}_{idx}",
+            [
+                (side * xo, yu + 0.012, zru),
+                (side * (xo + fx * 0.5), yu - 0.008, (zru + ztu) * 0.5),
+                (side * (xo + fx * 0.25), yu + 0.016, ztu),
+            ],
+            rx_base=ru,
+            ry_base=ru * 0.85
+        )
         teeth_objs.append(u_inc)
 
-        l_inc = create_tapered_curve_mesh(f"Lower_Incisor_{side}_{idx}", [
-            ((side * x_off, -0.86, -0.35), 0.020),
-            ((side * x_off, -0.87, -0.28), 0.014),
-            ((side * x_off, -0.85, -0.22), 0.004),
-        ], resolution_u=10, bevel_res=5)
+        l_inc = create_sculpted_fang_mesh(
+            f"Lower_Incisor_{side}_{idx}",
+            [
+                (side * (xo * 0.90), yl + 0.012, zrl),
+                (side * (xo * 0.90 + fx * 0.45), yl - 0.006, (zrl + ztl) * 0.5),
+                (side * (xo * 0.88 + fx * 0.20), yl + 0.014, ztl),
+            ],
+            rx_base=rl,
+            ry_base=rl * 0.85
+        )
         teeth_objs.append(l_inc)
 
-    # 4) Lateral Premolars / Molars along jaw margin
-    for idx in range(4):
-        t = idx / 3.0
-        y_pos = -0.68 + t * 0.32
-        x_pos_u = 0.28 + t * 0.05
-        z_pos_u = 0.06 + t * 0.03
-        u_mol = create_tapered_curve_mesh(f"Upper_Molar_{side}_{idx}", [
-            ((side * x_pos_u, y_pos, z_pos_u), 0.026),
-            ((side * x_pos_u, y_pos, z_pos_u - 0.05), 0.018),
-            ((side * (x_pos_u - 0.01), y_pos + 0.02, z_pos_u - 0.10), 0.005),
-        ], resolution_u=10, bevel_res=5)
-        teeth_objs.append(u_mol)
+    # 2) Commanding Upper Sabre Canine Fang
+    u_fang = create_sculpted_fang_mesh(
+        f"Upper_Main_Canine_{side}",
+        [
+            (side * 0.220, -0.62,  0.088),
+            (side * 0.238, -0.64, -0.020),
+            (side * 0.230, -0.63, -0.130),
+            (side * 0.208, -0.58, -0.230),
+        ],
+        rx_base=0.044,
+        ry_base=0.051,
+        flute_depth=0.10,
+        n_u=16,
+        n_v=16
+    )
+    teeth_objs.append(u_fang)
 
-        x_pos_l = 0.25 + t * 0.05
-        z_pos_l = -0.30 + t * 0.09
-        l_mol = create_tapered_curve_mesh(f"Lower_Molar_{side}_{idx}", [
-            ((side * x_pos_l, y_pos, z_pos_l - 0.02), 0.023),
-            ((side * x_pos_l, y_pos, z_pos_l + 0.03), 0.016),
-            ((side * (x_pos_l - 0.01), y_pos + 0.02, z_pos_l + 0.08), 0.005),
-        ], resolution_u=10, bevel_res=5)
-        teeth_objs.append(l_mol)
+    # 3) Interlocking Lower Sabre Canine Fang
+    l_fang = create_sculpted_fang_mesh(
+        f"Lower_Main_Canine_{side}",
+        [
+            (side * 0.192, -0.675, -0.285),
+            (side * 0.205, -0.690, -0.205),
+            (side * 0.198, -0.675, -0.120),
+            (side * 0.178, -0.640, -0.045),
+        ],
+        rx_base=0.037,
+        ry_base=0.043,
+        flute_depth=0.09,
+        n_u=16,
+        n_v=16
+    )
+    teeth_objs.append(l_fang)
 
-teeth_mesh = join_and_assign(teeth_objs, "Dragon_Teeth_Fangs", mat_ivory)
+    # 4) Non-Uniform Clustered Lateral Premolars & Double-Cusp Carnassial Fangs
+    upper_lateral_specs = [
+        (-0.525, 0.244, 0.082, 0.082, 0.018, 0.023, 0.014),
+        (-0.390, 0.262, 0.088, 0.155, 0.027, 0.039, 0.032),
+        (-0.285, 0.276, 0.094, 0.110, 0.022, 0.031, 0.022),
+        (-0.168, 0.286, 0.098, 0.070, 0.017, 0.022, 0.014),
+    ]
+    for idx, (yp, xp, zr, ln, rx_t, ry_t, bc) in enumerate(upper_lateral_specs):
+        u_lat = create_sculpted_fang_mesh(
+            f"Upper_Lateral_Tooth_{side}_{idx}",
+            [
+                (side * xp, yp, zr),
+                (side * (xp + 0.005), yp + bc * 0.3, zr - ln * 0.45),
+                (side * (xp - 0.008), yp + bc, zr - ln),
+            ],
+            rx_base=rx_t,
+            ry_base=ry_t
+        )
+        teeth_objs.append(u_lat)
 
-# 5) Dynamic S-Curved Dragon Tongue seated naturally inside the lower jaw trough
-tongue_obj = create_tapered_curve_mesh("Dragon_Tongue", [
-    ((0.0, -0.08, -0.10), 0.12),
-    ((0.0, -0.32, -0.20), 0.13),
-    ((0.0, -0.56, -0.28), 0.115),
-    ((0.0, -0.74, -0.26), 0.082),
-    ((0.0, -0.86, -0.19), 0.020),
-], resolution_u=18, bevel_res=8)
-tongue_obj.scale = (1.18, 1.0, 0.42)
-bpy.ops.object.select_all(action='DESELECT')
-tongue_obj.select_set(True)
-bpy.context.view_layer.objects.active = tongue_obj
-bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-tongue_obj.data.materials.append(mat_crimson)
+        if idx in (1, 2):
+            u_cusp = create_sculpted_fang_mesh(
+                f"Upper_Carnassial_Cusp_{side}_{idx}",
+                [
+                    (side * xp, yp + ry_t * 0.85, zr),
+                    (side * xp, yp + ry_t * 0.95, zr - ln * 0.28),
+                    (side * (xp - 0.005), yp + ry_t * 1.05, zr - ln * 0.55),
+                ],
+                rx_base=rx_t * 0.65,
+                ry_base=ry_t * 0.60,
+                n_u=8,
+                n_v=10
+            )
+            teeth_objs.append(u_cusp)
+
+    lower_lateral_specs = [
+        (-0.568, 0.226, -0.252, 0.086, 0.017, 0.022, 0.014),
+        (-0.442, 0.244, -0.228, 0.142, 0.025, 0.035, 0.026),
+        (-0.338, 0.258, -0.200, 0.104, 0.021, 0.028, 0.019),
+        (-0.215, 0.268, -0.175, 0.068, 0.017, 0.022, 0.012),
+    ]
+    for idx, (yp, xp, zr, ln, rx_t, ry_t, bc) in enumerate(lower_lateral_specs):
+        l_lat = create_sculpted_fang_mesh(
+            f"Lower_Lateral_Tooth_{side}_{idx}",
+            [
+                (side * xp, yp, zr),
+                (side * (xp + 0.005), yp + bc * 0.3, zr + ln * 0.45),
+                (side * (xp - 0.008), yp + bc, zr + ln),
+            ],
+            rx_base=rx_t,
+            ry_base=ry_t
+        )
+        teeth_objs.append(l_lat)
+
+        if idx in (1, 2):
+            l_cusp = create_sculpted_fang_mesh(
+                f"Lower_Carnassial_Cusp_{side}_{idx}",
+                [
+                    (side * xp, yp + ry_t * 0.85, zr),
+                    (side * xp, yp + ry_t * 0.95, zr + ln * 0.28),
+                    (side * (xp - 0.005), yp + ry_t * 1.05, zr + ln * 0.52),
+                ],
+                rx_base=rx_t * 0.65,
+                ry_base=ry_t * 0.60,
+                n_u=8,
+                n_v=10
+            )
+            teeth_objs.append(l_cusp)
+
+teeth_mesh = join_and_assign(teeth_objs, "Dragon_Teeth_Fangs", mat_ivory, assign_uv=False)
+
+# 5) Quad-Lofted S-Curved Dragon Tongue with Dorsal Median Sulcus & Pointed Flame Tip
+def build_sculpted_dragon_tongue():
+    bm = bmesh.new()
+    spine = catmull_rom_spline([
+        (0.0,  0.02, -0.07),
+        (0.0, -0.20, -0.16),
+        (0.0, -0.44, -0.24),
+        (0.0, -0.62, -0.21),
+        (0.0, -0.73, -0.15),
+    ], 26)
+    n_u = len(spine)
+    n_v = 24
+    rings = []
+
+    for iu in range(n_u):
+        tu = iu / (n_u - 1)
+        c = spine[iu]
+        w_tongue = 0.135 * math.sin(math.acos(max(-0.99, min(0.99, 2.0 * tu - 1.0)))) * (1.0 - 0.48 * (tu ** 1.8))
+        w_tongue = max(0.003, w_tongue + 0.024 * (1.0 - tu))
+        h_tongue = max(0.002, 0.048 * (1.0 - 0.84 * (tu ** 1.6)))
+
+        ring_verts = []
+        for iv in range(n_v):
+            ang = (iv / n_v) * 2.0 * math.pi
+            cos_a = math.cos(ang)
+            sin_a = math.sin(ang)
+            x = w_tongue * cos_a
+            sulcus = -0.016 * (1.0 - tu * 0.7) * gaussian(cos_a, 0.0, 0.28) if sin_a > 0.0 else 0.0
+            z = c.z + h_tongue * sin_a + sulcus
+            ring_verts.append(bm.verts.new((x, c.y, z)))
+        rings.append(ring_verts)
+
+    for iu in range(n_u - 1):
+        r0 = rings[iu]
+        r1 = rings[iu + 1]
+        for iv in range(n_v):
+            niv = (iv + 1) % n_v
+            bm.faces.new((r0[iv], r0[niv], r1[niv], r1[iv]))
+
+    v_tip = bm.verts.new((0.0, -0.755, -0.135))
+    for iv in range(n_v):
+        niv = (iv + 1) % n_v
+        bm.faces.new((rings[-1][iv], rings[-1][niv], v_tip))
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new("Dragon_Tongue_Mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    t_obj = bpy.data.objects.new("Dragon_Tongue_Core", mesh)
+    link_to_master(t_obj)
+    return t_obj
+
+tongue_core = build_sculpted_dragon_tongue()
+oral_crimson_objs.append(tongue_core)
+tongue_obj = join_and_assign(oral_crimson_objs, "Dragon_Tongue", mat_crimson, uv_scale=3.0)
 
 # ---------------------------------------------------------------------------
-# 7. Flowing Dragon Whiskers, Flame Eyebrows, Cheek Mane & Ruyi Nasal Crest
+# 7. Three-Tiered Ribbon Whiskers (主鬚、副鬚、後鬚) & Clustered Non-Comb Flame Brows/Mane
 # ---------------------------------------------------------------------------
-print("[DragonHead] Sculpting deep-rooted flowing whiskers, Jiannian flame brows & cheek curls...")
+print("[DragonHead 2.2] Sculpting 3-tier ribbon whiskers (主鬚、副鬚、後鬚) & clustered non-comb flame brows/mane...")
+
+def create_sculpted_ribbon_mesh(name, control_specs, n_u=30, up_hint=(0.0, 0.0, 1.0)):
+    bm = bmesh.new()
+    pts = [spec[0] for spec in control_specs]
+    widths = [spec[1] for spec in control_specs]
+    thicks = [spec[2] for spec in control_specs]
+    twists = [spec[3] for spec in control_specs]
+
+    centers = catmull_rom_spline(pts, n_u)
+    n_ctrl = len(control_specs)
+
+    def interp_scalar(arr, tu):
+        pos = tu * (n_ctrl - 1)
+        idx = min(n_ctrl - 2, int(pos))
+        frac = smooth_step(0.0, 1.0, pos - idx)
+        return arr[idx] * (1.0 - frac) + arr[idx + 1] * frac
+
+    profile_8 = [
+        (-0.50,  0.00),
+        (-0.26,  0.40),
+        ( 0.00,  0.54),
+        ( 0.26,  0.40),
+        ( 0.50,  0.00),
+        ( 0.26, -0.40),
+        ( 0.00, -0.54),
+        (-0.26, -0.40),
+    ]
+
+    up_vec = Vector(up_hint).normalized()
+    rings = []
+
+    for iu in range(n_u - 1):
+        tu = iu / (n_u - 1)
+        c = centers[iu]
+        if iu < n_u - 1:
+            tang = (centers[iu + 1] - c).normalized()
+        else:
+            tang = (c - centers[iu - 1]).normalized()
+
+        if abs(tang.dot(up_vec)) > 0.94:
+            ref = Vector((0.0, 1.0, 0.0))
+        else:
+            ref = up_vec
+        w_axis = tang.cross(ref).normalized()
+        h_axis = w_axis.cross(tang).normalized()
+
+        twist_rad = math.radians(interp_scalar(twists, tu))
+        cos_tw = math.cos(twist_rad)
+        sin_tw = math.sin(twist_rad)
+        w_rot = cos_tw * w_axis + sin_tw * h_axis
+        h_rot = -sin_tw * w_axis + cos_tw * h_axis
+
+        w_val = interp_scalar(widths, tu)
+        h_val = interp_scalar(thicks, tu)
+
+        ring_verts = []
+        for (wf, hf) in profile_8:
+            pt = c + (wf * w_val) * w_rot + (hf * h_val) * h_rot
+            ring_verts.append(bm.verts.new(pt))
+        rings.append(ring_verts)
+
+    for iu in range(len(rings) - 1):
+        r0 = rings[iu]
+        r1 = rings[iu + 1]
+        for iv in range(8):
+            niv = (iv + 1) % 8
+            bm.faces.new((r0[iv], r0[niv], r1[niv], r1[iv]))
+
+    bm.faces.new(tuple(reversed(rings[0])))
+
+    v_tip = bm.verts.new(centers[-1])
+    for iv in range(8):
+        niv = (iv + 1) % 8
+        bm.faces.new((rings[-1][iv], rings[-1][niv], v_tip))
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+
+    obj = bpy.data.objects.new(name, mesh)
+    link_to_master(obj)
+    return obj
 
 whisker_gold_objs = []
 flame_vermilion_objs = []
 
 for side in (-1, 1):
-    # 1) Primary Long Flowing Dragon Whiskers (根部深埋於 x=0.22 上顎內部，自然向外與向後S形舒展)
-    main_whisker = create_tapered_curve_mesh(f"Dragon_Whisker_Main_{side}", [
-        ((side * 0.22, -0.80, 0.03), 0.028),    # Deep internal root inside snout
-        ((side * 0.36, -0.86, 0.02), 0.038),    # Emerging at upper lip whisker follicle
-        ((side * 0.64, -0.94, -0.02), 0.030),   # Forward & outward sweep
-        ((side * 0.94, -0.76, -0.12), 0.023),   # Wide lateral arch
-        ((side * 1.14, -0.32, -0.18), 0.016),   # Mid-back S-wave
-        ((side * 1.26, 0.14, -0.06), 0.011),    # Trailing upward wave
-        ((side * 1.34, 0.50, 0.12), 0.004),     # Fine curled whisker tip
-    ], resolution_u=28, bevel_res=7)
+    # =========================================================================
+    # A. THREE-TIERED FLOWING RIBBON WHISKERS (主鬚、副鬚、後鬚：長短、寬窄、前後空間層次分明!)
+    # =========================================================================
+    # 1) Primary Sovereign Ribbon Whisker (主鬚)
+    main_follicle = create_tapered_curve_mesh(f"Main_Whisker_Follicle_{side}", [
+        ((side * 0.22, -0.65, 0.075), 0.044),
+        ((side * 0.29, -0.66, 0.070), 0.036),
+        ((side * 0.35, -0.67, 0.064), 0.024),
+    ], resolution_u=8, bevel_res=5)
+    flame_vermilion_objs.append(main_follicle)
+
+    main_whisker = create_sculpted_ribbon_mesh(
+        f"Dragon_Whisker_Primary_{side}",
+        [
+            ((side * 0.23, -0.65,  0.072), 0.028, 0.017, side * 12),
+            ((side * 0.34, -0.67,  0.062), 0.048, 0.019, side * 24),
+            ((side * 0.52, -0.69,  0.015), 0.082, 0.016, side * 42),
+            ((side * 0.72, -0.50, -0.055), 0.094, 0.014, side * 54),
+            ((side * 0.88, -0.14, -0.075), 0.072, 0.012, side * 26),
+            ((side * 0.96,  0.26,  0.015), 0.046, 0.009, side * -14),
+            ((side * 0.90,  0.62,  0.145), 0.022, 0.006, side * -34),
+            ((side * 0.78,  0.88,  0.245), 0.003, 0.002, side * -48),
+        ],
+        n_u=36,
+        up_hint=(0.0, 0.0, 1.0)
+    )
     whisker_gold_objs.append(main_whisker)
 
-    # Secondary Upper Nostril Tendril Whisker (向外前方優雅微揚，絕不遮擋45度角龍睛視線!)
-    sub_whisker = create_tapered_curve_mesh(f"Dragon_Whisker_Sub_{side}", [
-        ((side * 0.22, -0.88, 0.08), 0.018),    # Deep internal root
-        ((side * 0.35, -0.92, 0.10), 0.025),    # Emerging below nostril scroll
-        ((side * 0.56, -1.02, 0.15), 0.018),
-        ((side * 0.76, -0.96, 0.24), 0.011),
-        ((side * 0.86, -0.82, 0.32), 0.004),
-    ], resolution_u=20, bevel_res=6)
+    # 2) Secondary Anterior Tendril Whisker (副鬚)
+    sub_follicle = create_tapered_curve_mesh(f"Sub_Whisker_Follicle_{side}", [
+        ((side * 0.18, -0.74, 0.094), 0.032),
+        ((side * 0.25, -0.76, 0.090), 0.026),
+        ((side * 0.30, -0.77, 0.086), 0.018),
+    ], resolution_u=8, bevel_res=5)
+    flame_vermilion_objs.append(sub_follicle)
+
+    sub_whisker = create_sculpted_ribbon_mesh(
+        f"Dragon_Whisker_Secondary_{side}",
+        [
+            ((side * 0.18, -0.74, 0.092), 0.018, 0.012, side * 18),
+            ((side * 0.28, -0.77, 0.086), 0.034, 0.013, side * 32),
+            ((side * 0.44, -0.82, 0.058), 0.048, 0.011, side * 48),
+            ((side * 0.58, -0.73, 0.035), 0.036, 0.008, side * 22),
+            ((side * 0.66, -0.54, 0.068), 0.018, 0.005, side * -8),
+            ((side * 0.64, -0.36, 0.125), 0.003, 0.002, side * -26),
+        ],
+        n_u=24,
+        up_hint=(0.0, 0.0, 1.0)
+    )
     whisker_gold_objs.append(sub_whisker)
 
-    # 2) Multi-layered Jiannian Flame Eyebrows (根部深嵌於眉骨內，向外後方怒張飛揚)
-    for b_idx in range(5):
-        t = b_idx / 4.0
-        bx = 0.22 + t * 0.22
-        by = -0.38 + t * 0.20
-        bz = 0.35 + t * 0.10
-        brow_lock = create_tapered_curve_mesh(f"Flame_Brow_{side}_{b_idx}", [
-            ((side * (bx - 0.08), by + 0.04, bz - 0.05), 0.024), # Deep internal root inside brow ridge
-            ((side * bx, by, bz), 0.040),                        # Emerging at brow crest
-            ((side * (bx + 0.13), by + 0.06, bz + 0.10), 0.030),
-            ((side * (bx + 0.25), by + 0.20, bz + 0.22), 0.019),
-            ((side * (bx + 0.21), by + 0.34, bz + 0.34), 0.005),
-        ], resolution_u=16, bevel_res=6)
-        if b_idx in (0, 2, 4):
-            whisker_gold_objs.append(brow_lock)
+    # 3) Tertiary Posterior Maxillary Whisker (後鬚)
+    rear_follicle = create_tapered_curve_mesh(f"Rear_Whisker_Follicle_{side}", [
+        ((side * 0.26, -0.44, 0.072), 0.036),
+        ((side * 0.33, -0.45, 0.068), 0.028),
+        ((side * 0.38, -0.44, 0.062), 0.020),
+    ], resolution_u=8, bevel_res=5)
+    flame_vermilion_objs.append(rear_follicle)
+
+    rear_whisker = create_sculpted_ribbon_mesh(
+        f"Dragon_Whisker_Posterior_{side}",
+        [
+            ((side * 0.27, -0.44,  0.070), 0.022, 0.014, side * -12),
+            ((side * 0.37, -0.44,  0.060), 0.038, 0.015, side * -26),
+            ((side * 0.52, -0.34, -0.025), 0.058, 0.013, side * -44),
+            ((side * 0.66, -0.08, -0.145), 0.050, 0.011, side * -28),
+            ((side * 0.74,  0.24, -0.155), 0.032, 0.008, side * 8),
+            ((side * 0.72,  0.54, -0.085), 0.015, 0.005, side * 28),
+            ((side * 0.64,  0.76, -0.010), 0.003, 0.002, side * 42),
+        ],
+        n_u=28,
+        up_hint=(0.0, 0.0, 1.0)
+    )
+    whisker_gold_objs.append(rear_whisker)
+
+    # =========================================================================
+    # B. CLUSTERED ASYMMETRIC FLAME EYEBROWS (主次分明、長短寬窄交錯的火焰眉簇 — 100%浮於眉弓骨稜外上方，絕不穿模額頭皮膚!)
+    # =========================================================================
+    brow_cluster_specs = [
+        # 1. Inner Glabella Short Scowl Flame Tongue (眉頭短怒焰)
+        (True,  (0.24, -0.36, 0.38), (0.31, -0.40, 0.43), (0.38, -0.39, 0.49), (0.41, -0.34, 0.55), (0.38, -0.28, 0.59), 0.046, 0.018, 28),
+        # 2. Anterior Secondary Splay Flame (前次眉焰 — 向外前上方展開)
+        (False, (0.28, -0.34, 0.40), (0.36, -0.37, 0.46), (0.47, -0.34, 0.54), (0.55, -0.24, 0.63), (0.52, -0.14, 0.69), 0.058, 0.019, 42),
+        # 3. HERO PRIMARY BROW PEAK FLAME (主眉峰巨焰 — 最寬最長、向外上方威猛飛揚!)
+        (True,  (0.32, -0.30, 0.42), (0.41, -0.32, 0.49), (0.55, -0.25, 0.61), (0.67, -0.09, 0.74), (0.62,  0.07, 0.83), 0.082, 0.022, 50),
+        # 4. Upper Companion Overlapping Flame (主眉上方交疊副焰 — 與主焰交錯抱合)
+        (False, (0.35, -0.26, 0.43), (0.44, -0.27, 0.51), (0.55, -0.18, 0.64), (0.62, -0.03, 0.74), (0.58,  0.10, 0.79), 0.054, 0.018, 34),
+        # 5. Posterior Outer Sweeping Flame (眉尾外掠長焰 — 向外側後方大幅舒展)
+        (True,  (0.38, -0.22, 0.42), (0.47, -0.22, 0.48), (0.61, -0.12, 0.57), (0.73,  0.04, 0.66), (0.71,  0.19, 0.72), 0.066, 0.020, 46),
+        # 6. Outer Temple Basal Curling Tongue (太陽穴底托短焰)
+        (False, (0.41, -0.18, 0.39), (0.49, -0.17, 0.44), (0.59, -0.08, 0.50), (0.66,  0.03, 0.55), (0.64,  0.12, 0.58), 0.048, 0.017, 25),
+    ]
+    for b_idx, (is_gold, p0, p1, p2, p3, p4, wm, thm, twp) in enumerate(brow_cluster_specs):
+        brow_blade = create_sculpted_ribbon_mesh(
+            f"Flame_Brow_Cluster_{side}_{b_idx}",
+            [
+                ((side * p0[0], p0[1], p0[2]), wm * 0.45, thm * 0.85, side * (twp * 0.4)),
+                ((side * p1[0], p1[1], p1[2]), wm * 0.90, thm,        side * (twp * 0.75)),
+                ((side * p2[0], p2[1], p2[2]), wm * 1.08, thm * 0.82, side * twp),
+                ((side * p3[0], p3[1], p3[2]), wm * 0.56, thm * 0.55, side * (twp * 0.6)),
+                ((side * p4[0], p4[1], p4[2]), 0.003,     0.002,      side * (twp * 0.25)),
+            ],
+            n_u=18,
+            up_hint=(0.0, 1.0, 0.25)
+        )
+        if is_gold:
+            whisker_gold_objs.append(brow_blade)
         else:
-            flame_vermilion_objs.append(brow_lock)
+            flame_vermilion_objs.append(brow_blade)
 
-    # 3) Cheek Jowl Flame Locks (根部深嵌於腮幫內部 x=0.28，且高度範圍 cz in [0.00, 0.26] 絕不懸空外露底蓋!)
-    for c_idx in range(6):
-        t = c_idx / 5.0
-        cz = 0.26 - t * 0.26
-        cy = -0.06 + math.sin(t * math.pi) * 0.10
-        cx_surface = 0.44 + math.sin(t * math.pi) * 0.05
-        cheek_lock = create_tapered_curve_mesh(f"Cheek_Mane_{side}_{c_idx}", [
-            ((side * 0.26, cy + 0.04, cz + 0.02), 0.028),                # Deep internal root inside cranium/cheek
-            ((side * cx_surface, cy, cz), 0.046),                        # Emerging cleanly from cheek skin
-            ((side * (cx_surface + 0.15), cy + 0.14, cz + 0.03), 0.035),
-            ((side * (cx_surface + 0.29), cy + 0.30, cz + 0.09), 0.021),
-            ((side * (cx_surface + 0.35), cy + 0.45, cz + 0.18), 0.005),
-        ], resolution_u=16, bevel_res=6)
-        if c_idx % 2 == 0:
-            flame_vermilion_objs.append(cheek_lock)
+    # =========================================================================
+    # C. CLUSTERED NON-COMB CHEEK & JAWLINE FLAME MANE (三簇交疊龍腮火焰鬃毛)
+    # =========================================================================
+    cheek_cluster_specs = [
+        (False, (0.24, -0.05, 0.29), (0.43, -0.08, 0.28), (0.55, 0.04, 0.34), (0.64, 0.18, 0.41), (0.62, 0.28, 0.46), 0.052, 0.018, 22),
+        (True,  (0.24, -0.02, 0.23), (0.45, -0.04, 0.22), (0.63, 0.12, 0.28), (0.78, 0.32, 0.38), (0.76, 0.50, 0.46), 0.084, 0.022, 42),
+        (False, (0.23,  0.02, 0.18), (0.44,  0.01, 0.17), (0.57, 0.16, 0.20), (0.66, 0.34, 0.25), (0.64, 0.46, 0.30), 0.060, 0.019, 18),
+        (True,  (0.24, -0.03, 0.11), (0.46, -0.05, 0.10), (0.66, 0.11, 0.12), (0.82, 0.31, 0.20), (0.84, 0.52, 0.30), 0.090, 0.023, 48),
+        (False, (0.23,  0.00, 0.06), (0.44, -0.02, 0.05), (0.60, 0.12, 0.03), (0.73, 0.29, 0.08), (0.74, 0.44, 0.16), 0.058, 0.018, 30),
+        (True,  (0.22, -0.06, 0.01), (0.41, -0.08, 0.00), (0.54, 0.04, -0.02), (0.64, 0.18, 0.02), (0.65, 0.30, 0.08), 0.068, 0.020, 26),
+    ]
+    for c_idx, (is_gold, p0, p1, p2, p3, p4, wm, thm, twp) in enumerate(cheek_cluster_specs):
+        cheek_blade = create_sculpted_ribbon_mesh(
+            f"Cheek_Mane_Cluster_{side}_{c_idx}",
+            [
+                ((side * p0[0], p0[1], p0[2]), wm * 0.45, thm * 0.85, side * (twp * 0.35)),
+                ((side * p1[0], p1[1], p1[2]), wm * 0.92, thm,        side * (twp * 0.75)),
+                ((side * p2[0], p2[1], p2[2]), wm * 1.08, thm * 0.82, side * twp),
+                ((side * p3[0], p3[1], p3[2]), wm * 0.58, thm * 0.55, side * (twp * 0.60)),
+                ((side * p4[0], p4[1], p4[2]), 0.003,     0.002,      side * (twp * 0.20)),
+            ],
+            n_u=18,
+            up_hint=(0.0, 0.0, 1.0)
+        )
+        if is_gold:
+            whisker_gold_objs.append(cheek_blade)
         else:
-            whisker_gold_objs.append(cheek_lock)
+            flame_vermilion_objs.append(cheek_blade)
 
-# 4) Lower Jaw Chin Beard Locks (根部深嵌於下顎龍頷內部 z=-0.38)
-for ch_idx in range(-2, 3):
-    x_pos = ch_idx * 0.070
-    z_base = -0.43 - abs(ch_idx) * 0.010
-    y_base = -0.84 + abs(ch_idx) * 0.038
-    chin_lock = create_tapered_curve_mesh(f"Chin_Beard_{ch_idx}", [
-        ((x_pos * 0.7, y_base + 0.06, z_base + 0.07), 0.020), # Deep root inside chin bone
-        ((x_pos, y_base, z_base), 0.032),                     # Emerging under chin boss
-        ((x_pos * 1.22, y_base - 0.04, z_base - 0.10), 0.023),
-        ((x_pos * 1.45, y_base + 0.08, z_base - 0.22), 0.014),
-        ((x_pos * 1.60, y_base + 0.24, z_base - 0.30), 0.004),
-    ], resolution_u=16, bevel_res=6)
-    whisker_gold_objs.append(chin_lock)
+# 4) Layered Lower Jaw Chin Beard Tuft
+chin_specs = [
+    ( 0.000, -0.68, -0.45, 1.25, 0.056),
+    (-0.052, -0.65, -0.46, 0.95, 0.044),
+    ( 0.052, -0.65, -0.46, 0.95, 0.044),
+    (-0.105, -0.61, -0.46, 0.72, 0.036),
+    ( 0.105, -0.61, -0.46, 0.72, 0.036),
+]
+for ch_idx, (x_pos, y_base, z_base, l_sc, w_m) in enumerate(chin_specs):
+    chin_ribbon = create_sculpted_ribbon_mesh(
+        f"Chin_Beard_Ribbon_{ch_idx}",
+        [
+            ((x_pos * 0.60, y_base + 0.08, z_base + 0.07), w_m * 0.45, 0.014, x_pos * 140),
+            ((x_pos,        y_base,        z_base),        w_m,        0.016, x_pos * 220),
+            ((x_pos * 1.18, y_base + 0.05 * l_sc, z_base - 0.09 * l_sc), w_m * 1.08, 0.012, x_pos * 300),
+            ((x_pos * 1.35, y_base + 0.17 * l_sc, z_base - 0.18 * l_sc), w_m * 0.55, 0.008, x_pos * 180),
+            ((x_pos * 1.45, y_base + 0.32 * l_sc, z_base - 0.23 * l_sc), 0.003,      0.002, x_pos * 60),
+        ],
+        n_u=16,
+        up_hint=(1.0, 0.0, 0.0)
+    )
+    whisker_gold_objs.append(chin_ribbon)
 
-# 5) Nasal Bridge Ruyi Cloud Crest Fins (沿著傾斜鼻樑脊高度自然排列)
+# 5) Graduated Ruyi Nasal Bridge Cloud Crest Blades
 for n_idx in range(4):
     t_n = n_idx / 3.0
-    ny = -0.78 + t_n * 0.42
-    nz = 0.22 + t_n * 0.16
-    nasal_fin = create_tapered_curve_mesh(f"Nasal_Fin_{n_idx}", [
-        ((0.0, ny, nz - 0.06), 0.030),
-        ((0.0, ny + 0.03, nz + 0.04), 0.024),
-        ((0.0, ny + 0.10, nz + 0.09), 0.005),
-    ], resolution_u=12, bevel_res=5)
-    whisker_gold_objs.append(nasal_fin)
+    ny = -0.70 + t_n * 0.34
+    nz = 0.21 + t_n * 0.13
+    sc_n = 0.75 + 0.45 * t_n
+    nasal_blade = create_sculpted_ribbon_mesh(
+        f"Nasal_Crest_Blade_{n_idx}",
+        [
+            ((0.0, ny - 0.01, nz - 0.05), 0.024 * sc_n, 0.015, 90),
+            ((0.0, ny + 0.01, nz + 0.015), 0.044 * sc_n, 0.017, 90),
+            ((0.0, ny + 0.05 * sc_n, nz + 0.058 * sc_n), 0.028 * sc_n, 0.011, 90),
+            ((0.0, ny + 0.09 * sc_n, nz + 0.088 * sc_n), 0.003, 0.002, 90),
+        ],
+        n_u=12,
+        up_hint=(1.0, 0.0, 0.0)
+    )
+    whisker_gold_objs.append(nasal_blade)
 
-whiskers_gold_mesh = join_and_assign(whisker_gold_objs, "Dragon_Whiskers_And_Gold_Brows", mat_gold)
-flames_vermilion_mesh = join_and_assign(flame_vermilion_objs, "Dragon_Flame_Mane_Locks", mat_vermilion)
+whiskers_gold_mesh = join_and_assign(whisker_gold_objs, "Dragon_Whiskers_And_Gold_Brows", mat_gold, uv_scale=2.8)
+flames_vermilion_mesh = join_and_assign(flame_vermilion_objs, "Dragon_Flame_Mane_Locks", mat_vermilion, uv_scale=2.8)
 
 # ---------------------------------------------------------------------------
-# 8. Surface-Conformed Layered 3D Neck Scales, Dorsal Mane & Body Socket
+# 8. Surface-Conformed 3D Neck Scales, Dorsal Flame Fins & Form-Fitting Neck Collar
 # ---------------------------------------------------------------------------
-print("[DragonHead] Constructing surface-conformed overlapping 3D neck scales, dorsal fins & body socket...")
+print("[DragonHead 2.2] Constructing surface-conformed 3D neck scales, dorsal fins & form-fitting neck collar...")
 
 def build_curved_shield_scale_template():
-    """Creates a thick 3D curved shield scale mesh with central keel ridge."""
     bm = bmesh.new()
     top_coords = [
-        (0.0, 0.065, 0.026),
-        (-0.088, 0.0, 0.018),
-        (-0.068, -0.095, 0.010),
-        (0.0, -0.145, 0.016),
-        (0.068, -0.095, 0.010),
-        (0.088, 0.0, 0.018),
-        (0.0, -0.045, 0.035),
+        (0.0, 0.068, 0.026),
+        (-0.090, 0.0, 0.018),
+        (-0.070, -0.098, 0.010),
+        (0.0, -0.148, 0.017),
+        (0.070, -0.098, 0.010),
+        (0.090, 0.0, 0.018),
+        (0.0, -0.045, 0.038),
     ]
-    bot_coords = [(x, y, z - 0.045) for (x, y, z) in top_coords]
+    bot_coords = [(x, y, z - 0.046) for (x, y, z) in top_coords]
 
     t_verts = [bm.verts.new(c) for c in top_coords]
     b_verts = [bm.verts.new(c) for c in bot_coords]
@@ -878,15 +1779,13 @@ scale_template = build_curved_shield_scale_template()
 emerald_scale_objs = []
 gold_scale_objs = []
 
-# Place 5 staggered rows of 3D scales directly on the exact neck surface profile (-95 deg to +95 deg)
-neck_y_rows = [0.28, 0.41, 0.54, 0.67, 0.80]
+neck_y_rows = [0.26, 0.39, 0.52, 0.65, 0.78]
 
 for r_idx, ny in enumerate(neck_y_rows):
     z_c, n_rx, n_rz = get_neck_profile(ny)
-    # Account for occipital blend near y=0.28
-    occ_blend = gaussian(ny, 0.0, 0.24)
-    surf_rx = n_rx + 0.14 * occ_blend + 0.012
-    surf_rz = n_rz + 0.12 * occ_blend + 0.012
+    occ_blend = gaussian(ny, 0.0, 0.22)
+    surf_rx = n_rx + 0.14 * occ_blend + 0.010
+    surf_rz = n_rz + 0.12 * occ_blend + 0.010
 
     num_in_row = 9
     for s_idx in range(num_in_row):
@@ -912,41 +1811,73 @@ for r_idx, ny in enumerate(neck_y_rows):
         else:
             emerald_scale_objs.append(sc_obj)
 
-# Central Dorsal Mane Fins along Top of Neck & Occiput
 for d_idx in range(6):
-    dy = 0.12 + d_idx * 0.135
+    dy = 0.12 + d_idx * 0.13
     z_c, _, n_rz = get_neck_profile(dy)
-    occ_b = gaussian(dy, 0.0, 0.24)
+    occ_b = gaussian(dy, 0.0, 0.22)
     dz = z_c + n_rz + 0.12 * occ_b
-    dorsal_fin = create_tapered_curve_mesh(f"Dorsal_Mane_Fin_{d_idx}", [
-        ((0.0, dy, dz - 0.08), 0.056),
-        ((0.0, dy + 0.08, dz + 0.12), 0.042),
-        ((0.0, dy + 0.20, dz + 0.24), 0.022),
-        ((0.0, dy + 0.30, dz + 0.32), 0.006),
-    ], resolution_u=14, bevel_res=6)
+    d_scale = 1.15 - 0.08 * d_idx
+    dorsal_fin = create_sculpted_ribbon_mesh(
+        f"Dorsal_Mane_Blade_{d_idx}",
+        [
+            ((0.0, dy - 0.02, dz - 0.08), 0.044 * d_scale, 0.026, 90),
+            ((0.0, dy + 0.02, dz + 0.02), 0.084 * d_scale, 0.028, 90),
+            ((0.0, dy + 0.11, dz + 0.15 * d_scale), 0.064 * d_scale, 0.020, 90),
+            ((0.0, dy + 0.22, dz + 0.25 * d_scale), 0.028 * d_scale, 0.010, 90),
+            ((0.0, dy + 0.30, dz + 0.31 * d_scale), 0.003, 0.002, 90),
+        ],
+        n_u=14,
+        up_hint=(1.0, 0.0, 0.0)
+    )
     if d_idx % 2 == 0:
         gold_scale_objs.append(dorsal_fin)
     else:
         emerald_scale_objs.append(dorsal_fin)
 
-# Rear Neck Connection Collar Ring
-z_end_c, rx_end, rz_end = get_neck_profile(0.90)
-bpy.ops.mesh.primitive_torus_add(
-    major_radius=0.37,
-    minor_radius=0.052,
-    major_segments=28,
-    minor_segments=12,
-    location=(0.0, 0.90, z_end_c),
-    rotation=(math.radians(68), 0, 0)
-)
-collar_ring = bpy.context.active_object
-collar_ring.name = "Neck_Body_Connection_Collar"
-collar_ring.scale = (0.98, 0.95, 1.0)
-link_to_master(collar_ring)
+def build_form_fitting_neck_collar():
+    bm = bmesh.new()
+    n_u = 40
+    n_v = 12
+    y_col = 0.87
+    z_c, rx_c, rz_c = get_neck_profile(y_col)
+    rings = []
+    for iu in range(n_u):
+        theta = (iu / n_u) * 2.0 * math.pi
+        sin_t = math.sin(theta)
+        cos_t = math.cos(theta)
+        cloud_wave = 0.012 * math.cos(theta * 6.0)
+        loop_verts = []
+        for iv in range(n_v):
+            phi = (iv / n_v) * 2.0 * math.pi
+            dr = 0.026 * math.cos(phi)
+            dy = (0.042 + cloud_wave) * math.sin(phi)
+            x = (rx_c + dr) * sin_t
+            y = y_col + dy
+            z = z_c + (rz_c + dr) * cos_t
+            loop_verts.append(bm.verts.new((x, y, z)))
+        rings.append(loop_verts)
+
+    for iu in range(n_u):
+        niu = (iu + 1) % n_u
+        r0 = rings[iu]
+        r1 = rings[niu]
+        for iv in range(n_v):
+            niv = (iv + 1) % n_v
+            bm.faces.new((r0[iv], r1[iv], r1[niv], r0[niv]))
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    mesh = bpy.data.meshes.new("Neck_Body_Connection_Collar_Mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+    c_obj = bpy.data.objects.new("Neck_Body_Connection_Collar", mesh)
+    link_to_master(c_obj)
+    return c_obj
+
+collar_ring = build_form_fitting_neck_collar()
 gold_scale_objs.append(collar_ring)
 
-scales_emerald_mesh = join_and_assign(emerald_scale_objs, "Dragon_Neck_Scales_Emerald", mat_emerald)
-scales_gold_mesh = join_and_assign(gold_scale_objs, "Dragon_Dorsal_Mane_And_Collar_Gold", mat_gold)
+scales_emerald_mesh = join_and_assign(emerald_scale_objs, "Dragon_Neck_Scales_Emerald", mat_emerald, uv_scale=2.8)
+scales_gold_mesh = join_and_assign(gold_scale_objs, "Dragon_Dorsal_Mane_And_Collar_Gold", mat_gold, uv_scale=2.8)
 
 # ---------------------------------------------------------------------------
 # 9. Parent Hierarchy under Root Empty & Recalculate All Normals
@@ -972,10 +1903,10 @@ for obj in all_mesh_objs:
 # ---------------------------------------------------------------------------
 # 10. Save Editable .blend Source File & Export GLB
 # ---------------------------------------------------------------------------
-print(f"[DragonHead] Saving editable Blender project to: {BLEND_OUT}")
+print(f"[DragonHead 2.2] Saving editable Blender project to: {BLEND_OUT}")
 bpy.ops.wm.save_as_mainfile(filepath=BLEND_OUT)
 
-print(f"[DragonHead] Exporting GLB to: {GLB_OUT}")
+print(f"[DragonHead 2.2] Exporting GLB to: {GLB_OUT}")
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.export_scene.gltf(
     filepath=GLB_OUT,
@@ -988,12 +1919,12 @@ bpy.ops.export_scene.gltf(
 
 glb_size = os.path.getsize(GLB_OUT)
 blend_size = os.path.getsize(BLEND_OUT)
-print(f"[DragonHead] Exported GLB size: {glb_size} bytes | .blend size: {blend_size} bytes")
+print(f"[DragonHead 2.2] Exported GLB size: {glb_size} bytes | .blend size: {blend_size} bytes")
 
 # ---------------------------------------------------------------------------
-# 11. Render Studio Multi-Angle & Wireframe Inspection Views inside Blender 5.3
+# 11. Render Studio Multi-Angle, Close-Ups & Wireframe Views inside Blender 5.3
 # ---------------------------------------------------------------------------
-print("[DragonHead] Setting up Blender Studio Lighting & Camera for 6 Inspection Renders...")
+print("[DragonHead 2.2] Setting up identical Blender Studio Lighting & Camera for 9 Inspection Renders...")
 
 world = bpy.data.worlds.new("DragonStudioWorld")
 scene.world = world
@@ -1048,16 +1979,20 @@ scene.render.resolution_percentage = 100
 scene.render.image_settings.file_format = 'PNG'
 
 views = {
-    "front": ((0.0, -3.55, 0.52), (0.0, -0.15, 0.34)),
-    "side_left": ((-3.65, -0.05, 0.40), (0.0, -0.05, 0.36)),
-    "side_right": ((3.65, -0.05, 0.40), (0.0, -0.05, 0.36)),
-    "angle45": ((-2.55, -2.55, 1.18), (0.0, -0.08, 0.36)),
-    "top": ((0.0, -0.25, 3.95), (0.0, -0.05, 0.30)),
-    "bottom_jaw": ((0.0, -2.50, -1.65), (0.0, -0.45, 0.02)),
+    "front": ((0.0, -3.55, 0.52), (0.0, -0.15, 0.34), 50.0),
+    "side_left": ((-3.65, -0.05, 0.40), (0.0, -0.05, 0.36), 50.0),
+    "side_right": ((3.65, -0.05, 0.40), (0.0, -0.05, 0.36), 50.0),
+    "angle45": ((-2.55, -2.55, 1.18), (0.0, -0.08, 0.36), 50.0),
+    "top": ((0.0, -0.25, 3.95), (0.0, -0.05, 0.30), 50.0),
+    "bottom_jaw": ((0.0, -2.50, -1.65), (0.0, -0.45, 0.02), 50.0),
+    "closeup_eye_brow": ((-1.35, -1.25, 0.62), (-0.24, -0.26, 0.35), 62.0),
+    "closeup_snout_mouth_teeth": ((-1.25, -1.68, -0.04), (-0.04, -0.64, -0.06), 58.0),
+    "closeup_whisker_neck": ((-1.95, -1.10, 0.22), (-0.22, 0.08, 0.12), 52.0),
 }
 
 rendered_files = {}
-for vname, (cam_pos, tgt_pos) in views.items():
+for vname, (cam_pos, tgt_pos, lens_mm) in views.items():
+    cam_data.lens = lens_mm
     cam_obj.location = Vector(cam_pos)
     target_empty.location = Vector(tgt_pos)
     bpy.context.view_layer.update()
@@ -1065,20 +2000,25 @@ for vname, (cam_pos, tgt_pos) in views.items():
     scene.render.filepath = out_png
     bpy.ops.render.render(write_still=True)
     rendered_files[vname] = out_png
-    print(f"[DragonHead] Rendered {vname} -> {out_png}")
+
+    after_png = os.path.join(AFTER_DIR, f"after_{vname}.png")
+    scene.render.filepath = after_png
+    bpy.ops.render.render(write_still=True)
+    print(f"[DragonHead 2.2] Rendered {vname} -> {out_png}")
 
 # Render Wireframe Topology View
+cam_data.lens = 50.0
 cam_obj.location = Vector((-2.45, -2.45, 1.10))
 target_empty.location = Vector((0.0, -0.08, 0.36))
-mat_wire = create_jiannian_material("Wireframe_Gold", base_color=(0.95, 0.75, 0.22, 1.0), metallic=0.2, roughness=0.3)
-mat_clay = create_jiannian_material("Clay_Base", base_color=(0.08, 0.07, 0.06, 1.0), metallic=0.0, roughness=0.75)
+mat_wire = create_jiannian_material("Wireframe_Gold", base_color=(0.95, 0.75, 0.22, 1.0), metallic=0.2, roughness=0.3, use_glaze_maps=False)
+mat_clay = create_jiannian_material("Clay_Base", base_color=(0.08, 0.07, 0.06, 1.0), metallic=0.0, roughness=0.75, use_glaze_maps=False)
 
 for obj in all_mesh_objs:
     obj.data.materials.clear()
     obj.data.materials.append(mat_clay)
     obj.data.materials.append(mat_wire)
     wmod = obj.modifiers.new(name="WireOverlay", type='WIREFRAME')
-    wmod.thickness = 0.0038
+    wmod.thickness = 0.0035
     wmod.use_replace = False
     wmod.material_offset = 1
 
@@ -1087,12 +2027,12 @@ wire_png = os.path.join(RENDER_DIR, "blender_wireframe.png")
 scene.render.filepath = wire_png
 bpy.ops.render.render(write_still=True)
 rendered_files["wireframe"] = wire_png
-print(f"[DragonHead] Rendered wireframe -> {wire_png}")
+print(f"[DragonHead 2.2] Rendered wireframe -> {wire_png}")
 
 # ---------------------------------------------------------------------------
 # 12. Re-Import GLB into Clean Blender Scene & Collect Full Verification Metrics
 # ---------------------------------------------------------------------------
-print(f"[DragonHead] Re-importing {GLB_OUT} into clean Blender scene for verification...")
+print(f"[DragonHead 2.2] Re-importing {GLB_OUT} into clean Blender scene for verification...")
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=GLB_OUT)
 bpy.context.view_layer.update()
@@ -1140,8 +2080,11 @@ for o in imp_meshes:
 overall_dims = [round(all_bbox_max[i] - all_bbox_min[i], 4) for i in range(3)]
 
 report_data = {
+    "stage": "2.2",
     "blenderVersion": bpy.app.version_string,
     "blendSourceFile": BLEND_OUT,
+    "blendStage2BackupFile": os.path.join(ROOT_DIR, "assets", "source", "dragon-head-stage2.blend"),
+    "blendStage2_1BackupFile": os.path.join(ROOT_DIR, "assets", "source", "dragon-head-stage2.1.blend"),
     "blendFileSize": blend_size,
     "glbFile": GLB_OUT,
     "glbFileSize": glb_size,
@@ -1150,6 +2093,10 @@ report_data = {
         "totalVertices": total_verts,
         "totalEdges": total_edges,
         "totalTriangles": total_tris,
+        "stage2BaselineTriangles": 154968,
+        "stage2_1BaselineTriangles": 118014,
+        "triangleDeltaFromStage2": total_tris - 154968,
+        "triangleDeltaFromStage2_1": total_tris - 118014,
         "uniqueMaterials": sorted(list(material_names)),
         "overallDimensionsMeters": overall_dims,
         "boundingBoxMin": [round(x, 4) for x in all_bbox_min],
@@ -1162,6 +2109,6 @@ report_data = {
 with open(REPORT_OUT, "w", encoding="utf-8") as f:
     json.dump(report_data, f, indent=2, ensure_ascii=False)
 
-print(f"[DragonHead] Verification report saved to: {REPORT_OUT}")
-print(f"[DragonHead] Summary: {len(imp_meshes)} mesh groups, {total_verts} vertices, {total_tris} triangles, {glb_size} bytes")
-print("[DragonHead] STAGE 2 BLENDER PIPELINE COMPLETED SUCCESSFULLY!")
+print(f"[DragonHead 2.2] Verification report saved to: {REPORT_OUT}")
+print(f"[DragonHead 2.2] Summary: {len(imp_meshes)} mesh groups, {total_verts} vertices, {total_tris} triangles (Stage 2.1: 118,014 | Stage 2.0: 154,968), {glb_size} bytes")
+print("[DragonHead 2.2] STAGE 2.2 BLENDER PIPELINE COMPLETED SUCCESSFULLY!")
