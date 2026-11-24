@@ -956,6 +956,17 @@ export class TempleUi {
       <p class="eyebrow">市集接待與諮詢總覽</p>
       <h2>服務台（卡普拉接待所）</h2>
       <p class="venue-intro">歡迎蒞臨天心靈光市集！服務台匯整天心仙姑各項神明問事、命理探索、能量療癒與祈福點燈服務，亦提供旅人私密提問備忘與各殿堂快速傳送。</p>
+      <section class="market-service-actions" aria-label="立即使用市集工具">
+        <h3>立即使用本機工具</h3>
+        <div>
+          <button type="button" class="btn small" data-act="market-open-venue" data-market-target="birth-chart-hall">命盤與人類圖</button>
+          <button type="button" class="btn small" data-act="market-open-venue" data-market-target="card-house">塔羅抽牌</button>
+          <button type="button" class="btn small" data-act="market-open-venue" data-market-target="moon-meditation">60 秒靜心</button>
+          <button type="button" class="btn small" data-act="market-open-venue" data-market-target="chess-guide">五方排卦</button>
+          <button type="button" class="btn small" data-act="market-open-venue" data-market-target="life-numerology">生命靈數</button>
+        </div>
+        <p>工具均在此裝置瀏覽器中運算；需要人工服務時，請使用下方 LINE 入口洽詢。</p>
+      </section>
       
       <section class="ro-service-grid">
         <article class="ro-service-card">
@@ -1667,6 +1678,14 @@ export class TempleUi {
     else if (act === 'market-panel-close') {
       this.closeMarketPanel()
       window.dispatchEvent(new CustomEvent('market:close-panel'))
+    }
+    else if (act === 'market-open-venue') {
+      const id = t.dataset.marketTarget as MarketVenueId | undefined
+      const marketVenues: MarketVenueId[] = ['birth-chart-hall', 'card-house', 'moon-meditation', 'chess-guide', 'life-numerology']
+      if (id && marketVenues.includes(id)) {
+        this.openMarketPanel(id)
+        this.toast(`已開啟「${this.currentMarketVenue === id ? '市集工具' : id}」`)
+      }
     }
     else if (act === 'market-ziwei') {
       this.birthChartTab = 'ziwei'

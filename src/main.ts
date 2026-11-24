@@ -436,6 +436,10 @@ async function boot(): Promise<void> {
     const targetId = (e as CustomEvent<string>).detail
     if (targetId) (sceneManager.current as MarketGame).walkToPoint(targetId as any)
   })
+  window.addEventListener('market:walk-start', e => {
+    const point = (e as CustomEvent<{ title?: string }>).detail
+    if (point?.title) ui.toast(`正在前往「${point.title}」…`)
+  })
   window.addEventListener('market:camera', e => {
     if (sceneManager?.world !== 'market') return
     const market = sceneManager.current as MarketGame

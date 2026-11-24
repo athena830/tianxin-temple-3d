@@ -177,10 +177,16 @@ export class MarketGame {
     if (!target) return
     if (this.mode === 'panel') this.closePanel()
     else if (this.mode !== 'explore') this.startExplore()
-    this.moveTarget = new THREE.Vector3(target.position.x, 0, target.position.z)
-    this.pendingInteractId = id
-    this.world.setGroundCursor(target.position.x, target.position.z, true)
+    this.beginWalkTo(target)
     this.audio.play('ui')
+  }
+
+  /** 啟動攤位自動導引，並回報 UI，避免玩家誤認點擊沒有反應。 */
+  private beginWalkTo(target: MarketPoint): void {
+    this.moveTarget = new THREE.Vector3(target.position.x, 0, target.position.z)
+    this.pendingInteractId = target.id
+    this.world.setGroundCursor(target.position.x, target.position.z, true)
+    window.dispatchEvent(new CustomEvent('market:walk-start', { detail: target }))
   }
 
   private clearMoveTarget(): void {
@@ -243,9 +249,7 @@ export class MarketGame {
           this.clearMoveTarget()
           window.dispatchEvent(new CustomEvent('market:interact', { detail: target.id }))
         } else {
-          this.moveTarget = new THREE.Vector3(target.position.x, 0, target.position.z)
-          this.pendingInteractId = target.id
-          this.world.setGroundCursor(target.position.x, target.position.z, true)
+          this.beginWalkTo(target)
         }
         return
       }
@@ -266,9 +270,7 @@ export class MarketGame {
 
     const clickedPoint = this.world.nearestPoint(hit)
     if (clickedPoint) {
-      this.moveTarget = new THREE.Vector3(clickedPoint.position.x, 0, clickedPoint.position.z)
-      this.pendingInteractId = clickedPoint.id
-      this.world.setGroundCursor(clickedPoint.position.x, clickedPoint.position.z, true)
+      this.beginWalkTo(clickedPoint)
     } else {
       this.moveTarget = new THREE.Vector3(hit.x, 0, hit.z)
       this.pendingInteractId = null
