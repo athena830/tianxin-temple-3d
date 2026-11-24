@@ -81,6 +81,12 @@ export class Renderer {
     this.gl.compile(scene, camera)
   }
 
+  async compileAsync(scene: THREE.Scene, camera: THREE.Camera): Promise<void> {
+    if (typeof this.gl.compileAsync === 'function') {
+      await this.gl.compileAsync(scene, camera)
+    }
+  }
+
   resize(): void {
     const w = this.canvas.clientWidth || window.innerWidth
     const h = this.canvas.clientHeight || window.innerHeight

@@ -26,6 +26,7 @@ export class SceneManager {
   world: WorldId = 'temple'
   state: PortalTransitionState = 'idle'
   current!: ActiveGame
+  lastMarketCompileMs = 0
 
   constructor(private readonly options: SceneManagerOptions) {}
 
@@ -61,8 +62,24 @@ export class SceneManager {
       const next = target === 'market' ? await this.options.createMarket() : await this.options.createTemple()
       this.current = next
       this.world = target
-      if (target === 'temple') (next as TempleGame).enterFromMarket()
-      else (next as MarketGame).enter()
+      if (target === 'temple') {
+        (next as TempleGame).enterFromMarket()
+      } else {
+        const market = next as MarketGame
+        market.enter()
+        if (typeof this.options.renderer.gl.compileAsync === 'function') {
+          const tCompileStart = performance.now()
+          try {
+            await this.options.renderer.compileAsync(market.world.scene, market.camera)
+            this.lastMarketCompileMs = +(performance.now() - tCompileStart).toFixed(2)
+          } catch (e) {
+            console.warn('[SceneManager] compileAsync failed:', e)
+            this.lastMarketCompileMs = 0
+          }
+        } else {
+          this.lastMarketCompileMs = 0
+        }
+      }
       this.state = 'fading-in'
       this.options.onWorldChanged(target, next)
       this.options.onTransition(this.state, target === 'market' ? '抵達靈光市集⋯' : '回到天心宮⋯')

@@ -122,7 +122,25 @@ export class MarketGame {
     this.elevation = DEFAULT_ELEVATION
     this.targetElevation = DEFAULT_ELEVATION
     this.cameraZoom = window.innerHeight > window.innerWidth ? SHARED_ORTHO_CAMERA_CONFIG.zoom * 0.78 : SHARED_ORTHO_CAMERA_CONFIG.zoom
-    this.cameraReady = false
+    const aspect = Math.max(0.5, window.innerWidth / Math.max(1, window.innerHeight))
+    const halfH = SHARED_ORTHO_CAMERA_CONFIG.frustumSize / 2
+    this.camera.top = halfH
+    this.camera.bottom = -halfH
+    this.camera.right = halfH * aspect
+    this.camera.left = -halfH * aspect
+    this.camera.zoom = this.cameraZoom
+    this.camera.updateProjectionMatrix()
+    this.cameraTarget.set(spawn.x, spawn.y + SHARED_ORTHO_CAMERA_CONFIG.lookHeight, spawn.z)
+    const horiz = Math.cos(this.elevation) * CAMERA_DISTANCE
+    const vert = Math.sin(this.elevation) * CAMERA_DISTANCE
+    this.camera.position.set(
+      this.cameraTarget.x + Math.sin(this.azimuth) * horiz,
+      this.cameraTarget.y + vert,
+      this.cameraTarget.z + Math.cos(this.azimuth) * horiz,
+    )
+    this.camera.lookAt(this.cameraTarget)
+    this.camera.updateMatrixWorld()
+    this.cameraReady = true
     this.clearMoveTarget()
     this.world.setHoveredPoint(null)
     this.audio.play('chime')
