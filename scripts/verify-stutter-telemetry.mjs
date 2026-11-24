@@ -145,14 +145,14 @@ async function run() {
     // Verify version badge on DOM
     const badgeText = await page.$eval('#app-version', el => el.textContent.trim())
     console.log('App version badge in DOM:', badgeText)
-    if (badgeText !== 'VER 3.75.1') {
-      throw new Error(`Expected VER 3.75.1, but found: ${badgeText}`)
+    if (badgeText !== 'VER 3.75.2') {
+      throw new Error(`Expected VER 3.75.2, but found: ${badgeText}`)
     }
 
     // Capture version badge screenshot
     const badgeEl = await page.$('#app-version')
     if (badgeEl) {
-      await badgeEl.screenshot({ path: path.join(artifactDir, 'perf_ui_version_3751.png') })
+      await badgeEl.screenshot({ path: path.join(artifactDir, 'perf_ui_version_3752.png') })
     }
 
     // Enter explore mode and reset telemetry to record the clean 30-second walking session
@@ -270,7 +270,7 @@ async function run() {
     console.log('Telemetry Stats result:', JSON.stringify(telemetryStats, null, 2))
 
     // Write full telemetry and trajectory report
-    const jsonPath = path.join(artifactDir, 'perf_telemetry_3.75.1.json')
+    const jsonPath = path.join(artifactDir, 'perf_telemetry_3.75.2.json')
     fs.writeFileSync(jsonPath, JSON.stringify({
       version: badgeText,
       testDurationSeconds: 30,
@@ -283,11 +283,59 @@ async function run() {
     console.log('Telemetry report written to:', jsonPath)
 
     // Screenshot 1: Walking in courtyard / sacred trail
-    await page.screenshot({ path: path.join(artifactDir, 'perf_movement_courtyard_3751.png') })
+    await page.screenshot({ path: path.join(artifactDir, 'perf_movement_courtyard_3752.png') })
 
     // Screenshot 2: Sacred trail and sanctuary
     await wait(400)
-    await page.screenshot({ path: path.join(artifactDir, 'perf_movement_sanctuary_3751.png') })
+    await page.screenshot({ path: path.join(artifactDir, 'perf_movement_sanctuary_3752.png') })
+
+    // Roof tiles visibility validation across Medium, Low, High presets
+    console.log('Capturing roof tile visibility screenshots across presets...')
+    await page.evaluate(() => {
+      const g = window.__templeGame__ || window.__game?.game
+      if (!g) return
+      window.__customCam = { pos: [0, 6.8, 20.0], target: [0, 6.5, 0] }
+      g.render = function() {
+        if (window.__customCam) {
+          this.camera.position.set(window.__customCam.pos[0], window.__customCam.pos[1], window.__customCam.pos[2])
+          this.camera.lookAt(window.__customCam.target[0], window.__customCam.target[1], window.__customCam.target[2])
+          this.renderer.render(this.world.scene, this.camera)
+        }
+      }
+    })
+
+    // Capture Medium (default) roof tiles
+    await page.evaluate(() => {
+      const g = window.__templeGame__ || window.__game?.game
+      if (g) g.setQuality('medium')
+    })
+    await wait(600)
+    await page.screenshot({ path: path.join(artifactDir, 'roof_tiles_medium_front.png') })
+    console.log('Captured: roof_tiles_medium_front.png')
+
+    // Capture Low roof tiles (micro detail hidden)
+    await page.evaluate(() => {
+      const g = window.__templeGame__ || window.__game?.game
+      if (g) g.setQuality('low')
+    })
+    await wait(600)
+    await page.screenshot({ path: path.join(artifactDir, 'roof_tiles_low_front.png') })
+    console.log('Captured: roof_tiles_low_front.png')
+
+    // Capture High roof tiles
+    await page.evaluate(() => {
+      const g = window.__templeGame__ || window.__game?.game
+      if (g) g.setQuality('high')
+    })
+    await wait(600)
+    await page.screenshot({ path: path.join(artifactDir, 'roof_tiles_high_front.png') })
+    console.log('Captured: roof_tiles_high_front.png')
+
+    // Reset back to medium
+    await page.evaluate(() => {
+      const g = window.__templeGame__ || window.__game?.game
+      if (g) g.setQuality('medium')
+    })
 
     // Assertions according to Requirement 2
     if (!crossedSanctuaryBoundary || minX >= -22.0) {

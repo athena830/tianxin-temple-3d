@@ -1,5 +1,5 @@
 /**
- * Runtime telemetry for frame times, P95, and long frame causes (VER 3.75.1).
+ * Runtime telemetry for frame times, P95, and long frame causes (VER 3.75.2).
  */
 export type LongFrameTag = 'stage_load' | 'zone_light' | 'occlusion' | 'renderer' | 'physics'
 

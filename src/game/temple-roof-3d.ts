@@ -286,9 +286,9 @@ export class TempleRoof3D {
     this.tileWadangInstanced.instanceMatrix.needsUpdate = true
     this.tileDripInstanced.instanceMatrix.needsUpdate = true
 
-    this.highDetailGroup.add(this.tileTubeInstanced)
-    this.highDetailGroup.add(this.tileWadangInstanced)
-    this.highDetailGroup.add(this.tileDripInstanced)
+    this.mediumDetailGroup.add(this.tileTubeInstanced)
+    this.mediumDetailGroup.add(this.tileWadangInstanced)
+    this.mediumDetailGroup.add(this.tileDripInstanced)
   }
 
   /**

@@ -1,2 +1,2 @@
-/** VER 3.75.1 — 玉皇宮移動卡頓修復：分幀漸進式載入（3-4ms 切片）、區域燈光狀態快取與遲滯、迴圈零臨時物件配置、即時長幀原因追蹤。 */
-export const APP_VERSION = 'VER 3.75.1'
+/** VER 3.75.2 — 玉皇宮大廟立體屋瓦可見度還原：InstancedMesh 筒瓦／瓦當／滴水牙子於 Medium 與 High 畫質顯示，Low 隱藏。 */
+export const APP_VERSION = 'VER 3.75.2'

@@ -53,12 +53,18 @@ describe('Phase 2 Main Hall Stylized Realism 3D Roof & Eave Benchmark', () => {
     // Check quality switching
     roof3D.applyQuality('low')
     expect(roof3D.currentQuality).toBe('low')
+    // In low quality, mediumDetailGroup (containing tiles) is hidden
+    expect(roof3D['mediumDetailGroup'].visible).toBe(false)
 
     roof3D.applyQuality('medium')
     expect(roof3D.currentQuality).toBe('medium')
+    // In medium quality, mediumDetailGroup (containing tiles) is visible
+    expect(roof3D['mediumDetailGroup'].visible).toBe(true)
 
     roof3D.applyQuality('high')
     expect(roof3D.currentQuality).toBe('high')
+    // In high quality, mediumDetailGroup (containing tiles) is visible
+    expect(roof3D['mediumDetailGroup'].visible).toBe(true)
 
     // Safe disposal test
     roof3D.dispose()
