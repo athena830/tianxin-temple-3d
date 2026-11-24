@@ -1,2 +1,2 @@
-/** VER 3.75.5 — 天心靈光市集：P2 效能量測、長幀根因多瀏覽器冷暖機診斷與 A/B 受控驗證。 */
-export const APP_VERSION = 'VER 3.75.5'
+/** VER 3.75.6 — 天心靈光市集：效能量測校正、True Warm Re-entry 與可信基準建立。 */
+export const APP_VERSION = 'VER 3.75.6'
