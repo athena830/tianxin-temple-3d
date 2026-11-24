@@ -24,6 +24,7 @@ export type BuildContext = {
   roof: (width: number, depth: number, eaveY: number, peakY: number) => THREE.Group
   text: (text: string, fg: string, bg: string) => THREE.MeshBasicMaterial
   pbr?: TemplePbrLibrary
+  registerOccluder?: (obj: THREE.Object3D) => void
 }
 
 const PAL = {
@@ -76,17 +77,41 @@ export class FrontCourtyard {
   private readonly skyLanternGroups: CourtyardSkyLanternGroup[] = []
   private readonly playerLanternStandPos = new THREE.Vector3(-12.5, 0, 23.5)
   private playerLanternGroup?: CourtyardSkyLanternGroup
+  readonly sacredPlatformLights: THREE.PointLight[] = []
+  readonly trailLanternLights: THREE.PointLight[] = []
+  private stage2Loaded = false
+  private stage3Loaded = false
 
-  constructor(private readonly c: BuildContext) {
+  setSanctuaryLightsVisible(visible: boolean): void {
+    for (const l of this.sacredPlatformLights) l.visible = visible
+    for (const l of this.trailLanternLights) l.visible = visible
+  }
+
+  constructor(private readonly c: BuildContext, immediate = false) {
     this.addGround()
     this.addWalls()
     this.addRoad()
     this.addGateArch()
     this.addScreenWall()
     this.addPavilion()
-    this.addLotusPond()
     this.addGoldFurnace()
+
+    if (immediate) {
+      this.loadStage2()
+      this.loadStage3()
+    }
+  }
+
+  loadStage2(): void {
+    if (this.stage2Loaded) return
+    this.stage2Loaded = true
+    this.addLotusPond()
     this.addPlanting()
+  }
+
+  loadStage3(): void {
+    if (this.stage3Loaded) return
+    this.stage3Loaded = true
     this.addSacredTrailAndPlatform()
     this.addSkyLanterns()
   }
@@ -180,20 +205,35 @@ export class FrontCourtyard {
     this.c.scene.add(road)
     const lineMat = this.c.pbr ? this.c.pbr.get('plinthStone', 2, 1) : this.c.mat(PAL.roadLine, 0.88)
     const tileGeo = new THREE.BoxGeometry(ROAD_HALF * 2 - 0.1, 0.025, 0.16)
+    const tileGeoms: THREE.BufferGeometry[] = []
     for (let z = end - 1.5; z > start; z -= 3) {
-      const tile = new THREE.Mesh(tileGeo, lineMat)
-      tile.position.set(0, 0.04, z)
-      tile.receiveShadow = true
-      this.c.scene.add(tile)
+      const g = tileGeo.clone()
+      g.translate(0, 0.04, z)
+      tileGeoms.push(g)
+    }
+    tileGeo.dispose()
+    if (tileGeoms.length > 0) {
+      const mergedTiles = BufferGeometryUtils.mergeGeometries(tileGeoms, false)
+      for (const g of tileGeoms) g.dispose()
+      const tileMesh = new THREE.Mesh(mergedTiles, lineMat)
+      tileMesh.receiveShadow = true
+      this.c.scene.add(tileMesh)
     }
     // Low curb stones along both edges, flush enough to step over (purely visual).
     const curbMat = this.c.pbr ? this.c.pbr.get('plinthStone', 1, 16) : this.c.mat('#b9aa91', 0.9)
+    const curbGeo = new THREE.BoxGeometry(0.22, 0.08, GATE_Z - 1)
+    const curbGeoms: THREE.BufferGeometry[] = []
     for (const side of [-1, 1]) {
-      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.08, GATE_Z - 1), curbMat)
-      curb.position.set(side * (ROAD_HALF + 0.12), 0.04, GATE_Z / 2 - 0.5)
-      curb.receiveShadow = true
-      this.c.scene.add(curb)
+      const g = curbGeo.clone()
+      g.translate(side * (ROAD_HALF + 0.12), 0.04, GATE_Z / 2 - 0.5)
+      curbGeoms.push(g)
     }
+    curbGeo.dispose()
+    const mergedCurbs = BufferGeometryUtils.mergeGeometries(curbGeoms, false)
+    for (const g of curbGeoms) g.dispose()
+    const curbMesh = new THREE.Mesh(mergedCurbs, curbMat)
+    curbMesh.receiveShadow = true
+    this.c.scene.add(curbMesh)
   }
 
   /** Three-bay entrance arch. All three bays are walkable; lanterns hang only over the side bays, above 4.2 m. */
@@ -572,6 +612,9 @@ export class FrontCourtyard {
       pillarMesh.castShadow = true
       pillarMesh.receiveShadow = true
       this.add(pillarMesh)
+      if (this.c.registerOccluder) {
+        this.c.registerOccluder(pillarMesh)
+      }
       this.c.physics.addStaticCylinder(new THREE.Vector3(px, pillarY, pz), 0.16, postH)
 
       // 柱頂金箍
@@ -804,6 +847,9 @@ export class FrontCourtyard {
     }
 
     this.add(screenGroup, true)
+    if (this.c.registerOccluder) {
+      this.c.registerOccluder(screenFrame)
+    }
     this.c.physics.addStaticBox(new THREE.Vector3(cx - 1.25, podH + 1.15, cz), new THREE.Vector3(0.3, 2.3, 2.4))
 
     // 正面神龕溫潤洗牆光 (Front Niche Warm Wash Light)
@@ -812,13 +858,9 @@ export class FrontCourtyard {
     this.c.scene.add(screenWashLight)
 
     // 背面專屬暖光照明 (Dedicated Rear Warm Illumination - guarantees warm reddish brown wood & gold visibility)
-    const rearWashLight = new THREE.PointLight('#ffd5a3', 1.25, 6.0, 1.6)
-    rearWashLight.position.set(cx - 2.8, podH + 1.80, cz)
+    const rearWashLight = new THREE.PointLight('#ffd5a3', 1.5, 6.5, 1.6)
+    rearWashLight.position.set(cx - 2.5, podH + 2.0, cz)
     this.c.scene.add(rearWashLight)
-
-    const rearWashLight2 = new THREE.PointLight('#ffbe78', 0.85, 5.0, 1.8)
-    rearWashLight2.position.set(cx - 2.2, podH + 2.40, cz)
-    this.c.scene.add(rearWashLight2)
 
     // 7. 神壇核心：仙姑須彌神案與低矮供桌 (Altar Throne & Low Offering Table)
     const throneX = cx - 0.72
@@ -1198,30 +1240,6 @@ export class FrontCourtyard {
     return f
   }
 
-  private lotusBud(x: number, y: number, z: number, s: number, color = '#ea91a3'): THREE.Group {
-    const g = new THREE.Group()
-    g.position.set(x, y, z)
-    const budMat = this.c.mat(color, 0.6)
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(s * 0.45, s * 1.3, 8), budMat)
-    cone.position.y = s * 0.65
-    const base = new THREE.Mesh(new THREE.SphereGeometry(s * 0.42, 8, 6), this.c.mat(PAL.lotusPad, 0.7))
-    base.position.y = s * 0.2
-    g.add(cone, base)
-    return g
-  }
-
-  private lotusSeedpod(x: number, y: number, z: number, s: number): THREE.Group {
-    const g = new THREE.Group()
-    g.position.set(x, y, z)
-    const pod = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.55, s * 0.24, s * 0.7, 8), this.c.mat('#728a42', 0.6))
-    pod.position.y = s * 0.4
-    const top = new THREE.Mesh(new THREE.CircleGeometry(s * 0.52, 8), this.c.mat('#a4a046', 0.5))
-    top.rotation.x = -Math.PI / 2
-    top.position.y = s * 0.75
-    g.add(pod, top)
-    return g
-  }
-
   /**
    * Grand Scenic Lotus Pond (前庭東側・盛景九曲荷花池):
    * 擴建後的壯麗荷花池，尺寸拓展至約 10.4m × 7.4m，採古典漢白玉雕石蓮瓣護欄圍砌。
@@ -1527,6 +1545,51 @@ export class FrontCourtyard {
       { type: 'seedpod', size: 0.19 },
     ]
 
+    const pinkPetalGeoms: THREE.BufferGeometry[] = []
+    const whitePetalGeoms: THREE.BufferGeometry[] = []
+    const crimsonPetalGeoms: THREE.BufferGeometry[] = []
+    const flowerHeartGeoms: THREE.BufferGeometry[] = []
+    const budConeGeoms: THREE.BufferGeometry[] = []
+    const budBaseGeoms: THREE.BufferGeometry[] = []
+    const podBodyGeoms: THREE.BufferGeometry[] = []
+    const podTopGeoms: THREE.BufferGeometry[] = []
+
+    const appendFlowerPetals = (fx: number, fy: number, fz: number, s: number, targetList: THREE.BufferGeometry[]) => {
+      const baseOuter = new THREE.SphereGeometry(s, 8, 6)
+      for (let i = 0; i < 6; i += 1) {
+        const g = baseOuter.clone()
+        const a = (i / 6) * Math.PI * 2
+        const m = new THREE.Matrix4()
+        const rot = new THREE.Euler(Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55)
+        const pos = new THREE.Vector3(Math.cos(a) * s * 0.6, s * 0.55, Math.sin(a) * s * 0.6)
+        const scale = new THREE.Vector3(0.48, 0.92, 0.28)
+        m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scale)
+        g.applyMatrix4(m)
+        g.translate(fx, fy, fz)
+        targetList.push(g)
+      }
+      baseOuter.dispose()
+
+      const baseInner = new THREE.SphereGeometry(s * 0.85, 8, 6)
+      for (let i = 0; i < 5; i += 1) {
+        const g = baseInner.clone()
+        const a = (i / 5) * Math.PI * 2 + 0.35
+        const m = new THREE.Matrix4()
+        const rot = new THREE.Euler(Math.sin(a) * 0.32, 0, -Math.cos(a) * 0.32)
+        const pos = new THREE.Vector3(Math.cos(a) * s * 0.38, s * 0.65, Math.sin(a) * s * 0.38)
+        const scale = new THREE.Vector3(0.42, 0.88, 0.26)
+        m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scale)
+        g.applyMatrix4(m)
+        g.translate(fx, fy, fz)
+        targetList.push(g)
+      }
+      baseInner.dispose()
+
+      const heart = new THREE.SphereGeometry(s * 0.35, 8, 6)
+      heart.translate(fx, fy + s * 0.55, fz)
+      flowerHeartGeoms.push(heart)
+    }
+
     for (let j = 0; j < flowerTypes.length; j += 1) {
       const ft = flowerTypes[j]
       const padIdx = (j * 2 + 1) % padPositions.length
@@ -1542,13 +1605,45 @@ export class FrontCourtyard {
       stemGeoms.push(stemG)
 
       if (ft.type === 'bud') {
-        this.c.scene.add(this.lotusBud(fx, fy, fz, ft.size, ft.color))
+        const cone = new THREE.ConeGeometry(ft.size * 0.45, ft.size * 1.3, 8)
+        cone.translate(fx, fy + ft.size * 0.65, fz)
+        budConeGeoms.push(cone)
+        const base = new THREE.SphereGeometry(ft.size * 0.42, 8, 6)
+        base.translate(fx, fy + ft.size * 0.2, fz)
+        budBaseGeoms.push(base)
       } else if (ft.type === 'seedpod') {
-        this.c.scene.add(this.lotusSeedpod(fx, fy, fz, ft.size))
+        const pod = new THREE.CylinderGeometry(ft.size * 0.55, ft.size * 0.24, ft.size * 0.7, 8)
+        pod.translate(fx, fy + ft.size * 0.4, fz)
+        podBodyGeoms.push(pod)
+        const top = new THREE.CircleGeometry(ft.size * 0.52, 8)
+        top.rotateX(-Math.PI / 2)
+        top.translate(fx, fy + ft.size * 0.75, fz)
+        podTopGeoms.push(top)
+      } else if (ft.type === 'white') {
+        appendFlowerPetals(fx, fy, fz, ft.size, whitePetalGeoms)
+      } else if (ft.type === 'crimson') {
+        appendFlowerPetals(fx, fy, fz, ft.size, crimsonPetalGeoms)
       } else {
-        this.c.scene.add(this.lotusFlower(fx, fy, fz, ft.size, ft.color))
+        appendFlowerPetals(fx, fy, fz, ft.size, pinkPetalGeoms)
       }
     }
+
+    const mergeAndAddMesh = (geoms: THREE.BufferGeometry[], mat: THREE.Material) => {
+      if (geoms.length > 0) {
+        const merged = BufferGeometryUtils.mergeGeometries(geoms, false)
+        for (const g of geoms) g.dispose()
+        this.c.scene.add(new THREE.Mesh(merged, mat))
+      }
+    }
+
+    mergeAndAddMesh(pinkPetalGeoms, this.c.mat(PAL.lotus, 0.6))
+    mergeAndAddMesh(whitePetalGeoms, this.c.mat('#faf6ee', 0.6))
+    mergeAndAddMesh(crimsonPetalGeoms, this.c.mat('#d35670', 0.6))
+    mergeAndAddMesh(flowerHeartGeoms, this.c.mat('#e8c35c', 0.5))
+    mergeAndAddMesh(budConeGeoms, this.c.mat('#ea91a3', 0.6))
+    mergeAndAddMesh(budBaseGeoms, this.c.mat(PAL.lotusPad, 0.7))
+    mergeAndAddMesh(podBodyGeoms, this.c.mat('#728a42', 0.6))
+    mergeAndAddMesh(podTopGeoms, this.c.mat('#a4a046', 0.5))
 
     if (stemGeoms.length > 0) {
       const mergedStems = BufferGeometryUtils.mergeGeometries(stemGeoms, false)
@@ -1630,11 +1725,71 @@ export class FrontCourtyard {
   }
 
   private addPlanting(): void {
-    // 原神風格景觀步道植栽與雕花石燈台（沿主要參道兩側對稱排列）
+    // 1. 原神風格景觀步道植栽與雕花石燈台（沿主要參道兩側對稱排列）- 靈栽幾何全面合批 (Batched)
+    const potGeoms: THREE.BufferGeometry[] = []
+    const goldRimGeoms: THREE.BufferGeometry[] = []
+    const soilGeoms: THREE.BufferGeometry[] = []
+    const trunkGeoms: THREE.BufferGeometry[] = []
+    const puff1Geoms: THREE.BufferGeometry[] = []
+    const puff2Geoms: THREE.BufferGeometry[] = []
+    const puffTopGeoms: THREE.BufferGeometry[] = []
+    const flowerGeoms: THREE.BufferGeometry[] = []
+
+    const basePot = new THREE.CylinderGeometry(0.44, 0.32, 0.36, 6)
+    const baseRim = new THREE.CylinderGeometry(0.46, 0.44, 0.06, 6)
+    const baseSoil = new THREE.CylinderGeometry(0.4, 0.38, 0.05, 6)
+    const baseTrunk = new THREE.CylinderGeometry(0.06, 0.09, 0.45, 6)
+    const basePuff1 = new THREE.DodecahedronGeometry(0.32, 1)
+    const basePuff2 = new THREE.DodecahedronGeometry(0.35, 1)
+    const basePuffTop = new THREE.DodecahedronGeometry(0.24, 1)
+    const baseFlower = new THREE.DodecahedronGeometry(0.06)
+
     for (const side of [-1, 1]) {
-      for (const z of [14, 24, 34, 44]) this.shrub(side * 3.6, z)
+      for (const z of [14, 24, 34, 44]) {
+        const x = side * 3.6
+        const pG = basePot.clone(); pG.translate(x, 0.18, z); potGeoms.push(pG)
+        const rG = baseRim.clone(); rG.translate(x, 0.35, z); goldRimGeoms.push(rG)
+        const sG = baseSoil.clone(); sG.translate(x, 0.36, z); soilGeoms.push(sG)
+        const tG = baseTrunk.clone(); tG.rotateZ(-0.18); tG.translate(x + 0.02, 0.54, z); trunkGeoms.push(tG)
+        const pf1 = basePuff1.clone(); pf1.scale(1.15, 0.75, 1.1); pf1.translate(x - 0.12, 0.72, z + 0.06); puff1Geoms.push(pf1)
+        const pf2 = basePuff2.clone(); pf2.scale(1.2, 0.8, 1.15); pf2.translate(x + 0.1, 0.82, z - 0.05); puff2Geoms.push(pf2)
+        const pfT = basePuffTop.clone(); pfT.translate(x + 0.02, 1.02, z + 0.02); puffTopGeoms.push(pfT)
+        for (const [fx, fy, fz] of [[-0.22, 0.82, 0.18], [0.22, 0.88, 0.14], [0.05, 1.12, -0.1]]) {
+          const flG = baseFlower.clone(); flG.translate(x + fx, fy, z + fz); flowerGeoms.push(flG)
+        }
+        this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.5, z), 0.45, 1.0)
+      }
       for (const z of [19, 39]) this.stoneLantern(side * 3.6, z)
     }
+
+    basePot.dispose(); baseRim.dispose(); baseSoil.dispose(); baseTrunk.dispose()
+    basePuff1.dispose(); basePuff2.dispose(); basePuffTop.dispose(); baseFlower.dispose()
+
+    const mPot = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(potGeoms, false), this.c.mat('#e3ede6', 0.35, 0.15))
+    const mRim = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(goldRimGeoms, false), this.c.mat(PAL.gold, 0.4, 0.3))
+    const mSoil = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(soilGeoms, false), this.c.mat('#38281a', 0.95))
+    const mTrunk = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(trunkGeoms, false), this.c.mat('#4e3422', 0.85))
+    const mPuff1 = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(puff1Geoms, false), this.c.mat('#2d7348', 0.6))
+    const mPuff2 = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(puff2Geoms, false), this.c.mat('#59b378', 0.55))
+    const mPuffTop = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(puffTopGeoms, false), this.c.mat('#8ee0a6', 0.5))
+
+    const flowerMat = this.c.mat('#ffb8cf', 0.4)
+    flowerMat.emissive.set('#ff6994')
+    flowerMat.emissiveIntensity = 0.5
+    const mFlower = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(flowerGeoms, false), flowerMat)
+
+    for (const g of potGeoms) g.dispose()
+    for (const g of goldRimGeoms) g.dispose()
+    for (const g of soilGeoms) g.dispose()
+    for (const g of trunkGeoms) g.dispose()
+    for (const g of puff1Geoms) g.dispose()
+    for (const g of puff2Geoms) g.dispose()
+    for (const g of puffTopGeoms) g.dispose()
+    for (const g of flowerGeoms) g.dispose()
+
+    const shrubGroup = new THREE.Group()
+    shrubGroup.add(mPot, mRim, mSoil, mTrunk, mPuff1, mPuff2, mPuffTop, mFlower)
+    this.add(shrubGroup, false)
 
     // 前庭與外圍景觀神木群（全面升級為原神動漫仙境風格）
     let treeSeed = 10
@@ -1649,67 +1804,6 @@ export class FrontCourtyard {
     }
 
     for (const [x, z, a] of [[-6.4, 18, 0], [6.4, 18, 0], [-19, 36, Math.PI / 2], [19, 30, Math.PI / 2]] as const) this.bench(x, z, a)
-  }
-
-  /**
-   * 原神風格雕花玉盆靈栽（Genshin Impact Stylized Jade Planter Bonsai）
-   * 1. 六角雕花翡翠青瓷盆台（白瓷玉潤／金邊浮雕）
-   * 2. 蒼勁微型盆景枝幹
-   * 3. 蓬鬆多簇動漫雲團樹葉（翠綠漸層）
-   * 4. 點綴原神霓裳花／琉璃百合靈花花簇
-   */
-  private shrub(x: number, z: number): void {
-    const g = new THREE.Group()
-    g.position.set(x, 0, z)
-
-    // 1. 六角白玉青瓷盆
-    const jadePorcelain = this.c.mat('#e3ede6', 0.35, 0.15)
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.32, 0.36, 6), jadePorcelain)
-    pot.position.y = 0.18
-    const goldRim = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.44, 0.06, 6), this.c.mat(PAL.gold, 0.4, 0.3))
-    goldRim.position.y = 0.35
-    const soil = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.38, 0.05, 6), this.c.mat('#38281a', 0.95))
-    soil.position.y = 0.36
-    g.add(pot, goldRim, soil)
-
-    // 2. 蒼勁微盆景小主幹
-    const miniTrunkMat = this.c.mat('#4e3422', 0.85)
-    const miniTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.45, 6), miniTrunkMat)
-    miniTrunk.position.set(0.02, 0.54, 0)
-    miniTrunk.rotation.z = -0.18
-    g.add(miniTrunk)
-
-    // 3. 原神風格雙層蓬鬆雲團樹葉簇（Anime Cel-shaded Shrub Puffs）
-    const foliageMat1 = this.c.mat('#2d7348', 0.6)
-    const foliageMat2 = this.c.mat('#59b378', 0.55)
-    const puff1 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 1), foliageMat1)
-    puff1.position.set(-0.12, 0.72, 0.06)
-    puff1.scale.set(1.15, 0.75, 1.1)
-    const puff2 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35, 1), foliageMat2)
-    puff2.position.set(0.1, 0.82, -0.05)
-    puff2.scale.set(1.2, 0.8, 1.15)
-    const puffTop = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 1), this.c.mat('#8ee0a6', 0.5))
-    puffTop.position.set(0.02, 1.02, 0.02)
-    g.add(puff1, puff2, puffTop)
-
-    // 4. 原神仙草靈花（微光落櫻／琉璃仙花花蕊）- Merged into 1 geometry
-    const flowerMat = this.c.mat('#ffb8cf', 0.4)
-    flowerMat.emissive.set('#ff6994')
-    flowerMat.emissiveIntensity = 0.5
-    const flowerGeoms: THREE.BufferGeometry[] = []
-    const baseFlowerGeo = new THREE.DodecahedronGeometry(0.06)
-    for (const [fx, fy, fz] of [[-0.22, 0.82, 0.18], [0.22, 0.88, 0.14], [0.05, 1.12, -0.1]]) {
-      const fg = baseFlowerGeo.clone()
-      fg.translate(fx, fy, fz)
-      flowerGeoms.push(fg)
-    }
-    baseFlowerGeo.dispose()
-    const mergedFlowers = BufferGeometryUtils.mergeGeometries(flowerGeoms, false)
-    for (const fg of flowerGeoms) fg.dispose()
-    g.add(new THREE.Mesh(mergedFlowers, flowerMat))
-
-    this.add(g, false)
-    this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.5, z), 0.45, 1.0)
   }
 
   /**
@@ -1780,6 +1874,10 @@ export class FrontCourtyard {
     const groundLight = new THREE.PointLight('#ffc060', 1.45, 10.5, 1.8)
     groundLight.position.y = 1.6
     g.add(groundLight)
+    if (x < -25) {
+      this.trailLanternLights.push(groundLight)
+      groundLight.visible = false
+    }
 
     this.add(g, false)
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.9, z), 0.48, 1.8)
@@ -2030,10 +2128,19 @@ export class FrontCourtyard {
 
     // 小徑石條節奏紋理
     const lineMat = this.c.mat(PAL.roadLine, 0.88)
+    const stripBox = new THREE.BoxGeometry(0.18, 0.025, 3.1)
+    const stripGeoms: THREE.BufferGeometry[] = []
     for (let x = trailStartX - 2.0; x > trailEndX + 1.0; x -= 2.6) {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.025, 3.1), lineMat)
-      strip.position.set(x, 0.045, gateZ)
-      this.c.scene.add(strip)
+      const g = stripBox.clone()
+      g.translate(x, 0.045, gateZ)
+      stripGeoms.push(g)
+    }
+    stripBox.dispose()
+    if (stripGeoms.length > 0) {
+      const mergedStrips = BufferGeometryUtils.mergeGeometries(stripGeoms, false)
+      for (const g of stripGeoms) g.dispose()
+      const stripMesh = new THREE.Mesh(mergedStrips, lineMat)
+      this.c.scene.add(stripMesh)
     }
 
     // -------------------------------------------------------------
@@ -2189,6 +2296,8 @@ export class FrontCourtyard {
 
       const lampLight = new THREE.PointLight('#ffda7a', 1.2, 14, 1.8)
       lampLight.position.set(0, 2.45, 0)
+      this.sacredPlatformLights.push(lampLight)
+      lampLight.visible = false
 
       lampTower.add(lampBase1, lampBase2, lampPillar, lampTray, lampCore, lampRoof, lampGourd, lampSpire, lampLight)
       platGroup.add(lampTower)
@@ -2292,7 +2401,7 @@ export class FrontCourtyard {
       side: THREE.DoubleSide,
     })
     const paperMesh = new THREE.Mesh(geom, paperMat)
-    paperMesh.castShadow = true
+    paperMesh.castShadow = false
     group.add(paperMesh)
 
     // 2. Domed roof cap with golden pinnacle bead

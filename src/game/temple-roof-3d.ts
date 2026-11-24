@@ -223,15 +223,15 @@ export class TempleRoof3D {
     this.allocatedGeometries.push(dripGeom)
 
     this.tileTubeInstanced = new THREE.InstancedMesh(tubeGeom, this.tilePbrMat, totalTubes)
-    this.tileTubeInstanced.castShadow = true
+    this.tileTubeInstanced.castShadow = false
     this.tileTubeInstanced.receiveShadow = true
 
     this.tileWadangInstanced = new THREE.InstancedMesh(wadangGeom, this.ridgeGoldPbrMat, totalEnds)
-    this.tileWadangInstanced.castShadow = true
+    this.tileWadangInstanced.castShadow = false
     this.tileWadangInstanced.receiveShadow = true
 
     this.tileDripInstanced = new THREE.InstancedMesh(dripGeom, this.tilePbrMat, totalEnds - 1)
-    this.tileDripInstanced.castShadow = true
+    this.tileDripInstanced.castShadow = false
     this.tileDripInstanced.receiveShadow = true
 
     const dummy = new THREE.Object3D()
@@ -441,7 +441,7 @@ export class TempleRoof3D {
           const beast = new THREE.Mesh(beastGeom, this.goldPbrMat)
           beast.position.copy(pt)
           beast.position.y += 0.22
-          beast.castShadow = true
+          beast.castShadow = false
           hipGroup.add(beast)
         }
 
@@ -451,7 +451,7 @@ export class TempleRoof3D {
         const finial = new THREE.Mesh(finialGeom, this.ridgeGoldPbrMat)
         finial.position.copy(endPt)
         finial.scale.set(1.2, 0.85, 1.2)
-        finial.castShadow = true
+        finial.castShadow = false
         hipGroup.add(finial)
 
         this.root.add(hipGroup)
@@ -488,15 +488,15 @@ export class TempleRoof3D {
     const totalBeaks = clusterCount
 
     this.dougongBlockInstanced = new THREE.InstancedMesh(blockGeom, this.goldPbrMat, totalBlocks)
-    this.dougongBlockInstanced.castShadow = true
+    this.dougongBlockInstanced.castShadow = false
     this.dougongBlockInstanced.receiveShadow = true
 
     this.dougongArmInstanced = new THREE.InstancedMesh(armGeom, this.vermilionPbrMat, totalArms)
-    this.dougongArmInstanced.castShadow = true
+    this.dougongArmInstanced.castShadow = false
     this.dougongArmInstanced.receiveShadow = true
 
     this.dougongBeakInstanced = new THREE.InstancedMesh(beakGeom, this.ridgeGoldPbrMat, totalBeaks)
-    this.dougongBeakInstanced.castShadow = true
+    this.dougongBeakInstanced.castShadow = false
     this.dougongBeakInstanced.receiveShadow = true
 
     const dummy = new THREE.Object3D()
@@ -587,7 +587,7 @@ export class TempleRoof3D {
         const corbelGeom = new THREE.BoxGeometry(0.88, 0.45, 0.26)
         this.allocatedGeometries.push(corbelGeom)
         const corbelMesh = new THREE.Mesh(corbelGeom, this.vermilionPbrMat)
-        corbelMesh.castShadow = true
+        corbelMesh.castShadow = false
 
         const tailGeom = new THREE.ConeGeometry(0.18, 0.52, 6)
         this.allocatedGeometries.push(tailGeom)
@@ -608,14 +608,14 @@ export class TempleRoof3D {
       const dropBodyGeom = new THREE.CylinderGeometry(0.16, 0.18, 0.58, 8)
       this.allocatedGeometries.push(dropBodyGeom)
       const dropBody = new THREE.Mesh(dropBodyGeom, this.vermilionPbrMat)
-      dropBody.castShadow = true
+      dropBody.castShadow = false
 
       const lotusHeadGeom = new THREE.SphereGeometry(0.22, 12, 10)
       this.allocatedGeometries.push(lotusHeadGeom)
       const lotusHead = new THREE.Mesh(lotusHeadGeom, this.ridgeGoldPbrMat)
       lotusHead.position.y = -0.34
       lotusHead.scale.set(1, 1.35, 1)
-      lotusHead.castShadow = true
+      lotusHead.castShadow = false
 
       dropGroup.add(dropBody, lotusHead)
       this.highDetailGroup.add(dropGroup)

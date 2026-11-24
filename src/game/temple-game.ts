@@ -608,8 +608,10 @@ export class TempleGame {
     this.raycaster.near = 0
     this.raycaster.far = dist + 0.6 - 0.45
     const ignore = new Set(this.world.pickIgnore)
+    const candidates = this.world.getOccluderCandidates()
+    const targetPool = candidates.length > 0 ? candidates : this.world.scene.children
     try {
-      for (const hit of this.raycaster.intersectObjects(this.world.scene.children, true)) {
+      for (const hit of this.raycaster.intersectObjects(targetPool, true)) {
         let skip = false
         for (let n: THREE.Object3D | null = hit.object; n; n = n.parent) { if (ignore.has(n) || !n.visible) { skip = true; break } }
         if (skip || !(hit.object instanceof THREE.Mesh)) continue

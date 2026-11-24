@@ -82,10 +82,23 @@ async function run() {
         await new Promise((r) => requestAnimationFrame(r))
       }
 
-      // Read single-frame calls & triangles from the engine's real render pass
+      // Read single-frame calls & triangles from the engine's real scene render pass
+      let sceneCalls = 0
+      let sceneTriangles = 0
+      const origGlRender = gl.render.bind(gl)
+      gl.render = function (s, c) {
+        origGlRender(s, c)
+        if (s === scene) {
+          sceneCalls = gl.info.render.calls
+          sceneTriangles = gl.info.render.triangles
+        }
+      }
       await new Promise((r) => requestAnimationFrame(r))
-      const calls = gl.info.render.calls
-      const triangles = gl.info.render.triangles
+      await new Promise((r) => requestAnimationFrame(r))
+      gl.render = origGlRender
+
+      const calls = sceneCalls || gl.info.render.calls
+      const triangles = sceneTriangles || gl.info.render.triangles
 
       // Time 60 consecutive frames via rAF
       const frameTimes = []
@@ -127,6 +140,20 @@ async function run() {
   })
 
   console.log('BENCHMARK_RESULTS:', JSON.stringify(results, null, 2))
+
+  // Screenshot 1: UI Version Badge verification showing VER 3.75.0
+  const pathBadge = path.join(artifactDir, 'perf_version_badge.png')
+  const badgeEl = await page.$('#app-version')
+  if (badgeEl) {
+    await badgeEl.screenshot({ path: pathBadge })
+  } else {
+    await page.screenshot({ path: pathBadge, clip: { x: 0, y: 0, width: 300, height: 100 } })
+  }
+  console.log('Captured:', pathBadge)
+
+  const pathUiVersion = path.join(artifactDir, 'perf_ui_version.png')
+  await page.screenshot({ path: pathUiVersion })
+  console.log('Captured:', pathUiVersion)
 
   // Setup custom camera override for pristine visual verification screenshots
   await page.evaluate(() => {
@@ -170,7 +197,7 @@ async function run() {
     }
   })
 
-  // Screenshot 1: 玉皇宮正面 (perf_temple_front.png)
+  // Screenshot 2: 玉皇宮正面全景 (perf_temple_front.png)
   await page.evaluate(() => {
     window.__showChibi = true
     const g = window.__game?.game
@@ -185,27 +212,27 @@ async function run() {
   await page.screenshot({ path: path1 })
   console.log('Captured:', path1)
 
-  // Screenshot 2: 天心仙姑亭正面 (perf_fairy_pavilion.png)
+  // Screenshot 3: 玉皇宮左前 45 度 (perf_temple_angle45_left.png)
   await page.evaluate(() => {
     window.__showChibi = false
-    window.__customCam = { pos: [-3.6, 2.7, 30.0], target: [-12.0, 2.7, 30.0] }
+    window.__customCam = { pos: [-16, 4.8, 20], target: [0, 3.8, 0] }
+  })
+  await page.waitForTimeout(1000)
+  const pathAngle45 = path.join(artifactDir, 'perf_temple_angle45_left.png')
+  await page.screenshot({ path: pathAngle45 })
+  console.log('Captured:', pathAngle45)
+
+  // Screenshot 4: 天心仙姑亭正面與神壇近景 (perf_fairy_pavilion.png)
+  await page.evaluate(() => {
+    window.__showChibi = false
+    window.__customCam = { pos: [-8.8, 1.85, 30.0], target: [-13.2, 1.85, 30.0] }
   })
   await page.waitForTimeout(1000)
   const path2 = path.join(artifactDir, 'perf_fairy_pavilion.png')
   await page.screenshot({ path: path2 })
   console.log('Captured:', path2)
 
-  // Screenshot 3: 主殿近景 (perf_main_hall_closeup.png)
-  await page.evaluate(() => {
-    window.__showChibi = false
-    window.__customCam = { pos: [0, 2.2, 5.0], target: [0, 2.6, -2.5] }
-  })
-  await page.waitForTimeout(1000)
-  const path3 = path.join(artifactDir, 'perf_main_hall_closeup.png')
-  await page.screenshot({ path: path3 })
-  console.log('Captured:', path3)
-
-  // Screenshot 4: 移動鏡頭 (perf_moving_camera.png)
+  // Screenshot 5: 移動鏡頭 (perf_moving_camera.png)
   await page.evaluate(() => {
     window.__showChibi = true
     const g = window.__game?.game
@@ -219,6 +246,29 @@ async function run() {
   const path4 = path.join(artifactDir, 'perf_moving_camera.png')
   await page.screenshot({ path: path4 })
   console.log('Captured:', path4)
+
+  // Screenshot 6: Medium vs High comparison
+  // First capture High
+  await page.evaluate(() => {
+    const g = window.__game?.game
+    if (g) g.setQuality('high')
+    window.__showChibi = true
+    window.__customCam = { pos: [0, 2.6, 28], target: [0, 3.2, 0] }
+  })
+  await page.waitForTimeout(1000)
+  const pathHigh = path.join(artifactDir, 'perf_quality_high.png')
+  await page.screenshot({ path: pathHigh })
+  console.log('Captured:', pathHigh)
+
+  // Then reset to Medium
+  await page.evaluate(() => {
+    const g = window.__game?.game
+    if (g) g.setQuality('medium')
+  })
+  await page.waitForTimeout(1000)
+  const pathMedium = path.join(artifactDir, 'perf_quality_medium.png')
+  await page.screenshot({ path: pathMedium })
+  console.log('Captured:', pathMedium)
 
   await browser.close()
   server.kill('SIGTERM')

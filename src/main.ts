@@ -223,6 +223,7 @@ async function boot(): Promise<void> {
     console.warn('Shader precompile:', err)
   }
   ui.setBootProgress(1.0)
+  g.world.initProgressiveLoading()
   const configureTemple = (temple: TempleGame): void => {
     temple.reducedMotion = save.data.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches
     temple.world.reducedSmoke = temple.reducedMotion
