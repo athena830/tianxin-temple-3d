@@ -334,35 +334,8 @@ export class TempleRoof3D {
     crestMesh.castShadow = true
     this.root.add(crestMesh)
 
-    // (4) 正脊東西兩側立體雙燕尾（單一渾厚流線，向上優美挑起 1.85m，與正脊一體成形，零零散尖刺）
-    for (const tx of [-ridgeLen / 2 + 0.25, ridgeLen / 2 - 0.25]) {
-      const isEast = tx > 0
-      const tailGroup = new THREE.Group()
-      tailGroup.position.set(tx, ridgeY + 0.58, 0)
-
-      // 渾厚流線燕尾主樑（Thick sculpted sweeping swallowtail blade）
-      const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(isEast ? 0.65 : -0.65, 0.95, 0),
-        new THREE.Vector3(isEast ? 1.45 : -1.45, 1.85, 0)
-      )
-      const tailTubeGeom = new THREE.TubeGeometry(curve, 20, 0.22, 10, false)
-      this.allocatedGeometries.push(tailTubeGeom)
-      const tailMesh = new THREE.Mesh(tailTubeGeom, this.ridgeGoldPbrMat)
-      tailMesh.castShadow = true
-      tailGroup.add(tailMesh)
-
-      // 燕尾末端外揚立體收口（厚實卷雲收邊，與主樑一體）
-      const finialGeom = new THREE.SphereGeometry(0.24, 10, 8)
-      this.allocatedGeometries.push(finialGeom)
-      const finial = new THREE.Mesh(finialGeom, this.goldPbrMat)
-      finial.position.set(isEast ? 1.45 : -1.45, 1.85, 0)
-      finial.scale.set(1.4, 0.9, 1.0)
-      finial.castShadow = true
-      tailGroup.add(finial)
-
-      this.root.add(tailGroup)
-    }
+    // (4) 正脊東西兩側立體雙燕尾：依指令移除左右兩側斜向金色長圓柱與收口圓球，保留水平主脊與西施脊完整結構
+    // (Left and right slanted golden swallowtail cylinders and finials removed per architectural simplification)
   }
 
   /**
@@ -422,137 +395,18 @@ export class TempleRoof3D {
       this.pagodaGroup.add(flame)
     }
 
-    // (2) 東西兩條超大立體剪黏金龍（長度達 4.8m，立體昂首盤旋）
-    for (const dir of [-1, 1]) {
-      const isEast = dir > 0
-      const dragon = new THREE.Group()
-      dragon.position.set(dir * 2.8, crestCenterY + 0.35, 0)
-
-      // 霸氣張口龍首（朝向中央金塔）
-      const headGroup = new THREE.Group()
-      headGroup.position.set(dir * -0.95, 0.88, 0)
-
-      const skullGeom = new THREE.BoxGeometry(0.65, 0.38, 0.38)
-      this.allocatedGeometries.push(skullGeom)
-      const skull = new THREE.Mesh(skullGeom, this.goldPbrMat)
-      skull.castShadow = true
-
-      const jawGeom = new THREE.BoxGeometry(0.52, 0.20, 0.28)
-      this.allocatedGeometries.push(jawGeom)
-      const jaw = new THREE.Mesh(jawGeom, this.goldPbrMat)
-      jaw.position.set(dir * -0.10, -0.22, 0)
-
-      // 金鹿角（粗壯立體）
-      for (const side of [-1, 1]) {
-        const hornGeom = new THREE.ConeGeometry(0.08, 0.72, 8)
-        this.allocatedGeometries.push(hornGeom)
-        const horn = new THREE.Mesh(hornGeom, this.ridgeGoldPbrMat)
-        horn.position.set(dir * 0.14, 0.45, side * 0.16)
-        horn.rotation.z = isEast ? 0.48 : -0.48
-        horn.rotation.x = side * 0.35
-        headGroup.add(horn)
-      }
-
-      headGroup.add(skull, jaw)
-      dragon.add(headGroup)
-
-      // 壯觀起伏龍身（S 型三段波浪，直徑 0.28m，延展至外側）
-      const bodySegments = 7
-      for (let s = 0; s < bodySegments; s++) {
-        const u = s / (bodySegments - 1)
-        const wave = Math.sin(u * Math.PI * 2) * 0.45
-        const segX = dir * (s * 0.68)
-        const segY = 0.45 + wave
-
-        const segGeom = new THREE.CylinderGeometry(0.18, 0.22, 0.65, 8)
-        segGeom.rotateZ(Math.PI / 2)
-        this.allocatedGeometries.push(segGeom)
-        const seg = new THREE.Mesh(segGeom, this.vermilionPbrMat)
-        seg.position.set(segX, segY, 0)
-        seg.castShadow = true
-
-        // 巨幅金色背鰭（Dorsal Fin Spines）
-        const finGeom = new THREE.ConeGeometry(0.11, 0.42, 5)
-        this.allocatedGeometries.push(finGeom)
-        const fin = new THREE.Mesh(finGeom, this.goldPbrMat)
-        fin.position.set(segX, segY + 0.32, 0)
-        fin.castShadow = true
-
-        dragon.add(seg, fin)
-      }
-
-      // 祥雲底座（穩固承托）
-      for (let c = 0; c < 3; c++) {
-        const cloudGeom = new THREE.SphereGeometry(0.26, 8, 8)
-        this.allocatedGeometries.push(cloudGeom)
-        const cloud = new THREE.Mesh(cloudGeom, this.cutoutMat)
-        cloud.position.set(dir * (0.6 + c * 1.3), 0.14, 0)
-        cloud.scale.set(1.5, 0.8, 1.2)
-        dragon.add(cloud)
-      }
-
-      this.twinDragonsGroup.add(dragon)
-    }
+    // (2) 東西兩條立體剪黏金龍：依指令移除左側與右側祥龍整組（含龍首、龍身、金角、背鰭與底座祥雲），保留中央七寶八角金塔與摩尼寶珠
+    // (Left and right twin dragon sculptures removed per instruction, retaining central pagoda and pearl)
 
     this.root.add(this.pagodaGroup)
     this.root.add(this.twinDragonsGroup)
   }
 
   /**
-   * 5. 四方斜垂脊（Hip Ridges）與整體連貫一體的飛簷牌頭（移除獨立細尖刺）
+   * 5. 四方斜垂脊（Hip Ridges）與飛簷牌頭：依指令移除向左上與右上斜伸之金色長圓柱與端點收口金球
    */
-  private buildHipRidgesAndCornerBeasts(width: number, depth: number, eaveY: number, peakY: number): void {
-    const halfW = width / 2
-    const halfD = depth / 2
-
-    // 歇山頂四角斜垂脊
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        const hipGroup = new THREE.Group()
-
-        const startPt = new THREE.Vector3(sx * (halfW * 0.72), peakY + 0.35, 0)
-        // 簷口四角向外向上起翹
-        const endPt = new THREE.Vector3(sx * (halfW + 0.35), eaveY + 0.82, sz * (halfD + 0.35))
-        const midPt = new THREE.Vector3(
-          (startPt.x + endPt.x) / 2,
-          (startPt.y + endPt.y) / 2 - 0.22,
-          (startPt.z + endPt.z) / 2
-        )
-
-        const curve = new THREE.QuadraticBezierCurve3(startPt, midPt, endPt)
-        // 垂脊加粗至半徑 0.18m
-        const ridgeGeom = new THREE.TubeGeometry(curve, 16, 0.18, 8, false)
-        this.allocatedGeometries.push(ridgeGeom)
-        const ridgeMesh = new THREE.Mesh(ridgeGeom, this.ridgeGoldPbrMat)
-        ridgeMesh.castShadow = true
-        hipGroup.add(ridgeMesh)
-
-        // 垂脊上的仙人走獸立體雕飾（放大至 0.42m，清晰可見）
-        for (let b = 1; b <= 4; b++) {
-          const t = 0.32 + b * 0.13
-          const pt = curve.getPoint(t)
-
-          const beastGeom = new THREE.ConeGeometry(0.14, 0.42, 6)
-          this.allocatedGeometries.push(beastGeom)
-          const beast = new THREE.Mesh(beastGeom, this.goldPbrMat)
-          beast.position.copy(pt)
-          beast.position.y += 0.22
-          beast.castShadow = true
-          hipGroup.add(beast)
-        }
-
-        // 簷角牌頭祥雲印斗（穩實座落於簷角屋面，渾然一體，絕無任何向外懸空的異物尖刺）
-        const finialGeom = new THREE.SphereGeometry(0.28, 12, 10)
-        this.allocatedGeometries.push(finialGeom)
-        const finial = new THREE.Mesh(finialGeom, this.ridgeGoldPbrMat)
-        finial.position.copy(endPt)
-        finial.scale.set(1.2, 0.85, 1.2)
-        finial.castShadow = true
-        hipGroup.add(finial)
-
-        this.root.add(hipGroup)
-      }
-    }
+  private buildHipRidgesAndCornerBeasts(_width: number, _depth: number, _eaveY: number, _peakY: number): void {
+    // Left and right corner hip ridge golden tubes and finials removed per architectural simplification instruction
   }
 
   /**
