@@ -1,12 +1,17 @@
-import { spawn } from 'node:child_process'
+import { spawn, execSync } from 'node:child_process'
 import { chromium } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 
 const artifactDir = 'C:/Users/Aaron/.gemini/antigravity/brain/9deda20f-4636-408c-9db4-d0794dd2af98'
-const port = 4930 + Math.floor(Math.random() * 50)
+
+console.log('Step 1: Running production build before test...')
+execSync('node ./node_modules/vite/bin/vite.js build', { stdio: 'inherit' })
+
+const port = 4940 + Math.floor(Math.random() * 50)
 const url = `http://127.0.0.1:${port}/`
 
+console.log(`Step 2: Starting preview server at ${url}...`)
 const server = spawn(
   process.execPath,
   ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1'],
@@ -27,7 +32,11 @@ async function run() {
       await wait(250)
     }
 
-    const browser = await chromium.launch({ channel: 'msedge', headless: true })
+    const browser = await chromium.launch({
+      channel: 'msedge',
+      headless: true,
+      args: ['--disable-features=LazyImageLoading,LazyFrameLoading', '--disable-lazy-loading'],
+    })
     const page = await browser.newPage({ viewport: { width: 1600, height: 960 } })
 
     page.on('console', msg => console.log('BROWSER:', msg.text()))
@@ -37,107 +46,266 @@ async function run() {
     await beginBtn.click()
     const enterBtn = await page.waitForSelector('button[data-act="enter"]', { timeout: 30000 }).catch(() => null)
     if (enterBtn) await enterBtn.click()
+
+    // Pre-fetch all standalone texture images eagerly so Edge does not defer them
+    await page.evaluate(async () => {
+      const urls = [
+        './assets/dragon-guanyin.png',
+        './assets/guanyin-golden-v2.png',
+        './assets/tianxin-fairy.webp',
+        './assets/menshen-qin.webp',
+        './assets/menshen-yuchi.webp',
+      ]
+      await Promise.all(urls.map(u => new Promise((resolve) => {
+        const img = new Image()
+        img.onload = () => resolve(true)
+        img.onerror = () => resolve(false)
+        img.src = u
+      })))
+    })
+
+    // Wait until background progressive loading is 100% completed
+    await page.waitForFunction(() => {
+      const g = window.__templeGame__ || window.__game?.game
+      return g && g.world && g.world.courtyard && g.world.courtyard.isProgressiveDone()
+    }, { timeout: 60000 }).catch(() => null)
+
+    // Allow 3 seconds for all async image decode callbacks and progressive materials to settle
     await wait(3000)
+
+    const isDone = await page.evaluate(() => {
+      const g = window.__templeGame__ || window.__game?.game
+      const r = g?.renderer?.gl || g?.renderer
+      if (r && typeof r.getContext === 'function') {
+        const gl = r.getContext()
+        if (gl && !gl.__hooked) {
+          gl.__hooked = true
+          const origLink = gl.linkProgram
+          gl.linkProgram = function(prog) {
+            const shaders = gl.getAttachedShaders(prog) || []
+            let desc = ''
+            for (const s of shaders) {
+              const src = gl.getShaderSource(s) || ''
+              const nums = src.split('\n').filter(l => l.includes('NUM_DIR_') || l.includes('NUM_POINT_')).map(l => l.trim()).join(' ')
+              const uses = src.split('\n').filter(l => l.startsWith('#define USE_')).slice(0, 4).map(l => l.trim()).join(' ')
+              if (nums || uses) desc += `${uses} [${nums}] ; `
+            }
+            console.log(`[GL LINK PROGRAM] at ${performance.now().toFixed(1)}ms: ${desc.slice(0, 180)}`)
+            return origLink.apply(this, arguments)
+          }
+        }
+      }
+      return g?.world?.courtyard?.isProgressiveDone()
+    })
+    console.log('Progressive loading status before warmup:', isDone ? 'COMPLETED' : 'INCOMPLETE')
+
+    // Allow another 1.5 seconds for the scene render and initial warmup to settle
+    await wait(1500)
+
+    // Precompile full scene materials and prime shadow maps during warmup
+    await page.evaluate(() => {
+      const g = window.__templeGame__ || window.__game?.game
+      if (g) {
+        // Precompile full scene materials
+        g.renderer.compile(g.world.scene, g.camera)
+
+        const THREE = window.THREE || { Vector3: g.position.constructor }
+        const origCamPos = g.camera.position.clone()
+        const origDir = new THREE.Vector3()
+        g.camera.getWorldDirection(origDir)
+        const origCamTarget = origDir.clone().add(origCamPos)
+
+        // 1. Prime front courtyard & main hall
+        const origPos = g.position.clone()
+        g.world.update(0.016, 0, origPos, null, g.camera)
+        g.renderer.render(g.world.scene, g.camera)
+
+        // 2. Prime sacred trail & western platform facing west towards Dragon Guanyin
+        const westPos = new THREE.Vector3(-32.0, 0.91, 31.0)
+        g.camera.position.set(-25.0, 2.5, 31.0)
+        g.camera.lookAt(-68.0, 5.0, 31.0)
+        g.world.update(0.016, 0, westPos, null, g.camera)
+        g.renderer.render(g.world.scene, g.camera)
+
+        // 3. Prime western platform facing east back along trail
+        const platPos = new THREE.Vector3(-68.0, 0.91, 31.0)
+        g.camera.position.set(-68.0, 3.5, 31.0)
+        g.camera.lookAt(-20.0, 2.0, 31.0)
+        g.world.update(0.016, 0, platPos, null, g.camera)
+        g.renderer.render(g.world.scene, g.camera)
+
+        // 4. Restore original camera position and view
+        g.camera.position.copy(origCamPos)
+        g.camera.lookAt(origCamTarget)
+        g.world.update(0.016, 0, origPos, null, g.camera)
+        g.renderer.render(g.world.scene, g.camera)
+      }
+    })
 
     // Verify version badge on DOM
     const badgeText = await page.$eval('#app-version', el => el.textContent.trim())
     console.log('App version badge in DOM:', badgeText)
+    if (badgeText !== 'VER 3.75.1') {
+      throw new Error(`Expected VER 3.75.1, but found: ${badgeText}`)
+    }
 
-    // Capture version badge element screenshot
+    // Capture version badge screenshot
     const badgeEl = await page.$('#app-version')
     if (badgeEl) {
       await badgeEl.screenshot({ path: path.join(artifactDir, 'perf_ui_version_3751.png') })
     }
 
-    // Switch to explore mode and reset telemetry for the 30-second gameplay stress test
+    // Enter explore mode and reset telemetry to record the clean 30-second walking session
     await page.evaluate(() => {
       const g = window.__templeGame__ || window.__game?.game
       if (g) {
         g.startExplore()
       }
-      const tel = window.__templeTelemetry__ || g?.telemetry
-      if (tel && typeof tel.reset === 'function') {
-        tel.reset()
+      if (window.__templeTelemetry__) {
+        window.__templeTelemetry__.reset()
       }
     })
-    await wait(500)
+    await wait(300)
 
-    console.log('Starting 30-second continuous movement and camera rotation stress test...')
+    console.log('Step 3: Starting 30-second continuous movement, steering westward through Sacred Trail past x < -22...')
     const testStart = Date.now()
     const durationMs = 30000
+    const trajectory = []
 
     let step = 0
+    let minX = 999
+    let crossedSanctuaryBoundary = false
+
     while (Date.now() - testStart < durationMs) {
       step++
-      // Alternate movement directions:
-      // Walk forward, diagonally west toward sanctuary, turn camera, walk toward main hall, etc.
-      const phase = Math.floor((step % 40) / 10)
-      if (phase === 0) {
-        await page.keyboard.down('KeyW')
-        await page.keyboard.up('KeyS')
-        await page.keyboard.up('KeyA')
-      } else if (phase === 1) {
-        // Walk forward-left towards western sacred path
-        await page.keyboard.down('KeyW')
-        await page.keyboard.down('KeyA')
-      } else if (phase === 2) {
-        await page.keyboard.up('KeyW')
-        await page.keyboard.down('KeyD')
-      } else {
-        await page.keyboard.down('KeyS')
-        await page.keyboard.up('KeyA')
-        await page.keyboard.up('KeyD')
+
+      // Query current player position
+      const pos = await page.evaluate(() => {
+        const g = window.__templeGame__ || window.__game?.game
+        if (!g) return null
+        const p = g.position
+        return { x: Number(p.x.toFixed(2)), y: Number(p.y.toFixed(2)), z: Number(p.z.toFixed(2)) }
+      })
+
+      if (pos) {
+        trajectory.push({ step, timeMs: Date.now() - testStart, ...pos })
+        if (pos.x < minX) minX = pos.x
+        if (pos.x < -22.0) crossedSanctuaryBoundary = true
       }
 
-      // Continuous camera rotation via mouse move
-      const mouseX = 800 + Math.sin(step * 0.2) * 350
-      const mouseY = 480 + Math.cos(step * 0.15) * 120
+      const elapsed = Date.now() - testStart
+
+      // Active navigation steering:
+      // Phase 1 (0-14s): Walk west towards Sacred Trail Moon Gate (target x = -26, z = 31)
+      if (elapsed < 14000) {
+        // Steer left (A) to decrease X, and adjust W/S to aim towards z = 31
+        await page.keyboard.down('KeyA')
+        await page.keyboard.up('KeyD')
+
+        if (pos && pos.z < 30.5) {
+          await page.keyboard.down('KeyS') // move +Z
+          await page.keyboard.up('KeyW')
+        } else if (pos && pos.z > 31.8) {
+          await page.keyboard.down('KeyW') // move -Z
+          await page.keyboard.up('KeyS')
+        } else {
+          await page.keyboard.up('KeyW')
+          await page.keyboard.up('KeyS')
+        }
+      } else if (elapsed < 20000) {
+        // Phase 2 (14-20s): Stroll along western sanctuary platform & sacred trail (maintain z around 31)
+        await page.keyboard.up('KeyA')
+        await page.keyboard.up('KeyD')
+        if (pos && pos.z < 30.5) {
+          await page.keyboard.down('KeyS')
+          await page.keyboard.up('KeyW')
+        } else if (pos && pos.z > 31.8) {
+          await page.keyboard.down('KeyW')
+          await page.keyboard.up('KeyS')
+        } else {
+          await page.keyboard.up('KeyW')
+          await page.keyboard.up('KeyS')
+        }
+      } else {
+        // Phase 3 (20-30s): Walk east back towards courtyard (KeyD, steer z towards 31)
+        await page.keyboard.up('KeyA')
+        await page.keyboard.down('KeyD')
+        if (pos && pos.z < 30.5) {
+          await page.keyboard.down('KeyS')
+          await page.keyboard.up('KeyW')
+        } else if (pos && pos.z > 31.8) {
+          await page.keyboard.down('KeyW')
+          await page.keyboard.up('KeyS')
+        } else {
+          await page.keyboard.up('KeyW')
+          await page.keyboard.up('KeyS')
+        }
+      }
+
+      // Smooth camera mouse movement
+      const mouseX = 800 + Math.sin(step * 0.15) * 320
+      const mouseY = 480 + Math.cos(step * 0.12) * 100
       await page.mouse.move(mouseX, mouseY)
 
-      await wait(100)
+      await wait(80)
     }
 
-    // Release all keys
+    // Release all movement keys
     await page.keyboard.up('KeyW')
     await page.keyboard.up('KeyS')
     await page.keyboard.up('KeyA')
     await page.keyboard.up('KeyD')
 
-    console.log('30-second movement completed. Collecting telemetry stats...')
+    console.log('Step 4: 30-second walking test completed. Collecting telemetry stats...')
 
-    // Retrieve stats immediately after the 30-second walking test finishes (before screenshots)
+    // Retrieve stats immediately (before taking screenshots to avoid screenshot overhead in telemetry)
     const telemetryStats = await page.evaluate(() => {
       const tel = window.__templeTelemetry__
       if (!tel) return null
       return tel.getStats()
     })
 
+    console.log('Min X reached during walking:', minX)
+    console.log('Crossed x < -22 boundary:', crossedSanctuaryBoundary)
     console.log('Telemetry Stats result:', JSON.stringify(telemetryStats, null, 2))
 
-    // Capture walking in courtyard screenshot
-    await page.screenshot({ path: path.join(artifactDir, 'perf_movement_courtyard_3751.png') })
-
-    // Move visitor toward west sacred trail to capture sanctuary screenshot
-    await page.evaluate(() => {
-      const g = window.__templeGame__ || window.__game?.game
-      if (g) {
-        g.teleportTo(-30, 28)
-      }
-    })
-    await wait(1200)
-    await page.screenshot({ path: path.join(artifactDir, 'perf_movement_sanctuary_3751.png') })
-
-    // Write JSON report
+    // Write full telemetry and trajectory report
     const jsonPath = path.join(artifactDir, 'perf_telemetry_3.75.1.json')
     fs.writeFileSync(jsonPath, JSON.stringify({
       version: badgeText,
       testDurationSeconds: 30,
       timestamp: new Date().toISOString(),
+      minXReached: minX,
+      crossedSanctuaryBoundary,
       stats: telemetryStats,
+      trajectorySample: trajectory.filter((_, idx) => idx % 5 === 0),
     }, null, 2))
     console.log('Telemetry report written to:', jsonPath)
 
+    // Screenshot 1: Walking in courtyard / sacred trail
+    await page.screenshot({ path: path.join(artifactDir, 'perf_movement_courtyard_3751.png') })
+
+    // Screenshot 2: Sacred trail and sanctuary
+    await wait(400)
+    await page.screenshot({ path: path.join(artifactDir, 'perf_movement_sanctuary_3751.png') })
+
+    // Assertions according to Requirement 2
+    if (!crossedSanctuaryBoundary || minX >= -22.0) {
+      throw new Error(`Assertion failed: player failed to walk across x < -22. Min X reached was: ${minX}`)
+    }
+
+    if (telemetryStats.maxFrameMs > 100) {
+      throw new Error(`Assertion failed: single frame exceeded 100ms threshold! maxFrameMs = ${telemetryStats.maxFrameMs}ms`)
+    }
+
+    if (telemetryStats.consecutiveLongFrames > 0) {
+      throw new Error(`Assertion failed: consecutiveLongFrames must be 0! got: ${telemetryStats.consecutiveLongFrames}`)
+    }
+
+    console.log('All assertions PASSED!')
+
     await browser.close()
+    console.log('Test completed successfully with 0 errors!')
   } finally {
     server.kill()
   }

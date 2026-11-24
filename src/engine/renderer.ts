@@ -77,6 +77,10 @@ export class Renderer {
     return this.composer
   }
 
+  compile(scene: THREE.Scene, camera: THREE.Camera): void {
+    this.gl.compile(scene, camera)
+  }
+
   resize(): void {
     const w = this.canvas.clientWidth || window.innerWidth
     const h = this.canvas.clientHeight || window.innerHeight

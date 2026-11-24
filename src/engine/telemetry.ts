@@ -17,42 +17,60 @@ export interface TelemetryStats {
   maxFrameMs: number
   consecutiveLongFrames: number
   maxConsecutiveLongFrames: number
+  longFrameCount: number
   recentLongFrames: LongFrameRecord[]
 }
 
 export class GameTelemetry {
-  private readonly bufferSize = 120
-  private readonly frameBuffer: number[] = new Array(120).fill(16.6)
-  private bufferIdx = 0
+  readonly allFrames: number[] = []
   private frameCount = 0
   private maxFrameMs = 0
   private consecutiveLongFrames = 0
   private maxConsecutiveLongFrames = 0
+  private longFrameCount = 0
   readonly longFrames: LongFrameRecord[] = []
-  private activeTags = new Set<LongFrameTag>()
+  private readonly activeTags = new Set<LongFrameTag>()
 
-  markTag(tag: LongFrameTag, _durationMs?: number): void {
-    this.activeTags.add(tag)
+  private readonly tagThresholds: Record<LongFrameTag, number> = {
+    stage_load: 3.0,
+    zone_light: 0,
+    occlusion: 4.0,
+    renderer: 25.0,
+    physics: 8.0,
+  }
+
+  markTag(tag: LongFrameTag, durationMs?: number): void {
+    if (durationMs === undefined) {
+      this.activeTags.add(tag)
+    } else {
+      const threshold = this.tagThresholds[tag] ?? 0
+      if (durationMs >= threshold) {
+        this.activeTags.add(tag)
+      }
+    }
   }
 
   reset(): void {
-    this.frameBuffer.fill(16.6)
-    this.bufferIdx = 0
+    this.allFrames.length = 0
     this.frameCount = 0
     this.maxFrameMs = 0
     this.consecutiveLongFrames = 0
     this.maxConsecutiveLongFrames = 0
+    this.longFrameCount = 0
     this.longFrames.length = 0
     this.activeTags.clear()
   }
 
   recordFrame(durationMs: number): void {
     this.frameCount++
-    this.frameBuffer[this.bufferIdx] = durationMs
-    this.bufferIdx = (this.bufferIdx + 1) % this.bufferSize
+    this.allFrames.push(durationMs)
 
     if (durationMs > this.maxFrameMs) {
       this.maxFrameMs = Number(durationMs.toFixed(2))
+    }
+
+    if (durationMs > 100) {
+      this.longFrameCount++
     }
 
     if (durationMs > 50) {
@@ -66,7 +84,7 @@ export class GameTelemetry {
         tags: Array.from(this.activeTags),
         timestamp: Math.round(performance.now()),
       })
-      if (this.longFrames.length > 50) this.longFrames.shift()
+      if (this.longFrames.length > 100) this.longFrames.shift()
     } else {
       this.consecutiveLongFrames = 0
     }
@@ -75,7 +93,19 @@ export class GameTelemetry {
   }
 
   getStats(): TelemetryStats {
-    const samples = [...this.frameBuffer].sort((a, b) => a - b)
+    if (this.allFrames.length === 0) {
+      return {
+        frameCount: 0,
+        avgMs: 0,
+        p95Ms: 0,
+        maxFrameMs: 0,
+        consecutiveLongFrames: 0,
+        maxConsecutiveLongFrames: 0,
+        longFrameCount: 0,
+        recentLongFrames: [],
+      }
+    }
+    const samples = [...this.allFrames].sort((a, b) => a - b)
     const avg = samples.reduce((acc, v) => acc + v, 0) / samples.length
     const p95 = samples[Math.floor(samples.length * 0.95)]
     return {
@@ -85,8 +115,8 @@ export class GameTelemetry {
       maxFrameMs: this.maxFrameMs,
       consecutiveLongFrames: this.consecutiveLongFrames,
       maxConsecutiveLongFrames: this.maxConsecutiveLongFrames,
-      recentLongFrames: this.longFrames.slice(-10),
+      longFrameCount: this.longFrameCount,
+      recentLongFrames: this.longFrames.slice(-20),
     }
   }
 }
-

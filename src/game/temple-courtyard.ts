@@ -79,60 +79,144 @@ export class FrontCourtyard {
   private playerLanternGroup?: CourtyardSkyLanternGroup
   readonly sacredPlatformLights: THREE.PointLight[] = []
   readonly trailLanternLights: THREE.PointLight[] = []
+  private readonly prewarmedLights = new Map<string, THREE.PointLight>()
   private platGroup?: THREE.Group
-  private readonly progressiveTasks: (() => void)[] = [
-    () => this.addLotusPondStructure(),
-    () => this.addLotusPondFlora(),
-    () => this.addPlantingShrubs(),
-    () => this.addPlantingCourtyard(),
-    () => this.addSacredTrailEssential(),
-    () => this.addSacredTrailDecor(),
-    () => this.addSacredPlatformDecor(),
-    () => this.addSkyLanterns(),
-  ]
-  private progressiveTaskIndex = 0
+  private readonly taskQueue: { id: string; priority: number; run: () => void }[] = []
 
   setSanctuaryLightsVisible(visible: boolean): void {
-    for (const l of this.sacredPlatformLights) l.visible = visible
-    for (const l of this.trailLanternLights) l.visible = visible
+    for (const l of this.sacredPlatformLights) {
+      const orig = l.userData.origIntensity ?? 1.2
+      l.intensity = visible ? orig : 0
+      l.visible = true
+    }
+    for (const l of this.trailLanternLights) {
+      const orig = l.userData.origIntensity ?? 1.45
+      l.intensity = visible ? orig : 0
+      l.visible = true
+    }
   }
 
   isProgressiveDone(): boolean {
-    return this.progressiveTaskIndex >= this.progressiveTasks.length
+    return this.taskQueue.length === 0
   }
 
   stepProgressive(budgetMs = 3.5): boolean {
     const t0 = performance.now()
-    while (this.progressiveTaskIndex < this.progressiveTasks.length) {
-      const task = this.progressiveTasks[this.progressiveTaskIndex++]
-      task()
+    while (this.taskQueue.length > 0) {
       if (performance.now() - t0 >= budgetMs) {
         break
       }
+      const task = this.taskQueue.shift()!
+      task.run()
     }
     return this.isProgressiveDone()
   }
 
-  ensureSacredTrailEssential(): void {
-    while (this.progressiveTaskIndex <= 4 && this.progressiveTaskIndex < this.progressiveTasks.length) {
-      this.progressiveTasks[this.progressiveTaskIndex++]()
-    }
+  ensureSacredTrailEssential(budgetMs = 3.5): void {
+    this.taskQueue.sort((a, b) => a.priority - b.priority)
+    this.stepProgressive(budgetMs)
   }
 
   flushAll(): void {
-    while (this.progressiveTaskIndex < this.progressiveTasks.length) {
-      this.progressiveTasks[this.progressiveTaskIndex++]()
+    while (this.taskQueue.length > 0) {
+      const task = this.taskQueue.shift()!
+      task.run()
     }
   }
 
   loadStage2(): void {
-    while (this.progressiveTaskIndex < 4 && this.progressiveTaskIndex < this.progressiveTasks.length) {
-      this.progressiveTasks[this.progressiveTaskIndex++]()
+    const s2Ids = new Set(['pond_struct', 'pond_pads_1', 'pond_pads_2', 'pond_flowers', 'shrub_left', 'shrub_right', 'trees_1', 'trees_2', 'trees_3', 'benches'])
+    for (let i = 0; i < this.taskQueue.length; i++) {
+      if (s2Ids.has(this.taskQueue[i].id)) {
+        const [task] = this.taskQueue.splice(i, 1)
+        task.run()
+        i--
+      }
     }
   }
 
   loadStage3(): void {
     this.flushAll()
+  }
+
+  private initTaskQueue(): void {
+    this.taskQueue.push(
+      { id: 'pond_struct', priority: 10, run: () => this.addLotusPondStructure() },
+      { id: 'pond_pads_1', priority: 10, run: () => this.addLotusFloraPads(0, 27) },
+      { id: 'pond_pads_2', priority: 10, run: () => this.addLotusFloraPads(27, 27) },
+      { id: 'pond_flowers', priority: 10, run: () => this.addLotusFloraFlowers() },
+      { id: 'shrub_left', priority: 10, run: () => this.addPlantingShrubsSide(-1) },
+      { id: 'shrub_right', priority: 10, run: () => this.addPlantingShrubsSide(1) },
+      { id: 'trees_1', priority: 10, run: () => this.addPlantingTreesBatch(0, 4, 10) },
+      { id: 'trees_2', priority: 10, run: () => this.addPlantingTreesBatch(4, 3, 14) },
+      { id: 'trees_3', priority: 10, run: () => this.addPlantingTreesBatch(7, 3, 17) },
+      { id: 'benches', priority: 10, run: () => this.addPlantingBenches() },
+      { id: 'trail_essential', priority: 1, run: () => this.addSacredTrailEssential() },
+      { id: 'trail_road', priority: 2, run: () => this.addSacredTrailRoadDecor() },
+      { id: 'trail_trees_1', priority: 10, run: () => this.addSacredTrailTreesBatch(0, 2) },
+      { id: 'trail_trees_2', priority: 10, run: () => this.addSacredTrailTreesBatch(2, 3) },
+      { id: 'trail_lanterns', priority: 10, run: () => this.addSacredTrailLanterns() },
+      { id: 'plat_steps', priority: 2, run: () => this.addSacredPlatformSteps() },
+      { id: 'plat_rail_1', priority: 10, run: () => this.addSacredPlatformRailingsBatch(0, 14) },
+      { id: 'plat_rail_2', priority: 10, run: () => this.addSacredPlatformRailingsBatch(14, 14) },
+      { id: 'plat_lamps', priority: 10, run: () => this.addSacredPlatformLampTowers() },
+      { id: 'sky_lanterns', priority: 10, run: () => this.addSkyLanterns() },
+    )
+  }
+
+  private initPermanentPointLights(): void {
+    // 1. Lotus pond stone lantern light
+    const { x: pondX, z: pondZ } = LOTUS_POND
+    const rx = 5.2 - 0.55
+    const rz = 3.7 - 0.5
+    const pondLamp = new THREE.PointLight('#ffbe55', 1.0, 7.5, 1.8)
+    pondLamp.position.set(pondX + rx * 0.72, 1.62, pondZ - rz * 0.22)
+    this.c.scene.add(pondLamp)
+    this.prewarmedLights.set('lotus_pond_lantern', pondLamp)
+
+    // 2. Courtyard & Sacred Trail stone lanterns
+    const lanternCoords = [
+      { x: -3.6, z: 19 }, { x: 3.6, z: 19 }, { x: -3.6, z: 39 }, { x: 3.6, z: 39 },
+      { x: -36.0, z: 33.5 }, { x: -36.0, z: 28.5 }, { x: -46.0, z: 33.5 }, { x: -46.0, z: 28.5 },
+    ]
+    for (const { x, z } of lanternCoords) {
+      const key = `lantern_${x.toFixed(1)}_${z.toFixed(1)}`
+      const l = new THREE.PointLight('#ffc060', 1.45, 10.5, 1.8)
+      l.position.set(x, 1.6, z)
+      l.userData.origIntensity = 1.45
+      if (x < -25) {
+        l.intensity = 0
+        this.trailLanternLights.push(l)
+      }
+      this.c.scene.add(l)
+      this.prewarmedLights.set(key, l)
+    }
+
+    // 3. Sacred Platform corner lamp towers
+    const platX = -68.0
+    const platZ = 31.0
+    for (const [dx, dz] of [[-8.8, -8.8], [-8.8, 8.8], [7.5, -8.8], [7.5, 8.8]]) {
+      const key = `plat_lamp_${dx}_${dz}`
+      const lamp = new THREE.PointLight('#ffda7a', 1.2, 14, 1.8)
+      lamp.position.set(platX + dx, 2.99, platZ + dz)
+      lamp.userData.origIntensity = 1.2
+      lamp.intensity = 0
+      lamp.visible = true
+      this.c.scene.add(lamp)
+      this.sacredPlatformLights.push(lamp)
+      this.prewarmedLights.set(key, lamp)
+    }
+
+    // 4. Courtyard sky lanterns point lights
+    for (const key of ['sky_lantern_couple', 'sky_lantern_single', 'sky_lantern_player']) {
+      const lamp = new THREE.PointLight('#ff9436', 0.2, 8.5, 2.0)
+      lamp.position.set(-15, -100, 24)
+      lamp.userData.origIntensity = 0.2
+      lamp.intensity = 0
+      lamp.visible = true
+      this.c.scene.add(lamp)
+      this.prewarmedLights.set(key, lamp)
+    }
   }
 
   constructor(private readonly c: BuildContext, immediate = false) {
@@ -143,6 +227,8 @@ export class FrontCourtyard {
     this.addScreenWall()
     this.addPavilion()
     this.addGoldFurnace()
+    this.initPermanentPointLights()
+    this.initTaskQueue()
 
     if (immediate) {
       this.flushAll()
@@ -1162,32 +1248,34 @@ export class FrontCourtyard {
   }
 
   private addTianxinFairy(cx: number, cz: number): void {
+    const aspect = 290 / 511
+    const fairyH = 1.45
+    const fairyW = fairyH * aspect
+    const geo = new THREE.PlaneGeometry(fairyW, fairyH)
+    const mat = new THREE.MeshStandardMaterial({
+      transparent: true,
+      alphaTest: 0.05,
+      roughness: 0.85,
+      metalness: 0.02,
+      side: THREE.DoubleSide,
+    })
+    mat.emissive.set(0x000000)
+    mat.emissiveIntensity = 0.0
+
+    const mesh = new THREE.Mesh(geo, mat)
+    // Placed on the Sumeru throne, facing visitors entering the pavilion from the road (+X)
+    mesh.position.set(cx - 0.72, this.fairyBaseY + fairyH / 2, cz)
+    mesh.rotation.y = Math.PI / 2
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    this.fairyMesh = mesh
+    this.c.scene.add(mesh)
+
     const loader = new THREE.TextureLoader()
     const applyFairy = (tex: THREE.Texture) => {
       tex.colorSpace = THREE.SRGBColorSpace
-      const aspect = 290 / 511
-      const fairyH = 1.45
-      const fairyW = fairyH * aspect
-      const geo = new THREE.PlaneGeometry(fairyW, fairyH)
-      const mat = new THREE.MeshStandardMaterial({
-        map: tex,
-        transparent: true,
-        alphaTest: 0.05,
-        roughness: 0.85,
-        metalness: 0.02,
-        side: THREE.DoubleSide,
-      })
-      mat.emissive.set(0x000000)
-      mat.emissiveIntensity = 0.0
-
-      const mesh = new THREE.Mesh(geo, mat)
-      // Placed on the Sumeru throne, facing visitors entering the pavilion from the road (+X)
-      mesh.position.set(cx - 0.72, this.fairyBaseY + fairyH / 2, cz)
-      mesh.rotation.y = Math.PI / 2
-      mesh.castShadow = true
-      mesh.receiveShadow = true
-      this.fairyMesh = mesh
-      this.c.scene.add(mesh)
+      mat.map = tex
+      mat.needsUpdate = true
     }
     loader.load('./assets/tianxin-fairy.webp', applyFairy)
   }
@@ -1426,9 +1514,11 @@ export class FrontCourtyard {
     lanternFinial.position.set(rx * 0.72, 1.98, -rz * 0.22)
     g.add(lanternBase, lanternWindow, lanternRoof, lanternFinial)
 
-    const lanternLight = new THREE.PointLight('#ffbe55', 1.0, 7.5, 1.8)
-    lanternLight.position.set(rx * 0.72, 1.62, -rz * 0.22)
-    g.add(lanternLight)
+    if (!this.prewarmedLights.has('lotus_pond_lantern')) {
+      const lanternLight = new THREE.PointLight('#ffbe55', 1.0, 7.5, 1.8)
+      lanternLight.position.set(rx * 0.72, 1.62, -rz * 0.22)
+      g.add(lanternLight)
+    }
 
     this.add(g)
 
@@ -1463,49 +1553,21 @@ export class FrontCourtyard {
     this.c.scene.add(this.lotusFlower(x, 0.42, z, 0.34, '#ffdf78'))
   }
 
-  private addLotusPondFlora(): void {
-    const { x, z } = LOTUS_POND
-    const rx = 5.2
-    const rz = 3.7
-    this.addGrandLotusFlora(x, z, rx - 0.55, rz - 0.5)
-  }
-
-  private addLotusPond(): void {
-    this.addLotusPondStructure()
-    this.addLotusPondFlora()
-  }
-
-  /**
-   * Generates a lush, varied lotus ecosystem across the grand pond:
-   * - 54 Lotus Pads: mixed sizes (0.28m to 0.68m), varied greens, natural notched geometry.
-   *   18 pads stand upright on slender stems (挺水葉, 0.16m - 0.34m above water).
-   *   36 pads float serenely on the water surface (浮水葉).
-   * - 28 Lotus Blossoms, Buds & Seedpods:
-   *   - 11 Classic Pink Blooming Lotuses (粉紅盛開重瓣大荷花)
-   *   - 6 Sacred White Lotuses (白玉出水仙蓮)
-   *   - 4 Crimson-Tipped Lotuses (胭脂艷紅蓮)
-   *   - 4 Slender Upright Lotus Buds (亭亭玉立含苞待放)
-   *   - 3 Ripened Golden-Green Seedpods (綠玉如意蓮蓬)
-   */
-  private addGrandLotusFlora(cx: number, cz: number, spreadX: number, spreadZ: number): void {
+  private computeLotusPadPositions(): { x: number; z: number; y: number; r: number; elevated: boolean; phi: number; color: string; stemH: number }[] {
+    const { x: cx, z: cz } = LOTUS_POND
+    const rx = 5.2 - 0.55
+    const rz = 3.7 - 0.5
     const padCount = 54
     const padColors = [PAL.lotusPad, '#4d7c43', '#669c57', '#3c6633', '#5a8c50']
-
-    // Seeded pseudo-random using golden ratio distribution
-    const padPositions: { x: number; z: number; y: number; r: number; elevated: boolean }[] = []
-
-    const padGeomsByColor = new Map<string, THREE.BufferGeometry[]>()
-    for (const c of padColors) padGeomsByColor.set(c, [])
-    const stemGeoms: THREE.BufferGeometry[] = []
+    const padPositions: { x: number; z: number; y: number; r: number; elevated: boolean; phi: number; color: string; stemH: number }[] = []
 
     for (let i = 0; i < padCount; i += 1) {
       const phi = i * 2.39996 + 0.5
       const radFrac = Math.sqrt((i + 0.8) / padCount) * 0.92
-      const px = cx + Math.cos(phi) * spreadX * radFrac
-      const pz = cz + Math.sin(phi) * spreadZ * radFrac
+      const px = cx + Math.cos(phi) * rx * radFrac
+      const pz = cz + Math.sin(phi) * rz * radFrac
 
-      // Avoid rock cluster area around eastern sector
-      if (px > cx + spreadX * 0.48 && pz < cz + spreadZ * 0.3 && pz > cz - spreadZ * 0.5) {
+      if (px > cx + rx * 0.48 && pz < cz + rz * 0.3 && pz > cz - rz * 0.5) {
         continue
       }
 
@@ -1515,28 +1577,41 @@ export class FrontCourtyard {
       const stemH = isElevated ? 0.16 + (i % 4) * 0.06 : 0
       const py = 0.29 + stemH
 
-      padPositions.push({ x: px, z: pz, y: py, r: padR, elevated: isElevated })
+      padPositions.push({ x: px, z: pz, y: py, r: padR, elevated: isElevated, phi, color, stemH })
+    }
+    return padPositions
+  }
 
-      // Pad geom
-      const padGeom = new THREE.CircleGeometry(padR, 14, 0.25, Math.PI * 2 - 0.25)
+  private addLotusFloraPads(start: number, count: number): void {
+    const allPads = this.computeLotusPadPositions()
+    const slice = allPads.slice(start, start + count)
+    if (slice.length === 0) return
+
+    const padGeomsByColor = new Map<string, THREE.BufferGeometry[]>()
+    const stemGeoms: THREE.BufferGeometry[] = []
+
+    for (let idx = 0; idx < slice.length; idx++) {
+      const p = slice[idx]
+      const i = start + idx
+      if (!padGeomsByColor.has(p.color)) padGeomsByColor.set(p.color, [])
+
+      const padGeom = new THREE.CircleGeometry(p.r, 14, 0.25, Math.PI * 2 - 0.25)
       padGeom.rotateX(-Math.PI / 2)
-      padGeom.rotateY(phi)
-      if (isElevated) {
+      padGeom.rotateY(p.phi)
+      if (p.elevated) {
         padGeom.rotateX(((i % 5) - 2) * 0.06)
         padGeom.rotateY(((i % 3) - 1) * 0.05)
       }
-      padGeom.translate(px, py, pz)
-      padGeomsByColor.get(color)!.push(padGeom)
+      padGeom.translate(p.x, p.y, p.z)
+      padGeomsByColor.get(p.color)!.push(padGeom)
 
-      // Slender stem down to water if elevated
-      if (isElevated) {
-        const stemG = new THREE.CylinderGeometry(0.016, 0.018, stemH + 0.08, 6)
-        stemG.translate(px, 0.25 + stemH / 2, pz)
+      if (p.elevated) {
+        const stemG = new THREE.CylinderGeometry(0.016, 0.018, p.stemH + 0.08, 6)
+        stemG.translate(p.x, 0.25 + p.stemH / 2, p.z)
         stemGeoms.push(stemG)
       }
     }
 
-    // Merge and add pads by color
     for (const [color, geoms] of padGeomsByColor.entries()) {
       if (geoms.length > 0) {
         const merged = BufferGeometryUtils.mergeGeometries(geoms, false)
@@ -1546,9 +1621,19 @@ export class FrontCourtyard {
       }
     }
 
-    // 28 Flowers, Buds and Seedpods distributed across lush pads
+    if (stemGeoms.length > 0) {
+      const mergedStems = BufferGeometryUtils.mergeGeometries(stemGeoms, false)
+      for (const sg of stemGeoms) sg.dispose()
+      const stemMesh = new THREE.Mesh(mergedStems, this.c.mat('#446b38', 0.8))
+      this.c.scene.add(stemMesh)
+    }
+  }
+
+  private addLotusFloraFlowers(): void {
+    const padPositions = this.computeLotusPadPositions()
+    if (padPositions.length === 0) return
+
     const flowerTypes: { type: 'pink' | 'white' | 'crimson' | 'bud' | 'seedpod'; color?: string; size: number }[] = [
-      // 11 Pink blooming lotuses
       { type: 'pink', color: '#ea9fb0', size: 0.24 },
       { type: 'pink', color: '#f2a8b8', size: 0.26 },
       { type: 'pink', color: '#e58e9f', size: 0.23 },
@@ -1560,33 +1645,26 @@ export class FrontCourtyard {
       { type: 'pink', color: '#f1abb9', size: 0.23 },
       { type: 'pink', color: '#e792a3', size: 0.26 },
       { type: 'pink', color: '#f5b4c2', size: 0.24 },
-
-      // 6 Sacred White lotuses
       { type: 'white', color: '#fbf8f0', size: 0.24 },
       { type: 'white', color: '#fffdf8', size: 0.26 },
       { type: 'white', color: '#f7f4ea', size: 0.23 },
       { type: 'white', color: '#faf6ee', size: 0.25 },
       { type: 'white', color: '#fffcf5', size: 0.22 },
       { type: 'white', color: '#f8f4ec', size: 0.25 },
-
-      // 4 Crimson-tipped lotuses
       { type: 'crimson', color: '#d85c76', size: 0.24 },
       { type: 'crimson', color: '#ce4f69', size: 0.26 },
       { type: 'crimson', color: '#e06680', size: 0.23 },
       { type: 'crimson', color: '#d35670', size: 0.25 },
-
-      // 4 Slender upright buds
       { type: 'bud', color: '#e2889a', size: 0.18 },
       { type: 'bud', color: '#ea91a3', size: 0.20 },
       { type: 'bud', color: '#dc7a8c', size: 0.19 },
       { type: 'bud', color: '#e58c9e', size: 0.18 },
-
-      // 3 Seedpods
       { type: 'seedpod', size: 0.18 },
       { type: 'seedpod', size: 0.21 },
       { type: 'seedpod', size: 0.19 },
     ]
 
+    const stemGeoms: THREE.BufferGeometry[] = []
     const pinkPetalGeoms: THREE.BufferGeometry[] = []
     const whitePetalGeoms: THREE.BufferGeometry[] = []
     const crimsonPetalGeoms: THREE.BufferGeometry[] = []
@@ -1641,7 +1719,6 @@ export class FrontCourtyard {
       const stemH = 0.12 + (j % 5) * 0.05
       const fy = 0.29 + stemH
 
-      // Slender stem
       const stemG = new THREE.CylinderGeometry(0.015, 0.018, stemH + 0.08, 6)
       stemG.translate(fx, 0.26 + stemH / 2, fz)
       stemGeoms.push(stemG)
@@ -1766,8 +1843,7 @@ export class FrontCourtyard {
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 1.8, 3.0)
   }
 
-  private addPlantingShrubs(): void {
-    // 1. 原神風格景觀步道植栽與雕花石燈台（沿主要參道兩側對稱排列）- 靈栽幾何全面合批 (Batched)
+  private addPlantingShrubsSide(side: -1 | 1): void {
     const potGeoms: THREE.BufferGeometry[] = []
     const goldRimGeoms: THREE.BufferGeometry[] = []
     const soilGeoms: THREE.BufferGeometry[] = []
@@ -1786,23 +1862,21 @@ export class FrontCourtyard {
     const basePuffTop = new THREE.DodecahedronGeometry(0.24, 1)
     const baseFlower = new THREE.DodecahedronGeometry(0.06)
 
-    for (const side of [-1, 1]) {
-      for (const z of [14, 24, 34, 44]) {
-        const x = side * 3.6
-        const pG = basePot.clone(); pG.translate(x, 0.18, z); potGeoms.push(pG)
-        const rG = baseRim.clone(); rG.translate(x, 0.35, z); goldRimGeoms.push(rG)
-        const sG = baseSoil.clone(); sG.translate(x, 0.36, z); soilGeoms.push(sG)
-        const tG = baseTrunk.clone(); tG.rotateZ(-0.18); tG.translate(x + 0.02, 0.54, z); trunkGeoms.push(tG)
-        const pf1 = basePuff1.clone(); pf1.scale(1.15, 0.75, 1.1); pf1.translate(x - 0.12, 0.72, z + 0.06); puff1Geoms.push(pf1)
-        const pf2 = basePuff2.clone(); pf2.scale(1.2, 0.8, 1.15); pf2.translate(x + 0.1, 0.82, z - 0.05); puff2Geoms.push(pf2)
-        const pfT = basePuffTop.clone(); pfT.translate(x + 0.02, 1.02, z + 0.02); puffTopGeoms.push(pfT)
-        for (const [fx, fy, fz] of [[-0.22, 0.82, 0.18], [0.22, 0.88, 0.14], [0.05, 1.12, -0.1]]) {
-          const flG = baseFlower.clone(); flG.translate(x + fx, fy, z + fz); flowerGeoms.push(flG)
-        }
-        this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.5, z), 0.45, 1.0)
+    for (const z of [14, 24, 34, 44]) {
+      const x = side * 3.6
+      const pG = basePot.clone(); pG.translate(x, 0.18, z); potGeoms.push(pG)
+      const rG = baseRim.clone(); rG.translate(x, 0.35, z); goldRimGeoms.push(rG)
+      const sG = baseSoil.clone(); sG.translate(x, 0.36, z); soilGeoms.push(sG)
+      const tG = baseTrunk.clone(); tG.rotateZ(-0.18); tG.translate(x + 0.02, 0.54, z); trunkGeoms.push(tG)
+      const pf1 = basePuff1.clone(); pf1.scale(1.15, 0.75, 1.1); pf1.translate(x - 0.12, 0.72, z + 0.06); puff1Geoms.push(pf1)
+      const pf2 = basePuff2.clone(); pf2.scale(1.2, 0.8, 1.15); pf2.translate(x + 0.1, 0.82, z - 0.05); puff2Geoms.push(pf2)
+      const pfT = basePuffTop.clone(); pfT.translate(x + 0.02, 1.02, z + 0.02); puffTopGeoms.push(pfT)
+      for (const [fx, fy, fz] of [[-0.22, 0.82, 0.18], [0.22, 0.88, 0.14], [0.05, 1.12, -0.1]]) {
+        const flG = baseFlower.clone(); flG.translate(x + fx, fy, z + fz); flowerGeoms.push(flG)
       }
-      for (const z of [19, 39]) this.stoneLantern(side * 3.6, z)
+      this.c.physics.addStaticCylinder(new THREE.Vector3(x, 0.5, z), 0.45, 1.0)
     }
+    for (const z of [19, 39]) this.stoneLantern(side * 3.6, z)
 
     basePot.dispose(); baseRim.dispose(); baseSoil.dispose(); baseTrunk.dispose()
     basePuff1.dispose(); basePuff2.dispose(); basePuffTop.dispose(); baseFlower.dispose()
@@ -1834,25 +1908,26 @@ export class FrontCourtyard {
     this.add(shrubGroup, false)
   }
 
-  private addPlantingCourtyard(): void {
-    // 前庭與外圍景觀神木群（全面升級為原神動漫仙境風格）
-    let treeSeed = 10
-    for (const [x, z] of [
-      [-24, 44], [24, 44],
-      [-24, 18], [24, 22],
-      [-17, 8], [17, 8],
-      [-17, 28], [18, 36],
-      [-12, 48], [12, 48]
-    ] as const) {
-      this.genshinTree(x, z, treeSeed++)
-    }
+  private readonly COURTYARD_TREES = [
+    [-24, 44], [24, 44],
+    [-24, 18], [24, 22],
+    [-17, 8], [17, 8],
+    [-17, 28], [18, 36],
+    [-12, 48], [12, 48]
+  ] as const
 
-    for (const [x, z, a] of [[-6.4, 18, 0], [6.4, 18, 0], [-19, 36, Math.PI / 2], [19, 30, Math.PI / 2]] as const) this.bench(x, z, a)
+  private addPlantingTreesBatch(start: number, count: number, startSeed: number): void {
+    let seed = startSeed
+    for (let i = start; i < Math.min(start + count, this.COURTYARD_TREES.length); i++) {
+      const [x, z] = this.COURTYARD_TREES[i]
+      this.genshinTree(x, z, seed++)
+    }
   }
 
-  private addPlanting(): void {
-    this.addPlantingShrubs()
-    this.addPlantingCourtyard()
+  private addPlantingBenches(): void {
+    for (const [x, z, a] of [[-6.4, 18, 0], [6.4, 18, 0], [-19, 36, Math.PI / 2], [19, 30, Math.PI / 2]] as const) {
+      this.bench(x, z, a)
+    }
   }
 
   /**
@@ -1920,12 +1995,17 @@ export class FrontCourtyard {
     g.add(finial)
 
     // PointLight
-    const groundLight = new THREE.PointLight('#ffc060', 1.45, 10.5, 1.8)
-    groundLight.position.y = 1.6
-    g.add(groundLight)
-    if (x < -25) {
-      this.trailLanternLights.push(groundLight)
-      groundLight.visible = false
+    const key = `lantern_${x.toFixed(1)}_${z.toFixed(1)}`
+    if (!this.prewarmedLights.has(key)) {
+      const groundLight = new THREE.PointLight('#ffc060', 1.45, 10.5, 1.8)
+      groundLight.position.y = 1.6
+      g.add(groundLight)
+      if (x < -25) {
+        groundLight.userData.origIntensity = 1.45
+        groundLight.intensity = 0
+        groundLight.visible = true
+        this.trailLanternLights.push(groundLight)
+      }
     }
 
     this.add(g, false)
@@ -2156,7 +2236,7 @@ export class FrontCourtyard {
     this.add(this.platGroup)
   }
 
-  private addSacredTrailDecor(): void {
+  private addSacredTrailRoadDecor(): void {
     const gateX = -(SITE.halfX - 0.4) // -29.6
     const gateZ = 31.0
     const stone = this.c.mat('#8e8474', 0.92)
@@ -2216,23 +2296,30 @@ export class FrontCourtyard {
       const stripMesh = new THREE.Mesh(mergedStrips, lineMat)
       this.c.scene.add(stripMesh)
     }
+  }
 
-    // 小徑兩側神木與石燈籠
-    let treeSeed = 1
-    for (const x of [-33.5, -38.5, -43.5, -48.5, -53.0]) {
-      this.genshinTree(x, gateZ + 3.6, treeSeed++)
-      this.genshinTree(x, gateZ - 3.6, treeSeed++)
+  private readonly TRAIL_TREE_XS = [-33.5, -38.5, -43.5, -48.5, -53.0] as const
+
+  private addSacredTrailTreesBatch(start: number, count: number): void {
+    const gateZ = 31.0
+    for (let i = start; i < Math.min(start + count, this.TRAIL_TREE_XS.length); i++) {
+      const x = this.TRAIL_TREE_XS[i]
+      const seed = i * 2 + 1
+      this.genshinTree(x, gateZ + 3.6, seed)
+      this.genshinTree(x, gateZ - 3.6, seed + 1)
     }
+  }
+
+  private addSacredTrailLanterns(): void {
+    const gateZ = 31.0
     for (const x of [-36.0, -46.0]) {
       this.stoneLantern(x, gateZ + 2.5)
       this.stoneLantern(x, gateZ - 2.5)
     }
   }
 
-  private addSacredPlatformDecor(): void {
+  private addSacredPlatformSteps(): void {
     if (!this.platGroup) return
-    const platX = -68.0
-    const platZ = 31.0
     const platR = 14.0
     const gold = this.c.mat(PAL.gold, 0.45, 0.28)
     const marble = this.c.mat('#dfd8cc', 0.9)
@@ -2250,8 +2337,14 @@ export class FrontCourtyard {
     danbi.rotation.z = -0.1
     stepsGroup.add(step1, step2, danbi)
     this.platGroup.add(stepsGroup)
+  }
 
-    // 外環漢白玉雕花欄杆與蓮花望柱
+  private addSacredPlatformRailingsBatch(start: number, count: number): void {
+    if (!this.platGroup) return
+    const platX = -68.0
+    const platZ = 31.0
+    const platR = 14.0
+    const marble = this.c.mat('#dfd8cc', 0.9)
     const postCount = 28
     const marbleRailGeoms: THREE.BufferGeometry[] = []
     const budGeoms: THREE.BufferGeometry[] = []
@@ -2260,7 +2353,7 @@ export class FrontCourtyard {
     const sphereBudGeo = new THREE.SphereGeometry(0.12, 10, 8)
     const boxPanelGeo = new THREE.BoxGeometry(2.6, 0.42, 0.1)
 
-    for (let i = 0; i < postCount; i++) {
+    for (let i = start; i < Math.min(start + count, postCount); i++) {
       const a = (i / postCount) * Math.PI * 2
       if (Math.abs(a) < 0.28 || Math.abs(a - Math.PI * 2) < 0.28) continue
       const px = Math.cos(a) * (platR - 0.6)
@@ -2295,8 +2388,15 @@ export class FrontCourtyard {
       for (const bg of budGeoms) bg.dispose()
       this.platGroup.add(new THREE.Mesh(mergedBud, this.c.mat('#faf6ee', 0.8)))
     }
+  }
 
-    // 四方通天金頂石燈樓
+  private addSacredPlatformLampTowers(): void {
+    if (!this.platGroup) return
+    const platX = -68.0
+    const platZ = 31.0
+    const gold = this.c.mat(PAL.gold, 0.45, 0.28)
+    const stone = this.c.mat('#8e8474', 0.92)
+
     for (const [dx, dz] of [[-8.8, -8.8], [-8.8, 8.8], [7.5, -8.8], [7.5, 8.8]]) {
       const lampTower = new THREE.Group()
       lampTower.position.set(dx, 0.54, dz)
@@ -2331,22 +2431,25 @@ export class FrontCourtyard {
       const lampSpire = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.26, 8), gold)
       lampSpire.position.y = 3.36
 
-      const lampLight = new THREE.PointLight('#ffda7a', 1.2, 14, 1.8)
-      lampLight.position.set(0, 2.45, 0)
-      this.sacredPlatformLights.push(lampLight)
-      lampLight.visible = false
+      const key = `plat_lamp_${dx}_${dz}`
+      const prewarmed = this.prewarmedLights.get(key)
+      if (prewarmed) {
+        prewarmed.position.set(platX + dx, 2.99, platZ + dz)
+      } else {
+        const lampLight = new THREE.PointLight('#ffda7a', 1.2, 14, 1.8)
+        lampLight.position.set(0, 2.45, 0)
+        lampLight.userData.origIntensity = 1.2
+        lampLight.intensity = 0
+        lampLight.visible = true
+        this.sacredPlatformLights.push(lampLight)
+        lampTower.add(lampLight)
+      }
 
-      lampTower.add(lampBase1, lampBase2, lampPillar, lampTray, lampCore, lampRoof, lampGourd, lampSpire, lampLight)
+      lampTower.add(lampBase1, lampBase2, lampPillar, lampTray, lampCore, lampRoof, lampGourd, lampSpire)
       this.platGroup.add(lampTower)
 
       this.c.physics.addStaticCylinder(new THREE.Vector3(platX + dx, 1.5, platZ + dz), 0.7, 3.2)
     }
-  }
-
-  private addSacredTrailAndPlatform(): void {
-    this.addSacredTrailEssential()
-    this.addSacredTrailDecor()
-    this.addSacredPlatformDecor()
   }
 
   private skyLanternTexture(frontText: string, backText: string): THREE.CanvasTexture {
@@ -2419,7 +2522,7 @@ export class FrontCourtyard {
     return tex
   }
 
-  private createSkyLanternModel(frontText: string, backText: string): {
+  private createSkyLanternModel(frontText: string, backText: string, lightKey?: string): {
     group: THREE.Group
     paperMesh: THREE.Mesh
     paperMat: THREE.MeshStandardMaterial
@@ -2473,10 +2576,16 @@ export class FrontCourtyard {
     flameMesh.position.y = -0.28
     group.add(fuel, flameMesh)
 
-    // 5. Dynamic PointLight inside the lantern
-    const pointLight = new THREE.PointLight('#ff9436', 0.2, 8.5, 2.0)
-    pointLight.position.set(0, -0.15, 0)
-    group.add(pointLight)
+    // 5. Dynamic PointLight inside the lantern (reused from prewarmed to keep scene light count static)
+    const prewarmed = lightKey ? this.prewarmedLights.get(lightKey) : undefined
+    let pointLight: THREE.PointLight
+    if (prewarmed) {
+      pointLight = prewarmed
+    } else {
+      pointLight = new THREE.PointLight('#ff9436', 0.2, 8.5, 2.0)
+      pointLight.position.set(0, -0.15, 0)
+      group.add(pointLight)
+    }
 
     return { group, paperMesh, paperMat, flameMesh, pointLight }
   }
@@ -2600,9 +2709,10 @@ export class FrontCourtyard {
     // 1. Group 1: NPC Couple holding lantern at (-15.2, 0, 24.2) beside the pavilion
     {
       const origin = new THREE.Vector3(-15.2, 0, 24.2)
-      const model = this.createSkyLanternModel('天心賜福', '所求如願')
+      const model = this.createSkyLanternModel('天心賜福', '所求如願', 'sky_lantern_couple')
       const lanternOriginY = skyLanternMountedY(0.95)
       model.group.position.set(origin.x, lanternOriginY, origin.z)
+      model.pointLight.position.set(origin.x, lanternOriginY - 0.15, origin.z)
       this.add(model.group)
 
       const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false })
@@ -2653,10 +2763,11 @@ export class FrontCourtyard {
     // 2. Group 2: NPC Devotee holding lantern at (-9.8, 0, 23.0) beside the pavilion
     {
       const origin = new THREE.Vector3(-9.8, 0, 23.0)
-      const model = this.createSkyLanternModel('萬事如意', '平安喜樂')
+      const model = this.createSkyLanternModel('萬事如意', '平安喜樂', 'sky_lantern_single')
       const lanternOriginY = skyLanternMountedY(0.95)
       const lanternY = skyLanternMountedY(6.5)
       model.group.position.set(origin.x, lanternY, origin.z)
+      model.pointLight.position.set(origin.x, lanternY - 0.15, origin.z)
       this.add(model.group)
 
       const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false })
@@ -2733,9 +2844,10 @@ export class FrontCourtyard {
       markerRing.position.set(origin.x, 0.04, origin.z)
       this.c.scene.add(markerRing)
 
-      const model = this.createSkyLanternModel('天心指路', '福慧雙增')
+      const model = this.createSkyLanternModel('天心指路', '福慧雙增', 'sky_lantern_player')
       const lanternOriginY = skyLanternMountedY(1.22)
       model.group.position.set(origin.x, lanternOriginY, origin.z)
+      model.pointLight.position.set(origin.x, lanternOriginY - 0.15, origin.z)
       model.group.userData = { skyLantern: true }
       model.paperMesh.userData = { skyLantern: true }
       this.add(model.group)
@@ -2795,6 +2907,7 @@ export class FrontCourtyard {
     // Sky Lanterns dynamic lifecycle and illumination
     for (const g of this.skyLanternGroups) {
       g.flameMesh.scale.y = 1.0 + Math.sin(time * 24.0 + (g.isPlayerStand ? 1.5 : 0.8)) * 0.22
+      g.pointLight.position.set(g.lanternGroup.position.x, g.lanternGroup.position.y - 0.15, g.lanternGroup.position.z)
 
       if (g.state === 'holding') {
         if (!g.isPlayerStand) {

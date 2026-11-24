@@ -169,8 +169,8 @@ export class TempleGame {
 
   constructor(private readonly renderer: Renderer, private readonly input: Input, private readonly audio: Audio) {
     this.world = new TempleWorld(this.physics, this.renderer.gl, this.telemetry)
-    ;(window as unknown as Record<string, unknown>).__templeTelemetry__ = this.telemetry
-    ;(window as unknown as Record<string, unknown>).__templeGame__ = this
+      ; (window as unknown as Record<string, unknown>).__templeTelemetry__ = this.telemetry
+      ; (window as unknown as Record<string, unknown>).__templeGame__ = this
     const markerGeo = new THREE.RingGeometry(0.18, 0.44, 24)
     markerGeo.rotateX(-Math.PI / 2)
     this.clickMarker = new THREE.Mesh(
@@ -738,8 +738,7 @@ export class TempleGame {
 
       const tOcc0 = performance.now()
       this.hideOccluders()
-      const tOcc = performance.now() - tOcc0
-      this.telemetry.markTag('occlusion', tOcc)
+      this.telemetry.markTag('occlusion', performance.now() - tOcc0)
 
       this.world.setGuide(this.guide ? this._vFeet : null, this.guide ? this.guide.position : null, this.time)
     }
@@ -754,7 +753,11 @@ export class TempleGame {
 
     const totalFrameMs = performance.now() - tFrameStart
     if (totalFrameMs > 100) {
-      console.warn(`[PerfWarning] Long frame detected: ${totalFrameMs.toFixed(1)}ms (world: ${tWorld.toFixed(1)}ms, rend: ${tRend.toFixed(1)}ms)`)
+      const glInfo = this.renderer.gl?.info
+      const progCount = glInfo?.programs?.length ?? '?'
+      const calls = glInfo?.render?.calls ?? '?'
+      const tris = glInfo?.render?.triangles ?? '?'
+      console.warn(`[PerfWarning] Long frame detected: ${totalFrameMs.toFixed(1)}ms (world: ${tWorld.toFixed(1)}ms, rend: ${tRend.toFixed(1)}ms) [calls: ${calls}, tris: ${tris}, progs: ${progCount}]`)
     }
 
     this.telemetry.recordFrame(totalFrameMs)
