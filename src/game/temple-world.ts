@@ -8,6 +8,7 @@ import { NpcManager } from './npc-system'
 import { TemplePbrLibrary, createTempleIblTexture } from './temple-pbr-materials'
 import { TempleRoof3D } from './temple-roof-3d'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import type { GameTelemetry } from '../engine/telemetry'
 
 export const DRAGON_GUANYIN_POS = new THREE.Vector3(-68.0, 0.545, 31.0)
 
@@ -511,6 +512,12 @@ export class TempleWorld {
   readonly dragonGuanyinLights: THREE.PointLight[] = []
   readonly occluderCandidates: THREE.Object3D[] = []
 
+  // Zone lighting cached states & hysteresis tracking
+  private rearLightsActive = false
+  private mainHallLightsActive = true
+  private sanctuaryLightsActive = false
+  private rearHallGroupActive = true
+
   registerOccluder(obj: THREE.Object3D): void {
     this.occluderCandidates.push(obj)
   }
@@ -519,7 +526,7 @@ export class TempleWorld {
     return this.occluderCandidates
   }
 
-  constructor(private readonly physics: Physics, renderer?: THREE.WebGLRenderer) {
+  constructor(private readonly physics: Physics, renderer?: THREE.WebGLRenderer, public telemetry?: GameTelemetry) {
     // Elegant warm celestial sky & gentle horizon fog (澄澈淡碧與暖金宮闕天空色調)
     this.scene.background = new THREE.Color('#98b8cb')
     this.scene.fog = new THREE.Fog('#bfd4df', 65, 175)
@@ -604,24 +611,28 @@ export class TempleWorld {
 
   initProgressiveLoading(): void {
     if (typeof window === 'undefined') return
-    const schedule = (fn: () => void, delay: number) => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => fn(), { timeout: delay + 500 })
-      } else {
-        setTimeout(fn, delay)
+    const runNextSlice = () => {
+      if (this.courtyard.isProgressiveDone()) return
+      this.telemetry?.markTag('stage_load')
+      this.courtyard.stepProgressive(3.5)
+      if (!this.courtyard.isProgressiveDone()) {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(runNextSlice, { timeout: 80 })
+        } else {
+          requestAnimationFrame(runNextSlice)
+        }
       }
     }
-    schedule(() => {
-      this.courtyard.loadStage2()
-    }, 120)
-    schedule(() => {
-      this.courtyard.loadStage3()
-    }, 380)
+    // 進入場景立即於背景啟動分幀（3-4ms切片）載入，極速平滑補齊各區域
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(runNextSlice, { timeout: 80 })
+    } else {
+      setTimeout(runNextSlice, 20)
+    }
   }
 
   flushProgressiveLoading(): void {
-    this.courtyard.loadStage2()
-    this.courtyard.loadStage3()
+    this.courtyard.flushAll()
   }
 
   private addMainHall(): void {
@@ -4717,34 +4728,81 @@ export class TempleWorld {
     const backWallZ = this.mainHallZ - 6.5 * this.mainHallScale
     const sideWallX = 9.5 * this.mainHallScale
     const insideHall = playerPosition.z < frontThresholdZ && playerPosition.z > backWallZ && Math.abs(playerPosition.x) < sideWallX
-    this.roof.visible = !insideHall
+    if (this.roof.visible !== !insideHall) {
+      this.roof.visible = !insideHall
+    }
+
     const insideRear = playerPosition.z < -16.5 && playerPosition.z > -33.5 && Math.abs(playerPosition.x) < 12.0
-    const nearRear = playerPosition.z < 12.0
-    if (this.rearHallGroup) this.rearHallGroup.visible = nearRear
-    this.rearRoof.visible = nearRear && !insideRear
-
-    // 分區 PointLight 最佳化：遠離後殿（z > 10m）時暫停後殿內部點光，進入前庭中後段與主殿即自動開啟，完全保留原有照明
-    const enableRearLights = playerPosition.z < 10.0
-    for (const light of this.rearHallLights) {
-      light.visible = enableRearLights
+    // 後殿建築群遲滯範圍：靠近 z < 14 開啟，離開 z > 16 關閉，避免邊界閃爍
+    let nearRear = this.rearHallGroupActive
+    if (!nearRear && playerPosition.z < 14.0) nearRear = true
+    else if (nearRear && playerPosition.z > 16.0) nearRear = false
+    if (this.rearHallGroup && this.rearHallGroup.visible !== nearRear) {
+      this.rearHallGroup.visible = nearRear
+      this.rearHallGroupActive = nearRear
+    }
+    const rearRoofVis = nearRear && !insideRear
+    if (this.rearRoof.visible !== rearRoofVis) {
+      this.rearRoof.visible = rearRoofVis
     }
 
-    // 主殿點光分區：僅在接近主殿（z < 34m 且 |x| < 26m）且非遠處後殿深處（z > -16m）時開啟
-    const enableMainHallLights = playerPosition.z < 34.0 && playerPosition.z > -16.0 && Math.abs(playerPosition.x) < 26.0
-    for (const light of this.mainHallLights) {
-      light.visible = enableMainHallLights
+    // 1. 後殿點光（遲滯範圍：進入 z < 8.0 開啟，離開 z > 12.0 關閉）
+    let newRearActive = this.rearLightsActive
+    if (!newRearActive && playerPosition.z < 8.0) {
+      newRearActive = true
+    } else if (newRearActive && playerPosition.z > 12.0) {
+      newRearActive = false
+    }
+    if (newRearActive !== this.rearLightsActive) {
+      this.rearLightsActive = newRearActive
+      this.telemetry?.markTag('zone_light')
+      for (const light of this.rearHallLights) {
+        light.visible = newRearActive
+      }
     }
 
-    // 昇龍觀音聖境點光分區：僅在走入西側神木小徑與聖境大平台（x < -22m）時開啟
-    if (playerPosition.x < -18.0) {
-      this.courtyard.loadStage2()
-      this.courtyard.loadStage3()
+    // 2. 主殿點光（遲滯範圍：進入 z < 32 且 z > -14 且 |x| < 24 開啟；離開 z > 36 或 z < -18 或 |x| > 28 關閉）
+    let newMainActive = this.mainHallLightsActive
+    const absX = Math.abs(playerPosition.x)
+    if (!newMainActive && playerPosition.z < 32.0 && playerPosition.z > -14.0 && absX < 24.0) {
+      newMainActive = true
+    } else if (newMainActive && (playerPosition.z > 36.0 || playerPosition.z < -18.0 || absX > 28.0)) {
+      newMainActive = false
     }
-    const enableSanctuaryLights = playerPosition.x < -22.0
-    for (const light of this.dragonGuanyinLights) {
-      light.visible = enableSanctuaryLights
+    if (newMainActive !== this.mainHallLightsActive) {
+      this.mainHallLightsActive = newMainActive
+      this.telemetry?.markTag('zone_light')
+      for (const light of this.mainHallLights) {
+        light.visible = newMainActive
+      }
     }
-    this.courtyard.setSanctuaryLightsVisible(enableSanctuaryLights)
+
+    // 3. 昇龍觀音聖境點光與預載（遲滯範圍：進入 x < -22 開啟，離開 x > -18 關閉）
+    if (!this.courtyard.isProgressiveDone()) {
+      // 玩家向西走入神木小徑前即提早加速分幀載入
+      if (playerPosition.x < -10.0) {
+        this.courtyard.stepProgressive(3.0)
+      }
+      // 若玩家極速抵達西側邊界，優先確保小徑地面與大平台核心物理碰撞完整
+      if (playerPosition.x < -22.0) {
+        this.courtyard.ensureSacredTrailEssential()
+      }
+    }
+
+    let newSanctuaryActive = this.sanctuaryLightsActive
+    if (!newSanctuaryActive && playerPosition.x < -22.0) {
+      newSanctuaryActive = true
+    } else if (newSanctuaryActive && playerPosition.x > -18.0) {
+      newSanctuaryActive = false
+    }
+    if (newSanctuaryActive !== this.sanctuaryLightsActive) {
+      this.sanctuaryLightsActive = newSanctuaryActive
+      this.telemetry?.markTag('zone_light')
+      for (const light of this.dragonGuanyinLights) {
+        light.visible = newSanctuaryActive
+      }
+      this.courtyard.setSanctuaryLightsVisible(newSanctuaryActive)
+    }
 
     // 跟隨式紋素對齊陰影（Texel-Snapped Following Shadow Camera）：維持 ±34m 高密度陰影並防止移動時陰影抖動閃爍
     const texelSize = (this.shadowHalfExtent * 2) / Math.max(512, this.shadowMapResolution)

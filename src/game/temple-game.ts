@@ -5,6 +5,7 @@ import { Assets } from '../engine/assets'
 import { Physics, RAPIER } from '../engine/physics'
 import type { Renderer } from '../engine/renderer'
 import type { Quality } from '../engine/save'
+import { GameTelemetry } from '../engine/telemetry'
 import { CONFIG } from './config'
 import { TEMPLE_MODEL_URLS } from './temple-assets'
 import { LOTUS_POND } from './temple-courtyard'
@@ -147,8 +148,29 @@ export class TempleGame {
   onGuide: (point: ShrinePoint | null, distance: number) => void = () => undefined
   onClickResult: (result: ClickResult) => void = () => undefined
 
+  readonly telemetry = new GameTelemetry()
+
+  // Zero-allocation cached vectors and objects for step, render, and occlusion
+  private readonly _vForward = new THREE.Vector3()
+  private readonly _vRight = new THREE.Vector3()
+  private readonly _vWish = new THREE.Vector3()
+  private readonly _vToTarget = new THREE.Vector3()
+  private readonly _vHere = new THREE.Vector3()
+  private readonly _vPos = new THREE.Vector3()
+  private readonly _vFeet = new THREE.Vector3()
+  private readonly _vTarget = new THREE.Vector3()
+  private readonly _vDir = new THREE.Vector3()
+  private readonly _rapierRayOrigin = { x: 0, y: 0, z: 0 }
+  private readonly _rapierRayDir = { x: 0, y: 0, z: 0 }
+  private readonly _rapierRay = new RAPIER.Ray(this._rapierRayOrigin, this._rapierRayDir)
+  private readonly _vOccludeToTarget = new THREE.Vector3()
+  private readonly _vOccludeOrigin = new THREE.Vector3()
+  private readonly _occludeIgnore = new Set<THREE.Object3D>()
+
   constructor(private readonly renderer: Renderer, private readonly input: Input, private readonly audio: Audio) {
-    this.world = new TempleWorld(this.physics, this.renderer.gl)
+    this.world = new TempleWorld(this.physics, this.renderer.gl, this.telemetry)
+    ;(window as unknown as Record<string, unknown>).__templeTelemetry__ = this.telemetry
+    ;(window as unknown as Record<string, unknown>).__templeGame__ = this
     const markerGeo = new THREE.RingGeometry(0.18, 0.44, 24)
     markerGeo.rotateX(-Math.PI / 2)
     this.clickMarker = new THREE.Mesh(
@@ -200,6 +222,7 @@ export class TempleGame {
     this.mode = 'browse'
     this.resumeMode = 'browse'
     this.audio.play('bell')
+    this.telemetry.reset()
   }
 
   startExplore(): void {
@@ -338,20 +361,20 @@ export class TempleGame {
     }
 
     const t = this.body.translation()
-    const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
-    const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw))
-    const wish = new THREE.Vector3()
+    this._vForward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw))
+    this._vRight.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw))
+    this._vWish.set(0, 0, 0)
 
     if (moving) {
       if (hasKeyMove) {
-        wish.addScaledVector(right, this.input.move.x).addScaledVector(forward, this.input.move.y)
+        this._vWish.addScaledVector(this._vRight, this.input.move.x).addScaledVector(this._vForward, this.input.move.y)
       } else if (this.targetDestination) {
-        const toTarget = new THREE.Vector3(
+        this._vToTarget.set(
           this.targetDestination.x - t.x,
           0,
           this.targetDestination.z - t.z
         )
-        const dist = toTarget.length()
+        const dist = this._vToTarget.length()
         const isIntermediate = this.navQueue.length > 0
         if (dist < (isIntermediate ? 0.85 : 0.45)) {
           if (isIntermediate) {
@@ -373,33 +396,37 @@ export class TempleGame {
             }
           }
         } else {
-          wish.copy(toTarget.normalize())
+          this._vWish.copy(this._vToTarget.normalize())
         }
       }
     }
-    const amount = Math.min(1, wish.length())
-    if (amount > 0.01) wish.normalize()
+    const amount = Math.min(1, this._vWish.length())
+    if (amount > 0.01) this._vWish.normalize()
     const speed = moving ? (this.input.held('sprint') ? CONFIG.player.sprintSpeed : CONFIG.player.walkSpeed) * amount : 0
     const grounded = this.controller.computedGrounded()
     this.vy = grounded ? -1 : Math.max(-30, this.vy - 24 * dt)
-    const desired = { x: wish.x * speed * dt, y: this.vy * dt, z: wish.z * speed * dt }
+    const desired = { x: this._vWish.x * speed * dt, y: this.vy * dt, z: this._vWish.z * speed * dt }
     this.controller.computeColliderMovement(this.collider, desired)
     const m = this.controller.computedMovement()
     const next = { x: t.x + m.x, y: t.y + m.y, z: t.z + m.z }
     if (next.y < FOOT_OFFSET - 0.02) { next.y = FOOT_OFFSET; this.vy = 0 }
     if (next.y < -5) { const s = this.world.spawn; next.x = s.x; next.y = s.y; next.z = s.z }
     this.body.setNextKinematicTranslation(next)
+
+    const tPhys0 = performance.now()
     this.physics.step(dt)
+    this.telemetry.markTag('physics', performance.now() - tPhys0)
+
     this.speedNow = Math.hypot(m.x, m.z) / Math.max(dt, 1e-4)
     if (amount > 0.01) {
-      const targetHeading = Math.atan2(wish.x, wish.z)
+      const targetHeading = Math.atan2(this._vWish.x, this._vWish.z)
       let diff = targetHeading - this.heading
       diff = Math.atan2(Math.sin(diff), Math.cos(diff))
       this.heading += diff * Math.min(1, dt * 12)
     }
 
-    const here = new THREE.Vector3(next.x, 0, next.z)
-    const near = this.mode === 'panel' ? this.active : this.world.nearestPoint(here)
+    this._vHere.set(next.x, 0, next.z)
+    const near = this.mode === 'panel' ? this.active : this.world.nearestPoint(this._vHere)
     if (near?.id !== this.active?.id) { this.active = near; this.onNear(near) }
     if (this.guide) {
       const d = Math.hypot(this.guide.position.x - next.x, this.guide.position.z - next.z)
@@ -564,8 +591,8 @@ export class TempleGame {
    * lens-to-visitor segment for this frame. Walls never reach here because the physics ray already pulled the lens in.
    */
   private hideOccluders(): void {
-    const toTarget = this.camTarget.clone().sub(this.camera.position)
-    const dist = toTarget.length()
+    this._vOccludeToTarget.copy(this.camTarget).sub(this.camera.position)
+    const dist = this._vOccludeToTarget.length()
     if (dist < 0.2) {
       for (const o of this.occluders) o.visible = true
       this.occluders.length = 0
@@ -600,20 +627,21 @@ export class TempleGame {
     for (const o of this.occluders) o.visible = true
     this.occluders.length = 0
 
-    toTarget.divideScalar(dist)
+    this._vOccludeToTarget.divideScalar(dist)
     // Start a little behind the lens so meshes that enclose the camera are caught too.
-    const origin = this.camera.position.clone().addScaledVector(toTarget, -0.6)
+    this._vOccludeOrigin.copy(this.camera.position).addScaledVector(this._vOccludeToTarget, -0.6)
     this.raycaster.camera = this.camera
-    this.raycaster.set(origin, toTarget)
+    this.raycaster.set(this._vOccludeOrigin, this._vOccludeToTarget)
     this.raycaster.near = 0
     this.raycaster.far = dist + 0.6 - 0.45
-    const ignore = new Set(this.world.pickIgnore)
+    this._occludeIgnore.clear()
+    for (const o of this.world.pickIgnore) this._occludeIgnore.add(o)
     const candidates = this.world.getOccluderCandidates()
     const targetPool = candidates.length > 0 ? candidates : this.world.scene.children
     try {
       for (const hit of this.raycaster.intersectObjects(targetPool, true)) {
         let skip = false
-        for (let n: THREE.Object3D | null = hit.object; n; n = n.parent) { if (ignore.has(n) || !n.visible) { skip = true; break } }
+        for (let n: THREE.Object3D | null = hit.object; n; n = n.parent) { if (this._occludeIgnore.has(n) || !n.visible) { skip = true; break } }
         if (skip || !(hit.object instanceof THREE.Mesh)) continue
         hit.object.visible = false
         this.occluders.push(hit.object)
@@ -670,8 +698,11 @@ export class TempleGame {
   }
 
   render(_alpha: number, frameSeconds: number): void {
+    const tFrameStart = performance.now()
     if (this.camera.fov !== CONFIG.camera.fov) { this.camera.fov = CONFIG.camera.fov; this.camera.updateProjectionMatrix() }
-    const p = this.position
+    const t = this.body.translation()
+    this._vPos.set(t.x, t.y, t.z)
+    this._vFeet.set(t.x, t.y - FOOT_OFFSET, t.z)
     const dt = Math.min(frameSeconds, 0.1)
     if (this.mode === 'select' || this.mode === 'loading') {
       this.selectOrbit += frameSeconds * (this.reducedMotion ? 0 : 0.12)
@@ -682,29 +713,51 @@ export class TempleGame {
       this.world.animateAvatar(dt, this.time, 0, this.reducedMotion)
       this.world.setGuide(null, null, this.time)
     } else {
-      const feet = this.feet
-      this.world.placeAvatar(feet, this.heading)
+      this.world.placeAvatar(this._vFeet, this.heading)
       const bow = this.ritualLeft > 0 ? 1 - this.ritualLeft / this.ritualLength : 0
       this.world.animateAvatar(dt, this.time, this.speedNow, this.reducedMotion, bow)
       const lookHeight = this.heroCameraMode ? LOOK_HEIGHT + 1.35 : LOOK_HEIGHT
-      const target = new THREE.Vector3(feet.x, feet.y + lookHeight, feet.z)
-      if (!this.camReady) { this.camTarget.copy(target); this.camDistance = this.zoom; this.camReady = true }
-      else this.camTarget.lerp(target, 1 - Math.exp(-14 * dt))
-      const dir = new THREE.Vector3(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch))
+      this._vTarget.set(this._vFeet.x, this._vFeet.y + lookHeight, this._vFeet.z)
+      if (!this.camReady) { this.camTarget.copy(this._vTarget); this.camDistance = this.zoom; this.camReady = true }
+      else this.camTarget.lerp(this._vTarget, 1 - Math.exp(-14 * dt))
+      this._vDir.set(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch))
       // Pull the camera in front of walls/pillars between the visitor and the lens.
       let allowed = this.zoom
-      const ray = new RAPIER.Ray({ x: this.camTarget.x, y: this.camTarget.y, z: this.camTarget.z }, { x: dir.x, y: dir.y, z: dir.z })
-      const hit = this.physics.world.castRay(ray, this.zoom + 0.3, true, undefined, undefined, undefined, this.body)
+      this._rapierRayOrigin.x = this.camTarget.x
+      this._rapierRayOrigin.y = this.camTarget.y
+      this._rapierRayOrigin.z = this.camTarget.z
+      this._rapierRayDir.x = this._vDir.x
+      this._rapierRayDir.y = this._vDir.y
+      this._rapierRayDir.z = this._vDir.z
+      const hit = this.physics.world.castRay(this._rapierRay, this.zoom + 0.3, true, undefined, undefined, undefined, this.body)
       if (hit) allowed = Math.max(0.5, Math.min(allowed, hit.timeOfImpact - 0.3))
       // Snap closer immediately when blocked; ease back out when clear.
       this.camDistance = allowed < this.camDistance ? allowed : THREE.MathUtils.damp(this.camDistance, allowed, 6, dt)
-      this.camera.position.copy(this.camTarget).addScaledVector(dir, this.camDistance)
+      this.camera.position.copy(this.camTarget).addScaledVector(this._vDir, this.camDistance)
       this.camera.lookAt(this.camTarget)
+
+      const tOcc0 = performance.now()
       this.hideOccluders()
-      this.world.setGuide(this.guide ? feet : null, this.guide ? this.guide.position : null, this.time)
+      const tOcc = performance.now() - tOcc0
+      this.telemetry.markTag('occlusion', tOcc)
+
+      this.world.setGuide(this.guide ? this._vFeet : null, this.guide ? this.guide.position : null, this.time)
     }
-    this.world.update(frameSeconds, this.time, p, this.inTemple ? this.active?.id ?? null : null, this.camera)
+    const tWorld0 = performance.now()
+    this.world.update(frameSeconds, this.time, this._vPos, this.inTemple ? this.active?.id ?? null : null, this.camera)
+    const tWorld = performance.now() - tWorld0
+
+    const tRend0 = performance.now()
     this.renderer.render(this.world.scene, this.camera)
+    const tRend = performance.now() - tRend0
+    this.telemetry.markTag('renderer', tRend)
+
+    const totalFrameMs = performance.now() - tFrameStart
+    if (totalFrameMs > 100) {
+      console.warn(`[PerfWarning] Long frame detected: ${totalFrameMs.toFixed(1)}ms (world: ${tWorld.toFixed(1)}ms, rend: ${tRend.toFixed(1)}ms)`)
+    }
+
+    this.telemetry.recordFrame(totalFrameMs)
   }
 
   /** Release this world's Rapier and GPU resources while leaving shared renderer, audio and stores alive. */

@@ -79,12 +79,60 @@ export class FrontCourtyard {
   private playerLanternGroup?: CourtyardSkyLanternGroup
   readonly sacredPlatformLights: THREE.PointLight[] = []
   readonly trailLanternLights: THREE.PointLight[] = []
-  private stage2Loaded = false
-  private stage3Loaded = false
+  private platGroup?: THREE.Group
+  private readonly progressiveTasks: (() => void)[] = [
+    () => this.addLotusPondStructure(),
+    () => this.addLotusPondFlora(),
+    () => this.addPlantingShrubs(),
+    () => this.addPlantingCourtyard(),
+    () => this.addSacredTrailEssential(),
+    () => this.addSacredTrailDecor(),
+    () => this.addSacredPlatformDecor(),
+    () => this.addSkyLanterns(),
+  ]
+  private progressiveTaskIndex = 0
 
   setSanctuaryLightsVisible(visible: boolean): void {
     for (const l of this.sacredPlatformLights) l.visible = visible
     for (const l of this.trailLanternLights) l.visible = visible
+  }
+
+  isProgressiveDone(): boolean {
+    return this.progressiveTaskIndex >= this.progressiveTasks.length
+  }
+
+  stepProgressive(budgetMs = 3.5): boolean {
+    const t0 = performance.now()
+    while (this.progressiveTaskIndex < this.progressiveTasks.length) {
+      const task = this.progressiveTasks[this.progressiveTaskIndex++]
+      task()
+      if (performance.now() - t0 >= budgetMs) {
+        break
+      }
+    }
+    return this.isProgressiveDone()
+  }
+
+  ensureSacredTrailEssential(): void {
+    while (this.progressiveTaskIndex <= 4 && this.progressiveTaskIndex < this.progressiveTasks.length) {
+      this.progressiveTasks[this.progressiveTaskIndex++]()
+    }
+  }
+
+  flushAll(): void {
+    while (this.progressiveTaskIndex < this.progressiveTasks.length) {
+      this.progressiveTasks[this.progressiveTaskIndex++]()
+    }
+  }
+
+  loadStage2(): void {
+    while (this.progressiveTaskIndex < 4 && this.progressiveTaskIndex < this.progressiveTasks.length) {
+      this.progressiveTasks[this.progressiveTaskIndex++]()
+    }
+  }
+
+  loadStage3(): void {
+    this.flushAll()
   }
 
   constructor(private readonly c: BuildContext, immediate = false) {
@@ -97,23 +145,8 @@ export class FrontCourtyard {
     this.addGoldFurnace()
 
     if (immediate) {
-      this.loadStage2()
-      this.loadStage3()
+      this.flushAll()
     }
-  }
-
-  loadStage2(): void {
-    if (this.stage2Loaded) return
-    this.stage2Loaded = true
-    this.addLotusPond()
-    this.addPlanting()
-  }
-
-  loadStage3(): void {
-    if (this.stage3Loaded) return
-    this.stage3Loaded = true
-    this.addSacredTrailAndPlatform()
-    this.addSkyLanterns()
   }
 
   private add(mesh: THREE.Object3D, shadow = false): THREE.Object3D {
@@ -1247,7 +1280,7 @@ export class FrontCourtyard {
    * 盛開著 28 朵千姿百態的仙蓮（粉紅盛開荷花、聖潔出水白蓮、胭脂艷紅蓮、亭亭玉立荷苞與如意蓮蓬）。
    * 池畔點綴天然太湖石假山與水榭石燈籠，夜幕降臨散發水面溫潤微光。
    */
-  private addLotusPond(): void {
+  private addLotusPondStructure(): void {
     const { x, z } = LOTUS_POND
     const rx = 5.2
     const rz = 3.7
@@ -1413,16 +1446,13 @@ export class FrontCourtyard {
     water.position.set(x, 0.28, z)
     this.c.scene.add(water)
 
-    // 5. Abundant Lotus Flora (繁茂蓮葉群與千姿仙蓮)
-    this.addGrandLotusFlora(x, z, rx - 0.55, rz - 0.5)
-
-    // 6. Physics Collision Barrier (防止玩家墜入深池)
+    // 5. Physics Collision Barrier (防止玩家墜入深池)
     this.c.physics.addStaticBox(
       new THREE.Vector3(x, 0.45, z),
       new THREE.Vector3((rx + 0.15) * 2, 0.95, (rz + 0.15) * 2)
     )
 
-    // 7. Center Sacred Lotus Pedestal & Treasure Bowl (池心聚寶金蓮台)
+    // 6. Center Sacred Lotus Pedestal & Treasure Bowl (池心聚寶金蓮台)
     const centerPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.65, 0.38, 16), this.c.mat('#8f8670', 0.8))
     centerPedestal.position.set(x, 0.15, z)
     this.c.scene.add(centerPedestal)
@@ -1431,6 +1461,18 @@ export class FrontCourtyard {
     this.c.scene.add(centerBowl)
     // Sacred golden lotus flower blooming in the center
     this.c.scene.add(this.lotusFlower(x, 0.42, z, 0.34, '#ffdf78'))
+  }
+
+  private addLotusPondFlora(): void {
+    const { x, z } = LOTUS_POND
+    const rx = 5.2
+    const rz = 3.7
+    this.addGrandLotusFlora(x, z, rx - 0.55, rz - 0.5)
+  }
+
+  private addLotusPond(): void {
+    this.addLotusPondStructure()
+    this.addLotusPondFlora()
   }
 
   /**
@@ -1724,7 +1766,7 @@ export class FrontCourtyard {
     this.c.physics.addStaticCylinder(new THREE.Vector3(x, 1.5, z), 1.8, 3.0)
   }
 
-  private addPlanting(): void {
+  private addPlantingShrubs(): void {
     // 1. 原神風格景觀步道植栽與雕花石燈台（沿主要參道兩側對稱排列）- 靈栽幾何全面合批 (Batched)
     const potGeoms: THREE.BufferGeometry[] = []
     const goldRimGeoms: THREE.BufferGeometry[] = []
@@ -1790,7 +1832,9 @@ export class FrontCourtyard {
     const shrubGroup = new THREE.Group()
     shrubGroup.add(mPot, mRim, mSoil, mTrunk, mPuff1, mPuff2, mPuffTop, mFlower)
     this.add(shrubGroup, false)
+  }
 
+  private addPlantingCourtyard(): void {
     // 前庭與外圍景觀神木群（全面升級為原神動漫仙境風格）
     let treeSeed = 10
     for (const [x, z] of [
@@ -1804,6 +1848,11 @@ export class FrontCourtyard {
     }
 
     for (const [x, z, a] of [[-6.4, 18, 0], [6.4, 18, 0], [-19, 36, Math.PI / 2], [19, 30, Math.PI / 2]] as const) this.bench(x, z, a)
+  }
+
+  private addPlanting(): void {
+    this.addPlantingShrubs()
+    this.addPlantingCourtyard()
   }
 
   /**
@@ -2043,23 +2092,18 @@ export class FrontCourtyard {
    * 3. 小徑兩側雙排鬱鬱青松（10 株茂密松柏樹）與古樸石燈籠（夜間柔和暖光）
    * 4. 昇龍觀音漢白玉八角大平台（半徑 14m，雙層須彌台基、漢白玉雕花欄杆、蓮花望柱、四方天燈塔、御路丹陛石踏步）
    */
-  private addSacredTrailAndPlatform(): void {
+  private addSacredTrailEssential(): void {
     const gateX = -(SITE.halfX - 0.4) // -29.6
     const gateZ = 31.0
     const gold = this.c.mat(PAL.gold, 0.45, 0.28)
     const vermilion = this.c.mat(PAL.red, 0.76)
     const marble = this.c.mat('#dfd8cc', 0.9)
     const paving = this.c.mat(PAL.paving, 0.94)
-    const stone = this.c.mat('#8e8474', 0.92)
 
-    // -------------------------------------------------------------
-    // 1. 西側牌坊拱門（【 昇 龍 聖 境 】 月亮門牌坊）
-    // -------------------------------------------------------------
-    // 左右兩大朱紅金柱（帶碰撞）
+    // 1. 西側月亮門牌坊本體結構與立柱碰撞
     for (const dz of [-2.2, 2.2]) {
       const pz = gateZ + dz
       this.pillar(gateX, pz, 4.8, 0.32, true)
-      // 柱腳抱鼓石
       const drumBase = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.4, 0.8), this.c.mat('#9c9180', 0.95))
       drumBase.position.set(gateX, 0.2, pz)
       const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 16), this.c.mat('#aba08f', 0.9))
@@ -2068,16 +2112,56 @@ export class FrontCourtyard {
       this.add(drumBase)
       this.add(drum)
     }
-    // 牌坊橫楣額樑
     this.box(0.7, 0.55, 4.8, vermilion, gateX, 4.3, gateZ)
     this.box(0.85, 0.2, 4.95, gold, gateX, 4.0, gateZ)
-
-    // 歇山式琉璃飛簷頂
     const archRoof = this.c.roof(2.4, 5.5, 4.55, 5.65)
     archRoof.position.set(gateX, 0, gateZ)
     this.add(archRoof, true)
 
-    // 牌匾：朝向前庭面（東面）題刻【昇龍聖境】，朝向小徑面（西面）題刻【紫氣東來】
+    // 2. 朝聖石板小徑實體地面物理碰撞（厚度 0.8m，頂面 y = -0.02）
+    const trailStartX = gateX // -29.6
+    const trailEndX = -54.0
+    const trailLen = trailStartX - trailEndX // 24.4
+    const trailMidX = (trailStartX + trailEndX) / 2 // -41.8
+    const trailW = 4.2
+    this.box(trailLen, 0.8, trailW, paving, trailMidX, -0.42, gateZ, true)
+
+    // 3. 昇龍觀音漢白玉八角大平台主體實體物理碰撞與階梯碰撞
+    const platX = -68.0
+    const platZ = 31.0
+    const platR = 14.0
+    const platTop = 0.545
+    const floorH = 1.0
+    const floorCenterY = platTop - floorH / 2
+    this.c.physics.addStaticCylinder(new THREE.Vector3(platX, floorCenterY, platZ), platR, floorH)
+    this.c.physics.addStaticBox(new THREE.Vector3(-53.7, 0.18 - floorH / 2, platZ), new THREE.Vector3(1.6, floorH, 4.8))
+    this.c.physics.addStaticBox(new THREE.Vector3(-54.7, 0.36 - floorH / 2, platZ), new THREE.Vector3(1.4, floorH, 4.8))
+
+    // 平台主體基座
+    this.platGroup = new THREE.Group()
+    this.platGroup.position.set(platX, 0, platZ)
+
+    const baseTier1 = new THREE.Mesh(new THREE.CylinderGeometry(platR, platR + 0.4, 0.35, 32), marble)
+    baseTier1.position.y = 0.175
+    baseTier1.castShadow = true
+    baseTier1.receiveShadow = true
+    this.platGroup.add(baseTier1)
+
+    const baseTier2 = new THREE.Mesh(new THREE.CylinderGeometry(platR - 0.4, platR - 0.2, 0.25, 32), this.c.mat('#eee8dc', 0.94))
+    baseTier2.position.y = 0.42
+    baseTier2.castShadow = true
+    baseTier2.receiveShadow = true
+    this.platGroup.add(baseTier2)
+
+    this.add(this.platGroup)
+  }
+
+  private addSacredTrailDecor(): void {
+    const gateX = -(SITE.halfX - 0.4) // -29.6
+    const gateZ = 31.0
+    const stone = this.c.mat('#8e8474', 0.92)
+
+    // 牌匾與宮燈
     const plaqueEast = new THREE.Mesh(
       new THREE.PlaneGeometry(2.8, 0.65),
       this.c.text('昇 龍 聖 境', '#f4d588', '#2e1910')
@@ -2094,30 +2178,21 @@ export class FrontCourtyard {
     plaqueWest.position.set(gateX - 0.38, 4.3, gateZ)
     this.c.scene.add(plaqueWest)
 
-    // 牌坊下懸掛一對迎賓吉祥宮燈
     for (const dz of [-1.5, 1.5]) {
       this.lantern(gateX, 3.85, gateZ + dz, 0.32)
     }
 
-    // -------------------------------------------------------------
-    // 2. 朝聖石板小徑（從 x = -29.6 延伸至 x = -54.0，長度 24.4m，約走 5 秒）
-    // -------------------------------------------------------------
-    const trailStartX = gateX // -29.6
+    // 小徑路面與花崗岩路緣石
+    const trailStartX = gateX
     const trailEndX = -54.0
-    const trailLen = trailStartX - trailEndX // 24.4
-    const trailMidX = (trailStartX + trailEndX) / 2 // -41.8
-    const trailW = 4.2
+    const trailLen = trailStartX - trailEndX
+    const trailMidX = (trailStartX + trailEndX) / 2
 
-    // 小徑實體地面物理碰撞（厚度 0.8m，頂面 y = -0.02，確保玩家行走 100% 踏實不穿透）
-    this.box(trailLen, 0.8, trailW, paving, trailMidX, -0.42, gateZ, true)
-
-    // 小徑中央鋪設青石古道面磚
     const roadSurface = new THREE.Mesh(new THREE.BoxGeometry(trailLen, 0.04, 3.2), this.c.mat(PAL.road, 0.92))
     roadSurface.position.set(trailMidX, 0.02, gateZ)
     roadSurface.receiveShadow = true
     this.c.scene.add(roadSurface)
 
-    // 小徑南北兩側花崗岩路緣石
     for (const side of [-1, 1]) {
       const curbZ = gateZ + side * 1.85
       const curb = new THREE.Mesh(new THREE.BoxGeometry(trailLen, 0.1, 0.26), stone)
@@ -2126,7 +2201,6 @@ export class FrontCourtyard {
       this.c.scene.add(curb)
     }
 
-    // 小徑石條節奏紋理
     const lineMat = this.c.mat(PAL.roadLine, 0.88)
     const stripBox = new THREE.BoxGeometry(0.18, 0.025, 3.1)
     const stripGeoms: THREE.BufferGeometry[] = []
@@ -2143,73 +2217,41 @@ export class FrontCourtyard {
       this.c.scene.add(stripMesh)
     }
 
-    // -------------------------------------------------------------
-    // 3. 小徑兩側 2 排原神風格唯美仙境神木與古樸石燈籠
-    // -------------------------------------------------------------
-    // 北排樹列 (z = 34.6) 與 南排樹列 (z = 27.4)
+    // 小徑兩側神木與石燈籠
     let treeSeed = 1
     for (const x of [-33.5, -38.5, -43.5, -48.5, -53.0]) {
-      this.genshinTree(x, gateZ + 3.6, treeSeed++) // 北側原神神木
-      this.genshinTree(x, gateZ - 3.6, treeSeed++) // 南側原神神木
+      this.genshinTree(x, gateZ + 3.6, treeSeed++)
+      this.genshinTree(x, gateZ - 3.6, treeSeed++)
     }
-    // 夾道古樸石燈籠（柔和微光）
     for (const x of [-36.0, -46.0]) {
       this.stoneLantern(x, gateZ + 2.5)
       this.stoneLantern(x, gateZ - 2.5)
     }
+  }
 
-    // -------------------------------------------------------------
-    // 4. 昇龍觀音漢白玉八角大平台（中心 x = -68.0, z = 31.0，半徑 14m）
-    // -------------------------------------------------------------
+  private addSacredPlatformDecor(): void {
+    if (!this.platGroup) return
     const platX = -68.0
     const platZ = 31.0
     const platR = 14.0
-    const platTop = 0.545 // 頂層八角廣場地坪頂面高程 (y = 0.42 + 0.25 / 2 = 0.545)
-    const floorH = 1.0
-    const floorCenterY = platTop - floorH / 2 // 0.045
+    const gold = this.c.mat(PAL.gold, 0.45, 0.28)
+    const marble = this.c.mat('#dfd8cc', 0.9)
+    const stone = this.c.mat('#8e8474', 0.92)
 
-    // (1) 漢白玉八角大平台主體實體物理碰撞（覆蓋直徑 28m 大圓台地面，頂面精確對齊 y = 0.545，人物行走踏實不陷地）
-    this.c.physics.addStaticCylinder(new THREE.Vector3(platX, floorCenterY, platZ), platR, floorH)
-
-    // (2) 東側朝聖階梯物理碰撞（自小徑 y = 0.02 逐級平穩登台，每階落差僅 ~0.18m，完美契合角色控制器自動攀爬）
-    // 第一階：踏面高程 y = 0.18 (x = -53.7, 寬 1.6m, 深 4.8m)
-    this.c.physics.addStaticBox(new THREE.Vector3(-53.7, 0.18 - floorH / 2, platZ), new THREE.Vector3(1.6, floorH, 4.8))
-    // 第二階：踏面高程 y = 0.36 (x = -54.7, 寬 1.4m, 深 4.8m)
-    this.c.physics.addStaticBox(new THREE.Vector3(-54.7, 0.36 - floorH / 2, platZ), new THREE.Vector3(1.4, floorH, 4.8))
-
-    // 平台群組
-    const platGroup = new THREE.Group()
-    platGroup.position.set(platX, 0, platZ)
-
-    // (A) 底層漢白玉大圓台基座 (Tier 1)
-    const baseTier1 = new THREE.Mesh(new THREE.CylinderGeometry(platR, platR + 0.4, 0.35, 32), marble)
-    baseTier1.position.y = 0.175
-    baseTier1.castShadow = true
-    baseTier1.receiveShadow = true
-    platGroup.add(baseTier1)
-
-    // (B) 頂層平整八角廣場地坪 (Tier 2)
-    const baseTier2 = new THREE.Mesh(new THREE.CylinderGeometry(platR - 0.4, platR - 0.2, 0.25, 32), this.c.mat('#eee8dc', 0.94))
-    baseTier2.position.y = 0.42
-    baseTier2.castShadow = true
-    baseTier2.receiveShadow = true
-    platGroup.add(baseTier2)
-
-    // (C) 東側朝聖階梯與九龍御路丹陛石（連接小徑與大平台）
+    // 朝聖階梯與丹陛雕石
     const stepsGroup = new THREE.Group()
     stepsGroup.position.set(platR - 0.3, 0, 0)
     const step1 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.18, 4.6), stone)
     step1.position.set(0.6, 0.09, 0)
     const step2 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.18, 4.6), marble)
     step2.position.set(-0.2, 0.27, 0)
-    // 中央金色祥雲丹陛雕石
     const danbi = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.04, 1.8), gold)
     danbi.position.set(0.2, 0.28, 0)
     danbi.rotation.z = -0.1
     stepsGroup.add(step1, step2, danbi)
-    platGroup.add(stepsGroup)
+    this.platGroup.add(stepsGroup)
 
-    // (D) 外環漢白玉雕花欄杆與蓮花望柱（圍繞半徑 13.5m，東向留出 4.6m 寬敞迎賓階梯） - Batched with mergeGeometries
+    // 外環漢白玉雕花欄杆與蓮花望柱
     const postCount = 28
     const marbleRailGeoms: THREE.BufferGeometry[] = []
     const budGeoms: THREE.BufferGeometry[] = []
@@ -2220,28 +2262,23 @@ export class FrontCourtyard {
 
     for (let i = 0; i < postCount; i++) {
       const a = (i / postCount) * Math.PI * 2
-      // 東側 (a ≈ 0) 留出小徑進場大缺口
       if (Math.abs(a) < 0.28 || Math.abs(a - Math.PI * 2) < 0.28) continue
       const px = Math.cos(a) * (platR - 0.6)
       const pz = Math.sin(a) * (platR - 0.6)
 
-      // 漢白玉方柱
       const pG = boxPostGeo.clone()
       pG.translate(px, 0.85, pz)
       marbleRailGeoms.push(pG)
 
-      // 蓮花柱頭
       const bG = sphereBudGeo.clone()
       bG.translate(px, 1.28, pz)
       budGeoms.push(bG)
 
-      // 雕花尋杖欄板
       const panG = boxPanelGeo.clone()
       panG.rotateY(a + Math.PI / 2)
       panG.translate(px, 0.75, pz)
       marbleRailGeoms.push(panG)
 
-      // 漢白玉圍欄實體物理防跌落碰撞
       this.c.physics.addStaticBox(new THREE.Vector3(platX + px, 0.545 + 0.45, platZ + pz), new THREE.Vector3(0.24, 0.9, 2.7), rotY(a + Math.PI / 2))
     }
     boxPostGeo.dispose()
@@ -2251,15 +2288,15 @@ export class FrontCourtyard {
     if (marbleRailGeoms.length > 0) {
       const mergedMarble = BufferGeometryUtils.mergeGeometries(marbleRailGeoms, false)
       for (const mg of marbleRailGeoms) mg.dispose()
-      platGroup.add(new THREE.Mesh(mergedMarble, marble))
+      this.platGroup.add(new THREE.Mesh(mergedMarble, marble))
     }
     if (budGeoms.length > 0) {
       const mergedBud = BufferGeometryUtils.mergeGeometries(budGeoms, false)
       for (const bg of budGeoms) bg.dispose()
-      platGroup.add(new THREE.Mesh(mergedBud, this.c.mat('#faf6ee', 0.8)))
+      this.platGroup.add(new THREE.Mesh(mergedBud, this.c.mat('#faf6ee', 0.8)))
     }
 
-    // (E) 原神璃月四方通天金頂石燈樓（分佈於昇龍觀音大平台四隅，晝夜長明神光）
+    // 四方通天金頂石燈樓
     for (const [dx, dz] of [[-8.8, -8.8], [-8.8, 8.8], [7.5, -8.8], [7.5, 8.8]]) {
       const lampTower = new THREE.Group()
       lampTower.position.set(dx, 0.54, dz)
@@ -2300,12 +2337,16 @@ export class FrontCourtyard {
       lampLight.visible = false
 
       lampTower.add(lampBase1, lampBase2, lampPillar, lampTray, lampCore, lampRoof, lampGourd, lampSpire, lampLight)
-      platGroup.add(lampTower)
+      this.platGroup.add(lampTower)
 
       this.c.physics.addStaticCylinder(new THREE.Vector3(platX + dx, 1.5, platZ + dz), 0.7, 3.2)
     }
+  }
 
-    this.add(platGroup)
+  private addSacredTrailAndPlatform(): void {
+    this.addSacredTrailEssential()
+    this.addSacredTrailDecor()
+    this.addSacredPlatformDecor()
   }
 
   private skyLanternTexture(frontText: string, backText: string): THREE.CanvasTexture {
