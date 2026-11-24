@@ -403,10 +403,60 @@ export class TempleRoof3D {
   }
 
   /**
-   * 5. 四方斜垂脊（Hip Ridges）與飛簷牌頭：依指令移除向左上與右上斜伸之金色長圓柱與端點收口金球
+   * 5. 四方斜垂脊（Hip Ridges）與整體連貫一體的飛簷牌頭（仙人走獸立體雕飾與簷角印斗完整保留）
    */
-  private buildHipRidgesAndCornerBeasts(_width: number, _depth: number, _eaveY: number, _peakY: number): void {
-    // Left and right corner hip ridge golden tubes and finials removed per architectural simplification instruction
+  private buildHipRidgesAndCornerBeasts(width: number, depth: number, eaveY: number, peakY: number): void {
+    const halfW = width / 2
+    const halfD = depth / 2
+
+    // 歇山頂四角斜垂脊
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const hipGroup = new THREE.Group()
+
+        const startPt = new THREE.Vector3(sx * (halfW * 0.72), peakY + 0.35, 0)
+        // 簷口四角向外向上起翹
+        const endPt = new THREE.Vector3(sx * (halfW + 0.35), eaveY + 0.82, sz * (halfD + 0.35))
+        const midPt = new THREE.Vector3(
+          (startPt.x + endPt.x) / 2,
+          (startPt.y + endPt.y) / 2 - 0.22,
+          (startPt.z + endPt.z) / 2
+        )
+
+        const curve = new THREE.QuadraticBezierCurve3(startPt, midPt, endPt)
+        // 垂脊加粗至半徑 0.18m
+        const ridgeGeom = new THREE.TubeGeometry(curve, 16, 0.18, 8, false)
+        this.allocatedGeometries.push(ridgeGeom)
+        const ridgeMesh = new THREE.Mesh(ridgeGeom, this.ridgeGoldPbrMat)
+        ridgeMesh.castShadow = true
+        hipGroup.add(ridgeMesh)
+
+        // 垂脊上的仙人走獸立體雕飾（放大至 0.42m，清晰可見）
+        for (let b = 1; b <= 4; b++) {
+          const t = 0.32 + b * 0.13
+          const pt = curve.getPoint(t)
+
+          const beastGeom = new THREE.ConeGeometry(0.14, 0.42, 6)
+          this.allocatedGeometries.push(beastGeom)
+          const beast = new THREE.Mesh(beastGeom, this.goldPbrMat)
+          beast.position.copy(pt)
+          beast.position.y += 0.22
+          beast.castShadow = true
+          hipGroup.add(beast)
+        }
+
+        // 簷角牌頭祥雲印斗（穩實座落於簷角屋面，渾然一體，絕無任何向外懸空的異物尖刺）
+        const finialGeom = new THREE.SphereGeometry(0.28, 12, 10)
+        this.allocatedGeometries.push(finialGeom)
+        const finial = new THREE.Mesh(finialGeom, this.ridgeGoldPbrMat)
+        finial.position.copy(endPt)
+        finial.scale.set(1.2, 0.85, 1.2)
+        finial.castShadow = true
+        hipGroup.add(finial)
+
+        this.root.add(hipGroup)
+      }
+    }
   }
 
   /**
