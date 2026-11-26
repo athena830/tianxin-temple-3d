@@ -144,7 +144,8 @@ export class TempleUi {
       <section class="screen hud" data-screen="hud">
         <header class="hud-top">
           <button type="button" class="badge badge-btn" data-act="go-home" title="返回首頁" aria-label="返回玉皇宮首頁"><span class="seal small">玉</span><div><b>玉皇宮</b><small data-who></small></div></button>
-          <div class="hud-buttons">
+          <button type="button" class="hud-menu-toggle" aria-expanded="true" aria-controls="temple-hud-buttons">收合功能 ▲</button>
+          <div class="hud-buttons" id="temple-hud-buttons">
             <button class="chip" data-act="time">${initialTimeLabel}</button>
             <button class="chip music-toggle-btn${isPlaying ? '' : ' is-muted'}" data-act="music" aria-label="切換背景音樂">${initialMusicLabel}</button>
             <button class="chip market-entry" data-act="market-enter" title="天心靈光市集（建構中）">進入市集（建構中）</button>
@@ -207,6 +208,14 @@ export class TempleUi {
       <div class="market-panel-wrap" hidden><section class="market-panel ro-dialog" role="dialog" aria-modal="true" aria-label="市集介紹"><header class="ro-dialog-bar"><span data-market-dialog-title>天心靈光市集・攤位資訊</span><button class="panel-x" data-act="market-panel-close" aria-label="關閉">×</button></header><div class="ro-dialog-body" data-market-panel-content></div></section></div>
       <div class="ziwei-panel-wrap" hidden><section class="ziwei-panel" role="dialog" aria-modal="true" aria-label="紫微斗數排盤"><button class="panel-x" data-act="ziwei-close" aria-label="關閉">×</button><div data-ziwei-panel-content></div></section></div>
       <div class="world-transition" hidden><div><i></i><b data-world-transition>穿越靈光之門⋯</b><small>正在切換獨立世界</small></div></div>`
+    const hudToggle = this.root.querySelector<HTMLButtonElement>('.hud-menu-toggle')
+    if (hudToggle) {
+      hudToggle.addEventListener('click', () => {
+        const expanded = hudToggle.getAttribute('aria-expanded') === 'true'
+        hudToggle.setAttribute('aria-expanded', String(!expanded))
+        hudToggle.textContent = expanded ? '展開功能 ▼' : '收合功能 ▲'
+      })
+    }
     this.root.addEventListener('click', e => this.onClick(e))
     window.setInterval(() => {
       if (this.currentTimeSetting === 'auto') {

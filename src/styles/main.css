@@ -306,6 +306,67 @@ h3 {
   box-shadow: 0 0 6px #4ade80;
 }
 
+.hud-menu-toggle { display: none; }
+
+/* Keep the temple view visible on phones while retaining every action. */
+@media (max-width: 640px) {
+  body:not([data-world="market"]) .hud-menu-toggle {
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-height: 40px;
+    padding: 0 12px;
+    color: #f7dc9d;
+    background: rgba(35, 22, 28, .9);
+    border: 1px solid #ac884e;
+    border-radius: 20px;
+    pointer-events: auto;
+    font-size: 12px;
+  }
+  body:not([data-world="market"]) .hud-menu-toggle[aria-expanded="false"] + .hud-buttons {
+    display: none;
+  }
+  body:not([data-world="market"]) .hud-top {
+    top: calc(31px + var(--safe-t, 0px));
+    left: 10px;
+    right: 10px;
+    gap: 5px;
+  }
+  body:not([data-world="market"]) .hud-top .badge-btn {
+    align-self: flex-start;
+    width: auto;
+    min-height: 36px;
+    padding: 3px 10px 3px 4px;
+    gap: 7px;
+  }
+  body:not([data-world="market"]) .hud-top .badge-btn .seal {
+    width: 29px;
+    height: 29px;
+    font-size: 16px;
+  }
+  body:not([data-world="market"]) .hud-top .badge-btn b { font-size: 13px; }
+  body:not([data-world="market"]) .hud-top .badge-btn small { font-size: 10px; }
+  body:not([data-world="market"]) .hud-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+  }
+  body:not([data-world="market"]) .hud-buttons .chip {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 40px;
+    padding: 3px 4px;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+    font-size: clamp(10px, 2.7vw, 12px);
+  }
+}
+
 .hud-top {
   position: absolute;
   top: calc(36px + var(--safe-t));
