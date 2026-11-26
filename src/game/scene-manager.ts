@@ -19,6 +19,7 @@ type SceneManagerOptions = {
   onTransition: (state: PortalTransitionState, message: string) => void
   onWorldChanged: (world: WorldId, game: ActiveGame) => void
   onError: (message: string) => void
+  canEnterMarket?: () => boolean
 }
 
 /** Owns which world is alive. It keeps renderer/input/audio shared, but never keeps two worlds loaded. */
@@ -48,6 +49,9 @@ export class SceneManager {
   async returnTemple(): Promise<void> { await this.switchTo('temple') }
 
   private async switchTo(target: WorldId): Promise<void> {
+    if (target === 'market' && this.options.canEnterMarket && !this.options.canEnterMarket()) {
+      return
+    }
     if (!canBeginPortalTransition(this.state) || this.world === target) return
     const previous = this.current
     this.state = 'entering-portal'

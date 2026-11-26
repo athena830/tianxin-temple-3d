@@ -46,6 +46,15 @@ async function boot(): Promise<void> {
 
   let interactBlockedUntil = 0
   const reopen = (id: ShrinePointId, msg: string) => ui.open(id, msg)
+  const tryEnterMarket = () => {
+    if (ui.isOwnerPreviewActive()) {
+      if (!sceneManager || sceneManager.world === 'market') return
+      audio.unlock()
+      void sceneManager.enterMarket()
+    } else {
+      ui.showUnderConstruction('天心靈光市集')
+    }
+  }
   const ui = new TempleUi(store, {
     begin: () => {
       audio.unlock()
@@ -93,11 +102,7 @@ async function boot(): Promise<void> {
       audio.play('ui')
       ui.toast('正在自動前往目的地（按方向鍵或點 × 可取消）')
     },
-    enterMarket: () => {
-      if (!sceneManager || sceneManager.world === 'market') return
-      audio.unlock()
-      void sceneManager.enterMarket()
-    },
+    enterMarket: tryEnterMarket,
     explore: startExplore,
     exitExplore,
     cancelGuide: () => game?.setGuide(null),
@@ -239,8 +244,13 @@ async function boot(): Promise<void> {
     if (!result) return
       if (Date.now() < interactBlockedUntil || temple.worshipping) return
       if (result.kind === 'open') {
-        if (result.id === 'market-portal') void sceneManager?.enterMarket()
-        else ui.open(result.id)
+        if (result.id === 'market-portal') {
+          tryEnterMarket()
+        } else if (result.id === 'unicorn-portal') {
+          ui.showUnderConstruction('月光森林・獨角獸心安宮')
+        } else {
+          ui.open(result.id)
+        }
       } else { ui.toast(`前往「${result.point.title}」...`); temple.setGuide(result.point.id) }
     }
   }
@@ -331,7 +341,11 @@ async function boot(): Promise<void> {
       return
     }
     if (id === 'market-portal') {
-      void sceneManager?.enterMarket()
+      tryEnterMarket()
+      return
+    }
+    if (id === 'unicorn-portal') {
+      ui.showUnderConstruction('月光森林・獨角獸心安宮')
       return
     }
     ui.open(id)
@@ -357,8 +371,15 @@ async function boot(): Promise<void> {
         triggerSkyLantern()
         return
       }
-      if (temple.active.id === 'market-portal') void sceneManager?.enterMarket()
-      else ui.open(temple.active.id)
+      if (temple.active.id === 'market-portal') {
+        tryEnterMarket()
+        return
+      }
+      if (temple.active.id === 'unicorn-portal') {
+        ui.showUnderConstruction('月光森林・獨角獸心安宮')
+        return
+      }
+      ui.open(temple.active.id)
     }
   })
   window.addEventListener('temple:toast', e => {
@@ -380,6 +401,7 @@ async function boot(): Promise<void> {
     renderer,
     input,
     audio,
+    canEnterMarket: () => ui.isOwnerPreviewActive(),
     createTemple: async () => {
       const next = new TempleGame(renderer, input, audio)
       configureTemple(next)

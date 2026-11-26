@@ -280,8 +280,8 @@ const pointSpecs: Omit<ShrinePoint, 'position'>[] = [
   { id: 'gold-furnace', title: '八角金亭', subtitle: '化金祈福，添香油聚善緣', radius: 3.0 },
   { id: 'guanyin-dragon', title: '參拜昇龍觀音', subtitle: '仰望五層樓高乘龍觀音金身', radius: 4.8 },
   { id: 'sky-lantern', title: '天燈祈福', subtitle: '於天心仙姑旁點燃祈福天燈', radius: 2.4 },
-  { id: 'market-portal', title: '踏入靈光時空門', subtitle: '前往天心靈光市集', radius: 2.8 },
-  { id: 'unicorn-portal', title: '踏入獨角獸時空門', subtitle: '前往月光森林・獨角獸心安宮', radius: 2.8 },
+  { id: 'market-portal', title: '踏入靈光時空門', subtitle: '前往天心靈光市集（建構中）', radius: 2.8 },
+  { id: 'unicorn-portal', title: '踏入獨角獸時空門', subtitle: '前往月光森林・獨角獸心安宮（建構中）', radius: 2.8 },
 ]
 const pointPositions: [number, number][] = [
   [0, 6.39], [COURTYARD_PRAYER_WALL_POS.x, COURTYARD_PRAYER_WALL_POS.z + 1.4], [-2.25, -2.2], [-9.2, 1.2], [PAVILION.x + 1.6, PAVILION.z],

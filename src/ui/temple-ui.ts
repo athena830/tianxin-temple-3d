@@ -147,8 +147,8 @@ export class TempleUi {
           <div class="hud-buttons">
             <button class="chip" data-act="time">${initialTimeLabel}</button>
             <button class="chip music-toggle-btn${isPlaying ? '' : ' is-muted'}" data-act="music" aria-label="切換背景音樂">${initialMusicLabel}</button>
-            <button class="chip market-entry" data-act="market-enter">進入市集</button>
-            <button class="chip unicorn-entry" data-act="unicorn-enter" title="前往月光森林・獨角獸心安宮聖域">🦄 獨角獸聖域</button>
+            <button class="chip market-entry" data-act="market-enter" title="天心靈光市集（建構中）">進入市集（建構中）</button>
+            <button class="chip unicorn-entry" data-act="unicorn-enter" title="前往月光森林・獨角獸心安宮聖域（建構中）">🦄 獨角獸聖域（建構中）</button>
             <button class="chip" data-act="map">參拜指引</button>
             <button class="chip" data-open="records">祈福紀錄</button>
             <button class="chip" data-open="prayer-wall">祈願牆</button>
@@ -161,8 +161,8 @@ export class TempleUi {
           <button data-go="offerings">虛擬供奉</button><button data-go="lamps">祈福燈區</button><button data-go="daily-lot">每日抽籤</button>
           <button data-go="woodfish">敲木魚</button><button data-go="bell">鳴鐘</button><button data-go="drum">鼓樓擊鼓</button>
           <button data-go="wishing-pool">蓮花許願池</button><button data-go="prayer-wall">大殿外廣場・祈願牆</button><button data-go="records">祈福紀錄</button>
-          <button data-go="market-portal">天心靈光市集</button>
-          <button data-go="unicorn-portal">🦄 獨角獸聖域</button>
+          <button data-go="market-portal">天心靈光市集（建構中）</button>
+          <button data-go="unicorn-portal">🦄 獨角獸聖域（建構中）</button>
         </nav>
         <div class="prompt" hidden><b data-prompt-title></b><span data-prompt-sub></span><kbd class="key">E</kbd><button class="btn small primary touch-only" data-act="interact" data-prompt-action>互動</button></div>
         <div class="guide" hidden><span>前往</span><b data-guide-name></b><small data-guide-dist></small><button class="guide-x" data-act="guide-cancel" aria-label="取消指引">×</button></div>
@@ -352,7 +352,7 @@ export class TempleUi {
     const isPortal = id === 'market-portal' || id === 'unicorn-portal' || id === 'return-temple'
     const isMarketVenue = ['birth-chart-hall', 'card-house', 'moon-meditation', 'chess-guide', 'service-desk', 'life-numerology'].includes(id)
     action.classList.toggle('portal-entry', isPortal || isMarketVenue)
-    action.textContent = id === 'market-portal' ? '進入市集' : id === 'unicorn-portal' ? '踏入聖域' : id === 'return-temple' ? '返回天心宮' : isMarketVenue ? '進入攤位' : '互動'
+    action.textContent = id === 'market-portal' ? '進入市集（建構中）' : id === 'unicorn-portal' ? '踏入聖域（建構中）' : id === 'return-temple' ? '返回天心宮' : isMarketVenue ? '進入攤位' : '互動'
   }
 
   openMarketPanel(id: MarketVenueId): void {
@@ -1245,6 +1245,64 @@ export class TempleUi {
     body.querySelector<HTMLElement>('textarea, button.primary')?.focus()
   }
 
+  /** 顯示符合玉皇宮視覺風格的「建構中」提示視窗 */
+  showUnderConstruction(areaName = '這個區域'): void {
+    this.hideWishBanner()
+    const wrap = this.root.querySelector<HTMLElement>('.panel-wrap')!
+    const body = wrap.querySelector<HTMLElement>('.panel-body')!
+    body.innerHTML = `
+      <p class="eyebrow">${esc(areaName)}</p>
+      <h2>建構中</h2>
+      <p class="lead" style="margin:14px 0 16px; font-size:15px; line-height:1.7; color:#503e30;">
+        這個區域正在用心整理，暫時不開放參觀。<br>
+        歡迎先在玉皇宮走走，敬請期待。
+      </p>
+      <div class="row" style="margin-top:20px; justify-content:center;">
+        <button class="btn primary" data-act="close" style="min-width:120px;">關閉</button>
+      </div>
+    `
+    wrap.hidden = false
+    this.actions.openPanel()
+    body.querySelector<HTMLElement>('button[data-act="close"]')?.focus()
+  }
+
+  /**
+   * 檢查是否為網站擁有者於本機環境測試預覽。
+   * 僅限於本機 loopback 主機 (localhost, 127.0.0.1, [::1], ::1) 生效。
+   * 注意：此機制純為本機開發便利性開關，非伺服器端登入或安全存取控制。
+   */
+  isOwnerPreviewActive(hostnameOverride?: string): boolean {
+    if (typeof window === 'undefined' || !window.location) return false
+    const hostname = hostnameOverride ?? window.location.hostname
+    const isLocalhost = hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '[::1]'
+
+    // 非本機網址一律不允許啟用預覽
+    if (!isLocalhost) return false
+
+    let ownerStorage = false
+    try {
+      ownerStorage = localStorage.getItem('tianxin_owner_preview') === 'true'
+    } catch {
+      // 瀏覽器禁用 Storage 或無痕模式拋錯時安全容錯，不阻斷應用程式運作
+      ownerStorage = false
+    }
+
+    let ownerQuery = false
+    try {
+      ownerQuery = new URLSearchParams(window.location.search).get('owner') === '1'
+    } catch {
+      ownerQuery = false
+    }
+
+    // 本機全域除錯旗標（同樣嚴格受限於 isLocalhost，用途為本機自動化腳本及開發者除錯）
+    const devFlag = (window as unknown as { __OWNER_PREVIEW__?: boolean }).__OWNER_PREVIEW__ === true
+
+    return isLocalhost && (ownerStorage || ownerQuery || devFlag)
+  }
+
   private render(id: PanelId, message: string): string {
     const d = this.store.data
     const note = message ? `<p class="result">${esc(message)}</p>` : ''
@@ -1256,17 +1314,24 @@ export class TempleUi {
         return `<p class="eyebrow">大殿外前庭廣場・祈願牆</p><h2>寫下心願</h2><p>心願將懸掛於大殿外前庭廣場祈願牆，也會記入你的祈福紀錄。</p>${note}
           <form class="wish-form"><textarea name="wish" maxlength="120" rows="4" placeholder="例如：願家人平安健康，萬事順心。"></textarea><button class="btn primary" type="submit">送出祈願</button></form>`
       case 'market-portal':
-        return `<p class="eyebrow">天心靈光市集</p><h2>靈光時空門</h2><p>正在準備進入市集入口廣場。</p>${note}`
+        return `<p class="eyebrow">天心靈光市集</p>
+          <h2>建構中</h2>
+          <p class="lead" style="margin:14px 0 16px; font-size:15px; line-height:1.7; color:#503e30;">
+            這個區域正在用心整理，暫時不開放參觀。<br>
+            歡迎先在玉皇宮走走，敬請期待。
+          </p>
+          <div class="row" style="margin-top:20px; justify-content:center;">
+            <button class="btn primary" data-act="close" style="min-width:120px;">關閉</button>
+          </div>`
       case 'unicorn-portal':
         return `<p class="eyebrow">月光森林・獨角獸心安宮</p>
-          <h2>🦄 獨角獸聖域時空門</h2>
-          <p class="venue-intro">穿越東方靈光星河，前往守護獨角獸心安宮聖域。漫步月光森林、向許願星泉傾訴心事、感受聖壇共鳴，並探索火、水、風三大自然元素領域。</p>
-          ${note}
-          <div class="row" style="margin-top:18px; gap:12px; flex-wrap:wrap;">
-            <a href="https://luvia0902.github.io/unicorn-sanctuary/" target="_blank" rel="noopener noreferrer" class="btn primary" style="background:linear-gradient(135deg,#8e44ad,#2980b9); border-color:#c39bd3; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
-              <span>✨ 踏入傳送門（前往獨角獸聖域）</span>
-            </a>
-            <button class="btn" data-act="close">留在天心宮</button>
+          <h2>建構中</h2>
+          <p class="lead" style="margin:14px 0 16px; font-size:15px; line-height:1.7; color:#503e30;">
+            這個區域正在用心整理，暫時不開放參觀。<br>
+            歡迎先在玉皇宮走走，敬請期待。
+          </p>
+          <div class="row" style="margin-top:20px; justify-content:center;">
+            <button class="btn primary" data-act="close" style="min-width:120px;">關閉</button>
           </div>`
       case 'offerings':
         return `<p class="eyebrow">虛擬供奉</p><h2>供花・供果・供茶</h2><p>選擇一份心意，供品會出現在主殿供桌上。</p>${note}
@@ -1654,8 +1719,13 @@ export class TempleUi {
     else if (act === 'wish-again') { e.preventDefault(); this.hideWishBanner(); this.actions.ritual('coin') }
     else if (act === 'wish-close') { e.preventDefault(); this.hideWishBanner() }
     else if (act === 'interact') window.dispatchEvent(new CustomEvent('temple:interact-touch'))
-    else if (act === 'market-enter') this.actions.enterMarket()
-    else if (act === 'unicorn-enter') this.open('unicorn-portal')
+    else if (act === 'market-enter') {
+      if (this.isOwnerPreviewActive()) this.actions.enterMarket()
+      else this.showUnderConstruction('天心靈光市集')
+    }
+    else if (act === 'unicorn-enter') {
+      this.showUnderConstruction('月光森林・獨角獸心安宮')
+    }
     else if (act === 'market-walk') {
       const targetId = t.dataset.marketTarget
       if (targetId) window.dispatchEvent(new CustomEvent('market:walk-to', { detail: targetId }))
